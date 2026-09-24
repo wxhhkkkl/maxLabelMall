@@ -2,3 +2,14 @@
 .idea/
 *.iml
 .vscode/
+
+# 敏感信息（服务器地址、密码等），禁止提交
+.env
+.env.local
+*.env
+
+# 模块建表 SQL：除仓库自带的两个外，其余是按模块从芋道知识星球下载的授权材料，不入库
+# （这两个是 yudao 仓库自带的，保持跟踪）
+yudao-cloud/sql/mysql/*.sql
+!yudao-cloud/sql/mysql/ruoyi-vue-pro.sql
+!yudao-cloud/sql/mysql/quartz.sql

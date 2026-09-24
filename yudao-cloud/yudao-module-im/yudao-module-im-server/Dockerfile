@@ -6,7 +6,7 @@ FROM eclipse-temurin:21-jre
 RUN mkdir -p /yudao-module-im-server
 WORKDIR /yudao-module-im-server
 ## 将后端项目的 Jar 文件，复制到镜像中
-COPY ./target/yudao-module-im-server.jar app.jar
+COPY ./target/yudao-module-im-server-boot.jar app.jar
 
 ## 设置 TZ 时区
 ## 设置 JAVA_OPTS 环境变量，可通过 docker run -e "JAVA_OPTS=" 进行覆盖

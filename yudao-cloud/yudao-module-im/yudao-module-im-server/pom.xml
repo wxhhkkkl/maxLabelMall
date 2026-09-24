@@ -143,6 +143,10 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <configuration>
+                    <!-- 主产物保留普通 jar，供 yudao-server 单体模式依赖；可执行 fat jar 带 boot 后缀 -->
+                    <classifier>boot</classifier>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

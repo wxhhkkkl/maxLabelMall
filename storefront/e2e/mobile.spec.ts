@@ -115,6 +115,16 @@ test.describe('移动端 375px —— 无横向滚动（SC-008）', () => {
     }
   })
 
+  test('**能从汉堡菜单打开登录弹层** —— `.login` 在 ≤768px 是隐藏的', async ({ page }) => {
+    // 设计稿有 `@media (max-width:768px) { .login { display:none } }`，而 `.login`
+    // 是登录入口与个人中心入口的**同一个元素** → 手机上本来既登录不了、也进不去
+    // 个人中心。汉堡菜单里的 `.m-login` 是兜底，这里走一遍真实链路。
+    await page.goto('/')
+    await page.locator('.nav-toggle').click()
+    await page.locator('.mobile-nav .m-login').click()
+    await expect(page.locator('.ml-modal')).toBeVisible()
+  })
+
   test('协议页', async ({ page }) => {
     await page.goto('/agreement/user')
     await expectNoHScroll(page, '用户协议')

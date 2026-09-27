@@ -78,6 +78,12 @@ function closeLogin(): void {
   }
 }
 
+/** 从汉堡菜单打开登录弹层：先把菜单收起来，免得它挡在弹层后面 */
+function openLoginFromMobile(): void {
+  document.body.classList.remove('nav-open')
+  openLogin()
+}
+
 function onLoginSuccess(): void {
   closeLogin()
 }
@@ -131,6 +137,16 @@ function isActive(name: string): boolean {
     </div>
 
     <div class="mobile-nav">
+      <!-- ⚠️ 汉堡菜单里的**登录 / 个人中心入口不能省**：
+           设计稿有一条 `@media (max-width:768px) { .login { display:none } }`，
+           而 `.login` 正是「登录入口」与「个人中心入口」的**同一个元素** ——
+           少了它，手机上既登录不了、登录后也进不去个人中心（FR-016 在手机上失效）。 -->
+      <RouterLink v-if="userStore.isLogin" class="m-login" to="/account">
+        {{ userStore.displayName || '个人中心' }}
+      </RouterLink>
+      <button v-else class="m-login m-login-btn" type="button" @click="openLoginFromMobile">
+        登录 / 注册
+      </button>
       <RouterLink
         v-for="item in NAV"
         :key="item.name"

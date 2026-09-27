@@ -118,9 +118,26 @@ describe('SiteHeader —— 静态结构', () => {
 
   it('移动端导航也渲染同样五项（汉堡菜单与主导航同源）', () => {
     const labels = mountHeader()
-      .findAll('.mobile-nav a')
+      .findAll('.mobile-nav a[href]:not(.m-login)')
       .map((a) => a.text())
     expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
+  })
+
+  it('**移动端汉堡菜单里必须有登录入口** —— `.login` 在 ≤768px 是隐藏的', () => {
+    // 设计稿有一条 `@media (max-width:768px) { .login { display:none } }`，
+    // 而 `.login` 是**登录入口与个人中心入口的同一个元素** ——
+    // 于是手机上既没登录入口、登录后也进不去个人中心。汉堡菜单里补一个兜底。
+    const w = mountHeader()
+    const mLogin = w.find('.mobile-nav .m-login')
+    expect(mLogin.exists()).toBe(true)
+    expect(mLogin.text()).toContain('登录')
+  })
+
+  it('登录后汉堡菜单里给的是**个人中心**入口', async () => {
+    const w = await mountLoggedIn()
+    const mLogin = w.find('.mobile-nav .m-login')
+    expect(mLogin.attributes('href')).toBe('/account')
+    expect(mLogin.text()).toContain('张三')
   })
 
   it('渲染汉堡按钮，点击切换 body 的 nav-open（沿用设计稿机制）', async () => {

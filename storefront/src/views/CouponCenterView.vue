@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { listCouponTemplates, takeCoupon } from '@/api/coupon'
+import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import { useToasts } from '@/components/base/useToasts'
@@ -92,47 +93,51 @@ onMounted(load)
     </p>
   </div>
 
-  <div class="ml-wrap">
-    <LoadingState v-if="loading" :count="3" />
+  <div class="account-wrap">
+    <AccountSidebar />
+    <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
+    <div class="account-main">
+      <LoadingState v-if="loading" :count="3" />
 
-    <EmptyState
-      v-else-if="error"
-      mode="error"
-      title="优惠券加载失败"
-      desc="网络或服务暂时不可用，请稍后重试"
-      action-text="重新加载"
-      @action="load"
-    />
+      <EmptyState
+        v-else-if="error"
+        mode="error"
+        title="优惠券加载失败"
+        desc="网络或服务暂时不可用，请稍后重试"
+        action-text="重新加载"
+        @action="load"
+      />
 
-    <EmptyState
-      v-else-if="!templates.length"
-      title="暂无可领取的优惠券"
-      desc="敬请期待，新券会在这里出现"
-      action-text="去商城逛逛"
-      @action="router.push('/mall')"
-    />
+      <EmptyState
+        v-else-if="!templates.length"
+        title="暂无可领取的优惠券"
+        desc="敬请期待，新券会在这里出现"
+        action-text="去商城逛逛"
+        @action="router.push('/mall')"
+      />
 
-    <div v-else class="grid-3 cc-grid">
-      <div v-for="t in templates" :key="t.id" class="cc-card">
-        <div class="cc-amount">
-          <span class="cc-num">{{ couponAmountText(t) }}</span>
-          <span class="cc-thresh">{{ couponThresholdText(t) }}</span>
+      <div v-else class="grid-3 cc-grid">
+        <div v-for="t in templates" :key="t.id" class="cc-card">
+          <div class="cc-amount">
+            <span class="cc-num">{{ couponAmountText(t) }}</span>
+            <span class="cc-thresh">{{ couponThresholdText(t) }}</span>
+          </div>
+          <div class="cc-info">
+            <div class="cc-name">{{ t.name }}</div>
+            <div v-if="t.description" class="cc-desc">{{ t.description }}</div>
+            <div v-if="couponValidText(t)" class="cc-valid">{{ couponValidText(t) }}</div>
+          </div>
+          <button
+            v-if="t.canTake"
+            class="btn-primary cc-take"
+            type="button"
+            :disabled="takingId === t.id"
+            @click="onTake(t)"
+          >
+            {{ takingId === t.id ? '领取中…' : '立即领取' }}
+          </button>
+          <span v-else class="cc-taken">已领取</span>
         </div>
-        <div class="cc-info">
-          <div class="cc-name">{{ t.name }}</div>
-          <div v-if="t.description" class="cc-desc">{{ t.description }}</div>
-          <div v-if="couponValidText(t)" class="cc-valid">{{ couponValidText(t) }}</div>
-        </div>
-        <button
-          v-if="t.canTake"
-          class="btn-primary cc-take"
-          type="button"
-          :disabled="takingId === t.id"
-          @click="onTake(t)"
-        >
-          {{ takingId === t.id ? '领取中…' : '立即领取' }}
-        </button>
-        <span v-else class="cc-taken">已领取</span>
       </div>
     </div>
   </div>

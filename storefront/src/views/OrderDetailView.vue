@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { cancelOrder, getOrderDetail } from '@/api/order'
 import { submitPay } from '@/api/pay'
+import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
@@ -139,124 +140,128 @@ onMounted(async () => {
     <h1 class="ml-page-title">订单详情</h1>
   </div>
 
-  <div class="ml-wrap">
-    <LoadingState v-if="loading" :count="3" />
+  <div class="account-wrap">
+    <AccountSidebar />
+    <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
+    <div class="account-main">
+      <LoadingState v-if="loading" :count="3" />
 
-    <EmptyState
-      v-else-if="error"
-      mode="error"
-      title="订单加载失败"
-      desc="网络或服务暂时不可用，请稍后重试"
-      action-text="重新加载"
-      @action="load"
-    />
+      <EmptyState
+        v-else-if="error"
+        mode="error"
+        title="订单加载失败"
+        desc="网络或服务暂时不可用，请稍后重试"
+        action-text="重新加载"
+        @action="load"
+      />
 
-    <template v-else-if="order">
-      <p v-if="message" class="od-msg">{{ message }}</p>
+      <template v-else-if="order">
+        <p v-if="message" class="od-msg">{{ message }}</p>
 
-      <!-- 状态区：大号状态 + 一句话说明；待支付额外给支付截止时间 -->
-      <div class="ml-card od-status">
-        <div class="od-status-row">
-          <span class="od-status-text">{{ statusText }}</span>
-          <MlPill :status="order.status" />
-        </div>
-        <p class="ml-hint">{{ STATUS_HINT[order.status] ?? '' }}</p>
-        <p v-if="isUnpaid" class="od-deadline">
-          支付截止 {{ formatDateTime(order.payExpireTime) }}，逾期订单将自动取消
-        </p>
-      </div>
-
-      <!-- 收货信息 -->
-      <div class="ml-card">
-        <div class="ml-card-title">收货信息</div>
-        <div class="addr-line">
-          <b>{{ order.receiverName }}</b>
-          <span>{{ order.receiverMobile }}</span>
-        </div>
-        <p class="od-text">
-          {{ order.receiverAreaName }} {{ order.receiverDetailAddress }}
-        </p>
-      </div>
-
-      <!-- 商品明细：名称 / 规格 / 单价 / 数量都是下单时的快照 -->
-      <div class="ml-card">
-        <div class="ml-card-title">商品明细（{{ order.items.length }} 项）</div>
-        <div v-for="it in order.items" :key="it.id" class="od-item">
-          <div class="od-thumb">
-            <img v-if="it.picUrl" :src="it.picUrl" :alt="it.spuName" />
-            <span v-else class="ph">图</span>
+        <!-- 状态区：大号状态 + 一句话说明；待支付额外给支付截止时间 -->
+        <div class="ml-card od-status">
+          <div class="od-status-row">
+            <span class="od-status-text">{{ statusText }}</span>
+            <MlPill :status="order.status" />
           </div>
-          <div class="od-info">
-            <div class="od-name">{{ it.spuName }}</div>
-            <div class="od-spec">
-              <template v-for="p in it.properties ?? []" :key="p.valueName">
-                {{ p.propertyName }}：{{ p.valueName }}
-              </template>
+          <p class="ml-hint">{{ STATUS_HINT[order.status] ?? '' }}</p>
+          <p v-if="isUnpaid" class="od-deadline">
+            支付截止 {{ formatDateTime(order.payExpireTime) }}，逾期订单将自动取消
+          </p>
+        </div>
+
+        <!-- 收货信息 -->
+        <div class="ml-card">
+          <div class="ml-card-title">收货信息</div>
+          <div class="addr-line">
+            <b>{{ order.receiverName }}</b>
+            <span>{{ order.receiverMobile }}</span>
+          </div>
+          <p class="od-text">
+            {{ order.receiverAreaName }} {{ order.receiverDetailAddress }}
+          </p>
+        </div>
+
+        <!-- 商品明细：名称 / 规格 / 单价 / 数量都是下单时的快照 -->
+        <div class="ml-card">
+          <div class="ml-card-title">商品明细（{{ order.items.length }} 项）</div>
+          <div v-for="it in order.items" :key="it.id" class="od-item">
+            <div class="od-thumb">
+              <img v-if="it.picUrl" :src="it.picUrl" :alt="it.spuName" />
+              <span v-else class="ph">图</span>
+            </div>
+            <div class="od-info">
+              <div class="od-name">{{ it.spuName }}</div>
+              <div class="od-spec">
+                <template v-for="p in it.properties ?? []" :key="p.valueName">
+                  {{ p.propertyName }}：{{ p.valueName }}
+                </template>
+              </div>
+            </div>
+            <div class="od-price">{{ formatYuan(it.price) }}</div>
+            <div class="od-count">×{{ it.count }}</div>
+          </div>
+        </div>
+
+        <!-- 金额构成：促销优惠与优惠券抵扣分列两行，无积分行（FR-026g） -->
+        <div class="ml-card">
+          <div class="ml-card-title">金额构成</div>
+          <div class="ml-amount-card">
+            <MlAmountRow label="商品小计" :fen="order.totalPrice" />
+            <MlAmountRow label="促销优惠" :fen="-order.discountPrice" cut />
+            <MlAmountRow label="运费" :fen="order.deliveryPrice" />
+            <MlAmountRow label="优惠券抵扣" :fen="-order.couponPrice" cut />
+            <MlAmountRow label="应付总额" :fen="order.payPrice" total />
+          </div>
+          <p v-if="usedCouponId" class="ml-hint od-coupon">
+            本单使用了优惠券（券编号 {{ usedCouponId }}），抵扣
+            {{ formatYuan(order.couponPrice) }}
+          </p>
+          <p v-if="!amountConsistent" class="od-msg">
+            金额明细与应付总额不一致，请联系客服核对
+          </p>
+        </div>
+
+        <!-- 订单信息 -->
+        <div class="ml-card">
+          <div class="ml-card-title">订单信息</div>
+          <div class="dl-table">
+            <div class="dl-row">
+              <span class="dl-name">订单号</span><span class="dl-val">{{ order.no }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">下单时间</span>
+              <span class="dl-val">{{ formatDateTime(order.createTime) }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">支付时间</span>
+              <span class="dl-val">
+                {{ order.payTime ? formatDateTime(order.payTime) : '尚未支付' }}
+              </span>
             </div>
           </div>
-          <div class="od-price">{{ formatYuan(it.price) }}</div>
-          <div class="od-count">×{{ it.count }}</div>
         </div>
-      </div>
 
-      <!-- 金额构成：促销优惠与优惠券抵扣分列两行，无积分行（FR-026g） -->
-      <div class="ml-card">
-        <div class="ml-card-title">金额构成</div>
-        <div class="ml-amount-card">
-          <MlAmountRow label="商品小计" :fen="order.totalPrice" />
-          <MlAmountRow label="促销优惠" :fen="-order.discountPrice" cut />
-          <MlAmountRow label="运费" :fen="order.deliveryPrice" />
-          <MlAmountRow label="优惠券抵扣" :fen="-order.couponPrice" cut />
-          <MlAmountRow label="应付总额" :fen="order.payPrice" total />
+        <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
+        <div v-if="isUnpaid" class="od-actions">
+          <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
+          <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
+          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
+            取消订单
+          </button>
+          <button
+            v-if="!needsNoPay"
+            id="payOrder"
+            class="btn-buy"
+            type="button"
+            :disabled="paying"
+            @click="onPay"
+          >
+            {{ paying ? '支付中…' : '立即支付' }}
+          </button>
         </div>
-        <p v-if="usedCouponId" class="ml-hint od-coupon">
-          本单使用了优惠券（券编号 {{ usedCouponId }}），抵扣
-          {{ formatYuan(order.couponPrice) }}
-        </p>
-        <p v-if="!amountConsistent" class="od-msg">
-          金额明细与应付总额不一致，请联系客服核对
-        </p>
-      </div>
-
-      <!-- 订单信息 -->
-      <div class="ml-card">
-        <div class="ml-card-title">订单信息</div>
-        <div class="dl-table">
-          <div class="dl-row">
-            <span class="dl-name">订单号</span><span class="dl-val">{{ order.no }}</span>
-          </div>
-          <div class="dl-row">
-            <span class="dl-name">下单时间</span>
-            <span class="dl-val">{{ formatDateTime(order.createTime) }}</span>
-          </div>
-          <div class="dl-row">
-            <span class="dl-name">支付时间</span>
-            <span class="dl-val">
-              {{ order.payTime ? formatDateTime(order.payTime) : '尚未支付' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
-      <div v-if="isUnpaid" class="od-actions">
-        <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
-        <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
-        <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
-          取消订单
-        </button>
-        <button
-          v-if="!needsNoPay"
-          id="payOrder"
-          class="btn-buy"
-          type="button"
-          :disabled="paying"
-          @click="onPay"
-        >
-          {{ paying ? '支付中…' : '立即支付' }}
-        </button>
-      </div>
-    </template>
+      </template>
+    </div>
   </div>
 
   <MlModal :open="cancelOpen" title="取消订单" @close="cancelOpen = false">

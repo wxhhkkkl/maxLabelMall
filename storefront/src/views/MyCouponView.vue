@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import { pageMyCoupons, type CouponStatusFilter } from '@/api/coupon'
+import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import type { Coupon } from '@/types'
@@ -81,54 +82,58 @@ onMounted(load)
     </p>
   </div>
 
-  <div class="ml-wrap">
-    <div class="cat-pills">
-      <button
-        v-for="t in TABS"
-        :key="t.status"
-        class="tab"
-        :class="{ active: active === t.status }"
-        type="button"
-        @click="onPick(t.status)"
-      >
-        {{ t.label }}
-      </button>
-    </div>
+  <div class="account-wrap">
+    <AccountSidebar />
+    <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
+    <div class="account-main">
+      <div class="cat-pills">
+        <button
+          v-for="t in TABS"
+          :key="t.status"
+          class="tab"
+          :class="{ active: active === t.status }"
+          type="button"
+          @click="onPick(t.status)"
+        >
+          {{ t.label }}
+        </button>
+      </div>
 
-    <LoadingState v-if="loading" :count="3" />
+      <LoadingState v-if="loading" :count="3" />
 
-    <EmptyState
-      v-else-if="error"
-      mode="error"
-      title="优惠券加载失败"
-      desc="网络或服务暂时不可用，请稍后重试"
-      action-text="重新加载"
-      @action="load"
-    />
+      <EmptyState
+        v-else-if="error"
+        mode="error"
+        title="优惠券加载失败"
+        desc="网络或服务暂时不可用，请稍后重试"
+        action-text="重新加载"
+        @action="load"
+      />
 
-    <EmptyState
-      v-else-if="!coupons.length"
-      :title="`暂无${STATUS_TEXT[active]}的优惠券`"
-      desc="去领券中心看看有什么可以领"
-      action-text="去领券中心"
-      @action="$router.push('/coupon')"
-    />
+      <EmptyState
+        v-else-if="!coupons.length"
+        :title="`暂无${STATUS_TEXT[active]}的优惠券`"
+        desc="去领券中心看看有什么可以领"
+        action-text="去领券中心"
+        @action="$router.push('/coupon')"
+      />
 
-    <div v-else class="grid-3 mc-grid">
-      <div v-for="c in coupons" :key="c.id" class="mc-card">
-        <div class="mc-amount">
-          <span class="mc-num">{{ couponAmountText(c) }}</span>
-          <span class="mc-thresh">{{ couponThresholdText(c) }}</span>
+      <div v-else class="grid-3 mc-grid">
+        <div v-for="c in coupons" :key="c.id" class="mc-card">
+          <div class="mc-amount">
+            <span class="mc-num">{{ couponAmountText(c) }}</span>
+            <span class="mc-thresh">{{ couponThresholdText(c) }}</span>
+          </div>
+          <div class="mc-info">
+            <div class="mc-name">{{ c.name }}</div>
+            <div v-if="couponValidText(c)" class="mc-valid">{{ couponValidText(c) }}</div>
+          </div>
+          <!-- 只有「未使用」才有可去的地方；已使用/已过期是灰态，不给操作 -->
+          <RouterLink v-if="c.status === 1" class="btn-cyan mc-use" :to="useLink(c)">
+            去使用
+          </RouterLink>
+          <span v-else class="mc-status">{{ STATUS_TEXT[c.status] }}</span>
         </div>
-        <div class="mc-info">
-          <div class="mc-name">{{ c.name }}</div>
-          <div v-if="couponValidText(c)" class="mc-valid">{{ couponValidText(c) }}</div>
-        </div>
-        <!-- 只有「未使用」才有可去的地方；已使用/已过期是灰态，不给操作 -->
-        <RouterLink v-if="c.status === 1" class="btn-cyan mc-use" :to="useLink(c)">
-          去使用
-        </RouterLink>
-        <span v-else class="mc-status">{{ STATUS_TEXT[c.status] }}</span>
       </div>
     </div>
   </div>

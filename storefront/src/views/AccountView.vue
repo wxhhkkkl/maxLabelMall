@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { sendSmsCode, SMS_SCENE_UPDATE_PASSWORD, updatePassword } from '@/api/member'
+import AccountSidebar from '@/components/AccountSidebar.vue'
 import MlField from '@/components/base/MlField.vue'
 import { useUserStore } from '@/store/user'
 
@@ -116,16 +117,7 @@ async function onLogout() {
   </div>
 
   <div class="account-wrap">
-    <aside class="sidebar">
-      <RouterLink class="s-item active" to="/account">个人中心</RouterLink>
-      <RouterLink class="s-item" to="/order">我的订单</RouterLink>
-      <!-- 领券中心：需要登录才能看到本页，所以未登录访客没有它的入口 ——
-           这是所有者 2026-09-27 的取舍（此前它一度在顶栏主导航里，
-           但顶栏加到 7 项后窄屏会挤到逐字折行）。 -->
-      <RouterLink class="s-item" to="/coupon">领券中心</RouterLink>
-      <RouterLink class="s-item" to="/account/address">收货地址</RouterLink>
-      <RouterLink class="s-item" to="/coupon/mine">我的券</RouterLink>
-    </aside>
+    <AccountSidebar />
 
     <div class="account-main">
       <div class="ml-card">
@@ -227,20 +219,6 @@ async function onLogout() {
 </template>
 
 <style scoped>
-.account-wrap {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 24px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 24px 72px;
-}
-.account-wrap .sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  position: static;
-}
 .acct-name {
   font-size: 20px;
   font-weight: 600;
@@ -287,9 +265,6 @@ async function onLogout() {
   color: var(--ml-primary);
 }
 @media (max-width: 768px) {
-  .account-wrap {
-    grid-template-columns: 1fr;
-  }
   .acct-entries {
     grid-template-columns: 1fr;
   }

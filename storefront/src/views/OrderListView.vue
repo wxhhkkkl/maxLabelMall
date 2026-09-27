@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { cancelOrder, pageOrders } from '@/api/order'
+import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -108,90 +109,94 @@ onMounted(load)
     <h1 class="ml-page-title">我的订单</h1>
   </div>
 
-  <div class="ml-wrap">
-    <div class="cat-pills">
-      <span
-        v-for="f in filters"
-        :key="String(f.value)"
-        class="tab"
-        :class="{ active: status === f.value }"
-        @click="pickStatus(f.value)"
-      >
-        {{ f.label }}
-      </span>
-    </div>
+  <div class="account-wrap">
+    <AccountSidebar />
+    <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
+    <div class="account-main">
+      <div class="cat-pills">
+        <span
+          v-for="f in filters"
+          :key="String(f.value)"
+          class="tab"
+          :class="{ active: status === f.value }"
+          @click="pickStatus(f.value)"
+        >
+          {{ f.label }}
+        </span>
+      </div>
 
-    <p v-if="message" class="ol-msg">{{ message }}</p>
+      <p v-if="message" class="ol-msg">{{ message }}</p>
 
-    <LoadingState v-if="loading" :count="2" />
+      <LoadingState v-if="loading" :count="2" />
 
-    <EmptyState
-      v-else-if="error"
-      mode="error"
-      title="订单加载失败"
-      desc="网络或服务暂时不可用，请稍后重试"
-      action-text="重新加载"
-      @action="load"
-    />
+      <EmptyState
+        v-else-if="error"
+        mode="error"
+        title="订单加载失败"
+        desc="网络或服务暂时不可用，请稍后重试"
+        action-text="重新加载"
+        @action="load"
+      />
 
-    <EmptyState
-      v-else-if="!list.length"
-      icon="📦"
-      title="还没有订单"
-      desc="下单后可以在这里查看订单状态与物流进度"
-      action-text="去商城逛逛"
-      @action="router.push('/mall')"
-    />
+      <EmptyState
+        v-else-if="!list.length"
+        icon="📦"
+        title="还没有订单"
+        desc="下单后可以在这里查看订单状态与物流进度"
+        action-text="去商城逛逛"
+        @action="router.push('/mall')"
+      />
 
-    <template v-else>
-      <div v-for="o in list" :key="o.id" class="p-card order-card">
-        <div class="oc-head">
-          <span class="oc-no">订单号 {{ o.no }}</span>
-          <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
-          <MlPill :status="o.status" />
-        </div>
+      <template v-else>
+        <div v-for="o in list" :key="o.id" class="p-card order-card">
+          <div class="oc-head">
+            <span class="oc-no">订单号 {{ o.no }}</span>
+            <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
+            <MlPill :status="o.status" />
+          </div>
 
-        <div class="oc-items">
-          <div v-for="it in o.items" :key="it.id" class="oc-item">
-            <div class="oc-thumb">
-              <img v-if="it.picUrl" :src="it.picUrl" :alt="it.spuName" />
-              <span v-else class="ph">图</span>
+          <div class="oc-items">
+            <div v-for="it in o.items" :key="it.id" class="oc-item">
+              <div class="oc-thumb">
+                <img v-if="it.picUrl" :src="it.picUrl" :alt="it.spuName" />
+                <span v-else class="ph">图</span>
+              </div>
+              <RouterLink class="oc-name" :to="`/order/${o.id}`">{{ it.spuName }}</RouterLink>
+              <span class="oc-count">×{{ it.count }}</span>
+              <span class="oc-price">{{ formatYuan(it.price) }}</span>
             </div>
-            <RouterLink class="oc-name" :to="`/order/${o.id}`">{{ it.spuName }}</RouterLink>
-            <span class="oc-count">×{{ it.count }}</span>
-            <span class="oc-price">{{ formatYuan(it.price) }}</span>
+          </div>
+
+          <div class="oc-foot">
+            <span class="oc-total-label">应付金额</span>
+            <span class="oc-total">{{ formatYuan(o.payPrice) }}</span>
+            <!--
+              支付入口在订单详情页（T117）—— 全站只有一处实现支付调用，
+              列表这里只把人送过去，不复制一份支付逻辑。
+            -->
+            <button
+              v-if="o.status === OrderStatus.UNPAID"
+              class="btn-cart go-pay"
+              type="button"
+              @click="router.push(`/order/${o.id}`)"
+            >
+              立即支付
+            </button>
+            <button
+              v-if="o.status === OrderStatus.UNPAID"
+              class="btn-cart cancel-order"
+              type="button"
+              @click="askCancel(o)"
+            >
+              取消订单
+            </button>
+            <RouterLink class="btn-cart" :to="`/order/${o.id}`">查看详情</RouterLink>
           </div>
         </div>
 
-        <div class="oc-foot">
-          <span class="oc-total-label">应付金额</span>
-          <span class="oc-total">{{ formatYuan(o.payPrice) }}</span>
-          <!--
-            支付入口在订单详情页（T117）—— 全站只有一处实现支付调用，
-            列表这里只把人送过去，不复制一份支付逻辑。
-          -->
-          <button
-            v-if="o.status === OrderStatus.UNPAID"
-            class="btn-cart go-pay"
-            type="button"
-            @click="router.push(`/order/${o.id}`)"
-          >
-            立即支付
-          </button>
-          <button
-            v-if="o.status === OrderStatus.UNPAID"
-            class="btn-cart cancel-order"
-            type="button"
-            @click="askCancel(o)"
-          >
-            取消订单
-          </button>
-          <RouterLink class="btn-cart" :to="`/order/${o.id}`">查看详情</RouterLink>
-        </div>
-      </div>
-
-      <Pagination :page-no="pageNo" :page-size="pageSize" :total="total" @update:page-no="onPage" />
-    </template>
+        <Pagination :page-no="pageNo" :page-size="pageSize" :total="total" @update:page-no="onPage" />
+      </template>
+    </div>
   </div>
 
   <!-- 取消订单不可撤销，必须先二次确认（FR-036） -->

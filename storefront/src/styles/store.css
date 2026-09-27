@@ -607,3 +607,43 @@
     display: none;
   }
 }
+
+/* ============================================================================
+   个人中心一组页面的两列布局（新增，非 C1–C8 契约的一部分）
+   `/account`、`/order`、`/order/:id`、`/account/address`、`/coupon`、`/coupon/mine`
+   共用：左侧 `AccountSidebar` + 右侧内容区。
+   原先只有 `/account` 自带侧栏，点进其余页面菜单就消失（所有者 2026-09-27 反馈）。
+   栅格与断点沿用设计稿既有取值（`.sidebar` 宽 250px 的紧凑版、≤768px 落成单列）。
+   ============================================================================ */
+.account-wrap {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+  /* 与 `.ml-wrap` 取同一个宽度，免得这几个页面宽度不一致 */
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 72px;
+}
+/* 设计稿的 `.sidebar` 是给商城页的（宽 250px、可 sticky），这里覆盖成竖排菜单。
+   ⚠️ `width: 100%` 不能省：设计稿写着 `width: 250px`，而这里的栅格列只有 200px ——
+   不覆盖的话侧栏会**溢出自己的列**（实测宽度确实是 250），顶到右侧内容上，
+   看上去就是"两栏挤在一起"。 */
+.account-sidebar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: static;
+}
+/* 菜单项给足点击区域（设计稿的 `.s-item` 是给商城分类用的，内边距偏小） */
+.account-sidebar .s-item {
+  padding: 9px 12px;
+}
+.account-main {
+  min-width: 0; /* 否则内容里的长表格/长文本会把栅格撑破 */
+}
+@media (max-width: 768px) {
+  .account-wrap {
+    grid-template-columns: 1fr;
+  }
+}

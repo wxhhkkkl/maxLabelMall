@@ -124,23 +124,15 @@ test.describe('移动端 375px —— 无横向滚动（SC-008）', () => {
 })
 
 /**
- * ⚠️ **已知且未修的横向溢出** —— 记在这里而不是删掉断言，改好了这个用例会立刻转绿
- * （在修好之前 `test.fail()` 是绿的，修好后它会失败并提醒你把 `fail` 去掉）。
+ * `/mall` 曾经在 375px 下横向溢出 **44px**（`div.mall-right` 实测 403px，比视口还宽）：
+ * `design.css` 的 `.mall-page-main { align-items: flex-start }` 在 ≤1100px 改成
+ * `flex-direction: column` 时**没有重置 `align-items`**，于是子项在交叉轴上不拉伸、
+ * 按内容最大宽度撑开。
  *
- * 现场：`/mall` 在 375px 下溢出 **44px**。实测定位到 `div.mall-right` 宽度 403px
- * （比视口还宽），原因是 **design.css 自己**的一处组合：
- * `.mall-page-main { align-items: flex-start }`，而 ≤1100px 的媒体查询只把
- * `flex-direction` 改成 `column`、**没有重置 `align-items`** —— 于是子项在交叉轴上
- * 不拉伸，`.mall-right` 按内容最大宽度撑开。
- *
- * **修法已经完全放开、只是还没做**：原先这里列过两条"不能修"的理由（`design.css`
- * 必须与设计稿逐字相同、在 store.css 覆盖等于第七处偏离），**两条都已随
- * FR-046/SC-012 的修订作废**（设计稿基线放开、`www/` 已删除，见宪法 2.1.0）。
- * 也就是说：直接改 `.mall-page-main` 的 `align-items`，或在 `store.css` 里覆盖，
- * **现在都不需要任何声明**。这是一条普通的未修缺陷，不再是"需所有者裁决的冲突"。
+ * 修复后这条用例**转为正常断言**（此前用 `test.fail()` 标为已知缺陷）——
+ * 修法就是在那条媒体查询里补 `align-items: stretch`。
  */
-test('【已知缺陷，未修】`/mall` 在 375px 下横向溢出 44px', async ({ page }) => {
-  test.fail()
+test('商城页在 375px 下不横向滚动（曾是已知缺陷）', async ({ page }) => {
   await page.goto('/mall')
   await expect(page.locator('.p-card').first()).toBeVisible()
   await expectNoHScroll(page, '商城')

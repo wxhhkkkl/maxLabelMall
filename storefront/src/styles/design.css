@@ -717,6 +717,12 @@ body.nav-open .mobile-nav { display: flex; }
   .price-cards { grid-template-columns: 1fr; max-width: 480px; }
   .sol-grid { grid-template-columns: repeat(3, 1fr); }
   .mall-page-main, .pd-main, .case, .feature-row, .params-row { flex-direction: column; }
+  /* ⚠️ 切成纵向后**必须重置 `align-items`**。主干规则里是 `align-items: flex-start`，
+     它让子项在交叉轴上不拉伸、按内容最大宽度撑开 —— 在横向排列时没问题，
+     但纵向排列时子项就直接溢出视口：`.mall-right` 实测 403px，375px 视口下
+     横向溢出 44px（移动端可左右滑动）。只对 `.mall-page-main` 修，
+     是因为另外几个的窄屏表现已经正常，不顺手改动它们。 */
+  .mall-page-main { align-items: stretch; }
   .sw-hero { flex-direction: column; height: auto; padding: 56px 40px; }
   .sidebar { width: 100%; }
   .quote { width: 100%; }

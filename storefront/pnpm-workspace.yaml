@@ -1,0 +1,4 @@
+# pnpm 12 的依赖构建白名单。esbuild 需要执行 postinstall 以准备二进制，
+# 而 vite 依赖 esbuild；不写这条时 `pnpm install` 会以退出码 1 失败。
+allowBuilds:
+  esbuild: true

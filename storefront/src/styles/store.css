@@ -1,0 +1,609 @@
+/* ============================================================================
+   新增页面样式 —— 17 条无设计稿路由的版式归口
+   ============================================================================
+
+   ⚠️ 本文件只**扩展**设计稿语言，不替换它。design.css（即 www/css/style.css
+      原样搬入）不得改动。新增页面 MUST 复用 design.css 的类与本文的 C1–C8，
+      **不得引入第二套按钮或卡片样式**。
+
+   令牌与组件契约依据 specs/001-mall-storefront-integration/design-new-pages.md：
+     §1 令牌（全部从 design.css 实测提取）
+     §2 八个新组件契约 C1–C8（设计稿没有的部分）
+     §5 一致性核对口径
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   §1 令牌（取自 design.css，附出现次数以便核对）
+   主色 #2E7CD6(49) · 亮蓝 #35A5FF(4) · 深蓝底 #0C2148(10) · 最深蓝 #0A1A38(5)
+   正文 #16233F(22) · 次级 #5B6C8F(24) · 占位 #8A97B5(14) · 弱 #B4C0D8(5)
+   浅蓝底 #EAF1FF(14) · 卡底 #F0F4FB/#F4F7FD/#F5F8FF · 边框 #EEF2FA/#E3E9F4
+   强调橙 #FF5C22(5) · 白 #FFFFFF(47，页面与卡片底，不受"只用表内色"限制)
+   圆角 100/16/14/12/10/8/2px · 断点 1100/768/480（仅此三个，不得新增）
+   --------------------------------------------------------------------------- */
+:root {
+  --ml-primary: #2e7cd6;
+  --ml-accent: #35a5ff;
+  --ml-deep: #0c2148;
+  --ml-deepest: #0a1a38;
+  --ml-text: #16233f;
+  --ml-text-sub: #5b6c8f;
+  --ml-text-ph: #8a97b5;
+  --ml-text-weak: #b4c0d8;
+  --ml-bg-soft: #eaf1ff;
+  --ml-bg-card: #f0f4fb;
+  --ml-bg-card-2: #f4f7fd;
+  --ml-bg-card-3: #f5f8ff;
+  --ml-border: #eef2fa;
+  --ml-border-2: #e3e9f4;
+  --ml-orange: #ff5c22;
+  --ml-white: #ffffff;
+
+  --ml-radius-pill: 100px;
+  --ml-radius-card: 14px;
+  --ml-radius-field: 8px;
+
+  --ml-shadow: 0 6px 24px rgba(10, 26, 56, 0.08);
+  --ml-shadow-lg: 0 12px 40px rgba(10, 26, 56, 0.14);
+}
+
+/* 顶栏登录入口在未登录时是 <button>（动作），已登录时是 <RouterLink>（导航）。
+   统一外观，避免两种标签的默认样式差异。 */
+.login-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* 金额数字等宽，避免逐行核对时抖动（C8） */
+.ml-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   页头：新页面的统一标题结构（复用 design.css 的 .crumbs）
+   --------------------------------------------------------------------------- */
+.ml-page-head {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 8px 24px 0;
+}
+.ml-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ml-text);
+  margin: 16px 0 10px;
+}
+.ml-page-sub {
+  font-size: 14px;
+  color: var(--ml-text-sub);
+  margin-bottom: 24px;
+}
+.ml-wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+/* ============================================================================
+   C1 模态弹层 .ml-modal
+   遮罩 rgba(10,26,56,.45)；面板白底、radius 14px、最大宽 480px（移动端 calc(100vw - 32px)）
+   含 .ml-modal-head / .ml-modal-body / .ml-modal-foot；关闭按钮右上角；Esc 与点遮罩关闭
+   ============================================================================ */
+.ml-modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 26, 56, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.ml-modal {
+  background: var(--ml-white);
+  border-radius: var(--ml-radius-card);
+  box-shadow: var(--ml-shadow-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.ml-modal-head {
+  padding: 20px 48px 12px 24px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ml-text);
+}
+.ml-modal-body {
+  padding: 0 24px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.ml-modal-foot {
+  padding: 16px 24px 20px;
+  display: flex;
+  gap: 12px;
+}
+.ml-modal-foot > * {
+  flex: 1;
+}
+.ml-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--ml-radius-field);
+  background: var(--ml-bg-card);
+  color: var(--ml-text-sub);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ml-modal-close:hover {
+  background: var(--ml-border-2);
+  color: var(--ml-text);
+}
+
+/* ============================================================================
+   C2 轻提示 .ml-toast
+   顶部居中、白底、radius 8px、有阴影；成功 #2E7CD6 / 警告·错误 #FF5C22；
+   3 秒自动消失；同时最多 3 条
+   ============================================================================ */
+.ml-toast-wrap {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.ml-toast {
+  background: var(--ml-white);
+  border-radius: var(--ml-radius-field);
+  box-shadow: var(--ml-shadow);
+  padding: 10px 16px 10px 14px;
+  font-size: 14px;
+  color: var(--ml-text);
+  border-left: 3px solid var(--ml-primary);
+  min-width: 220px;
+  max-width: 420px;
+}
+.ml-toast.is-success {
+  border-left-color: var(--ml-primary);
+}
+.ml-toast.is-warn,
+.ml-toast.is-error {
+  border-left-color: var(--ml-orange);
+}
+
+/* ============================================================================
+   C3 复选框 .ml-check —— 16×16、radius 2px、边框 #E3E9F4；
+   选中填充 #2E7CD6 + 白色对勾；含 .ml-check-label；禁用降透明度 .5 且不可点
+   ============================================================================ */
+.ml-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.ml-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ml-check-box {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid var(--ml-border-2);
+  border-radius: 2px;
+  background: var(--ml-white);
+  position: relative;
+}
+.ml-check input:checked + .ml-check-box {
+  background: var(--ml-primary);
+  border-color: var(--ml-primary);
+}
+.ml-check input:checked + .ml-check-box::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid var(--ml-white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.ml-check input:focus-visible + .ml-check-box {
+  outline: 2px solid var(--ml-accent);
+  outline-offset: 1px;
+}
+.ml-check-label {
+  font-size: 14px;
+  color: var(--ml-text-sub);
+}
+.ml-check.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ============================================================================
+   C4 表单 .ml-field —— 高 42px、radius 8px、边框 #E3E9F4、聚焦 #2E7CD6；
+   .ml-label(13px) / .ml-error(12px 橙) / .ml-hint(12px 占位色)；错误态边框转橙
+   ============================================================================ */
+.ml-field {
+  margin-bottom: 16px;
+}
+.ml-label {
+  display: block;
+  font-size: 13px;
+  color: var(--ml-text-sub);
+  margin-bottom: 6px;
+}
+.ml-label .req {
+  color: var(--ml-orange);
+  margin-left: 2px;
+}
+.ml-input,
+.ml-select,
+.ml-textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--ml-text);
+  background: var(--ml-white);
+  border: 1px solid var(--ml-border-2);
+  border-radius: var(--ml-radius-field);
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.ml-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+.ml-input:focus,
+.ml-select:focus,
+.ml-textarea:focus {
+  outline: none;
+  border-color: var(--ml-primary);
+}
+.ml-input::placeholder,
+.ml-textarea::placeholder {
+  color: var(--ml-text-ph);
+}
+.ml-field.is-error .ml-input,
+.ml-field.is-error .ml-select,
+.ml-field.is-error .ml-textarea {
+  border-color: var(--ml-orange);
+}
+.ml-error {
+  font-size: 12px;
+  color: var(--ml-orange);
+  margin-top: 6px;
+}
+.ml-hint {
+  font-size: 12px;
+  color: var(--ml-text-ph);
+  margin-top: 6px;
+}
+
+/* ============================================================================
+   C5 骨架屏 .ml-skeleton —— 灰底 #F0F4FB、radius 8px、1.4s 呼吸；
+   形状 MUST 与最终内容一致（卡片骨架 = 图 + 两行文字），避免加载完成跳版
+   ============================================================================ */
+@keyframes ml-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.ml-skeleton {
+  background: var(--ml-bg-card);
+  border-radius: var(--ml-radius-field);
+  animation: ml-breathe 1.4s ease-in-out infinite;
+}
+.ml-skeleton.is-line {
+  height: 14px;
+  margin-bottom: 10px;
+}
+.ml-skeleton.is-line.short {
+  width: 60%;
+}
+.ml-skeleton.is-img {
+  height: 160px;
+  margin-bottom: 12px;
+}
+.ml-skeleton.is-row {
+  height: 72px;
+  margin-bottom: 12px;
+}
+.ml-skeleton-card {
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-card);
+  padding: 12px;
+  background: var(--ml-white);
+}
+
+/* ============================================================================
+   C6 状态标签 .ml-pill —— 胶囊、radius 100px、12px
+   变体 ←→ 后端状态映射（与 utils/orderStatus.ts 一一对应，MUST NOT 增删）：
+     0 待支付   .is-pending            #FF5C22 / #FFFFFF
+     10 待发货  .is-awaiting-shipment  #EAF1FF / #2E7CD6
+     20 已发货  .is-shipped            #0A1A38 / #FFFFFF
+     30 已完成  .is-done               #F0F4FB / #5B6C8F
+     40 已取消  .is-cancelled          #F0F4FB / #8A97B5
+   三个非终态（0/10/20）底色两两不同；30 与 40 同底但文字色不同。
+   ============================================================================ */
+.ml-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--ml-radius-pill);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.ml-pill.is-pending {
+  background: var(--ml-orange);
+  color: var(--ml-white);
+}
+.ml-pill.is-awaiting-shipment {
+  background: var(--ml-bg-soft);
+  color: var(--ml-primary);
+}
+.ml-pill.is-shipped {
+  background: var(--ml-deepest);
+  color: var(--ml-white);
+}
+.ml-pill.is-done {
+  background: var(--ml-bg-card);
+  color: var(--ml-text-sub);
+}
+.ml-pill.is-cancelled {
+  background: var(--ml-bg-card);
+  color: var(--ml-text-ph);
+}
+
+/* ============================================================================
+   C7 步骤条 .ml-steps —— 横向 3–4 步、序号圆点 24px；
+   已完成 #2E7CD6 实心、当前 #2E7CD6 描边、未达 #E3E9F4；连接线 1px #E3E9F4
+   ============================================================================ */
+.ml-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 28px;
+}
+.ml-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ml-text-ph);
+}
+.ml-step-dot {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  border: 1px solid var(--ml-border-2);
+  background: var(--ml-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--ml-text-ph);
+}
+.ml-step.is-current .ml-step-dot {
+  border-color: var(--ml-primary);
+  color: var(--ml-primary);
+  box-shadow: 0 0 0 3px rgba(46, 124, 214, 0.12);
+}
+.ml-step.is-done .ml-step-dot {
+  background: var(--ml-primary);
+  border-color: var(--ml-primary);
+  color: var(--ml-white);
+}
+.ml-step.is-current,
+.ml-step.is-done {
+  color: var(--ml-text);
+}
+.ml-step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--ml-border-2);
+}
+
+/* ============================================================================
+   C8 金额行 .ml-amount-row —— 左标签 14px 次级色 + 右数值 14px 正文色（等宽数字）；
+   合计行 .is-total 加粗 18px 橙色。明细行 MUST 逐行可核对（FR-026）
+   ============================================================================ */
+.ml-amount-card {
+  background: var(--ml-bg-card-3);
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-card);
+  padding: 18px 20px;
+}
+.ml-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 7px 0;
+}
+.ml-amount-row .k {
+  color: var(--ml-text-sub);
+}
+.ml-amount-row .v {
+  color: var(--ml-text);
+  font-variant-numeric: tabular-nums;
+}
+.ml-amount-row .v.is-cut {
+  color: var(--ml-primary);
+}
+.ml-amount-row.is-total {
+  border-top: 1px dashed var(--ml-border-2);
+  margin-top: 8px;
+  padding-top: 14px;
+}
+.ml-amount-row.is-total .k {
+  color: var(--ml-text);
+  font-weight: 600;
+}
+.ml-amount-row.is-total .v {
+  color: var(--ml-orange);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   通用布局：两栏（结算页等）
+   --------------------------------------------------------------------------- */
+.ml-2col {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+.ml-card {
+  background: var(--ml-white);
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-card);
+  padding: 20px;
+}
+.ml-card + .ml-card {
+  margin-top: 16px;
+}
+.ml-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ml-text);
+  margin-bottom: 14px;
+}
+.ml-empty {
+  padding: 56px 16px;
+  text-align: center;
+}
+.ml-btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+.ml-btn-row > * {
+  flex: 1;
+}
+
+/* ============================================================================
+   SC-004 首屏预算：图片占位与懒加载
+   ---------------------------------------------------------------------------
+   design.css 给 .p-img / .g-main 的是「占位块」样式（.ph），真实图片会撑开
+   不同高度，导致加载完成后跳版（CLS），从而拖慢首屏可读时间。
+   这里用 aspect-ratio 预先占位：不需要知道图片真实尺寸也能避免跳版。
+   配合 <img loading="lazy">（卡片图）使用。
+   ============================================================================ */
+.p-img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--ml-radius-field);
+  background: var(--ml-bg-card);
+}
+.p-img-real {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.g-main {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--ml-radius-card);
+  background: var(--ml-bg-card);
+}
+.g-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.g-thumb {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--ml-radius-field);
+  background: var(--ml-bg-card);
+}
+.g-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.g-main-ph {
+  width: 100%;
+  height: 100%;
+}
+/* 规格项：无货态与选中态的视觉区分（FR-006） */
+.spec-out {
+  margin-left: 6px;
+  font-style: normal;
+  color: var(--ml-text-ph);
+  font-size: 12px;
+}
+.spec.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.pd-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ml-text);
+  margin-bottom: 8px;
+}
+.pd-desc :deep(img),
+.pd-desc img {
+  max-width: 100%;
+  height: auto;
+}
+.p-age-desc {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ml-text-sub);
+}
+
+@media (max-width: 1100px) {
+  .ml-2col {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .ml-page-title {
+    font-size: 22px;
+  }
+  .ml-modal {
+    max-width: calc(100vw - 32px);
+  }
+  .ml-steps {
+    gap: 6px;
+  }
+  .ml-step span:not(.ml-step-dot) {
+    display: none;
+  }
+}

@@ -141,7 +141,25 @@ img { display: block; }
   background: linear-gradient(180deg, #081530 0%, #2459B8 100%);
   display: flex; align-items: center; gap: 40px;
 }
-.hero-left { width: 540px; display: flex; flex-direction: column; gap: 28px; flex-shrink: 0; }
+/* ⚠️ hero 这三块的宽度是"写死"的：`.hero-slide` 的 padding 110×2 + `.hero-left` 540
+   + gap 40 + `.hero-visual` 500 + gap 20 + `.hero-chips` 152 = **1472px**。
+   而轮播的 `.car-slide` 是 `flex: 0 0 100%`（`flex-shrink: 0`，**不能小于内容的
+   min-content**）—— 于是**视口窄于 1472px 时，整屏右侧被裁掉**（看起来就是"轮播错位"）。
+   1101–1472px 正好是笔记本的常见区间，全程踩中；≤1100px 有媒体查询改成纵向排列，所以只在中间这段坏。
+
+   修法：让内容块**可收缩**。`min-width: 0` 是必须的 —— flex 项默认 min-width 是 auto，
+   不会小于自身内容宽度，加了才能真的收窄。空间不够时它们按比例收窄（文字多折两行、
+   配图变窄），而不是把整屏撑出视口。 */
+.hero-left {
+  /* 随视口缩放而不是写死 540px —— 见上面那段说明。下限 340px 保证标题不会
+     被挤成三行、按钮不会断行（实测 1200px 时写死宽度会把文字列压到 268px）。 */
+  width: clamp(340px, 42vw, 540px);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  flex-shrink: 1;
+  min-width: 0;
+}
 .hero-badge {
   align-self: flex-start;
   padding: 6px 14px;
@@ -175,7 +193,13 @@ img { display: block; }
 .btn-ghost-white:hover { background: rgba(255,255,255,.08); }
 .trust-line { font-size: 13px; color: #8FA6D9; }
 .hero-right { display: flex; align-items: center; gap: 20px; flex: 1; justify-content: flex-end; }
-.hero-visual { width: 500px; height: 440px; border-radius: 20px; flex-shrink: 0; }
+.hero-visual {
+  width: clamp(300px, 36vw, 500px);
+  height: 440px;
+  border-radius: 20px;
+  flex-shrink: 1;
+  min-width: 0;
+}
 .hero-chips { display: flex; flex-direction: column; gap: 14px; width: 152px; flex-shrink: 0; }
 .glass-chip {
   padding: 16px; border-radius: 14px;
@@ -731,6 +755,25 @@ body.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate
 .mobile-nav a { padding: 12px 4px; font-size: 15px; color: #3D4A66; border-bottom: 1px solid #F4F7FD; }
 .mobile-nav a:last-child { border-bottom: none; }
 .mobile-nav a.active { color: #2E7CD6; font-weight: 600; }
+/* 汉堡菜单里的「登录 / 注册」（未登录时是 <button>）与「个人中心」（已登录时是 <a>）。
+   按钮不会被上面的 `a` 选择器命中，所以单独给一份同样的版式。
+   它放在导航项**之前** —— 这样 `.mobile-nav a:last-child`（上面的去边框规则）
+   仍匹配「服务支持」，设计稿那条规则不受影响。 */
+.mobile-nav .m-login {
+  padding: 12px 4px;
+  font-size: 15px;
+  color: #2E7CD6;
+  font-weight: 600;
+  border-bottom: 1px solid #F4F7FD;
+}
+.mobile-nav .m-login-btn {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid #F4F7FD;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
 body.nav-open .mobile-nav { display: flex; }
 
 /* ---------- 响应式：平板 ≤1100px ---------- */
@@ -857,7 +900,15 @@ body.nav-open .mobile-nav { display: flex; }
    ============================================ */
 .carousel { position: relative; overflow: hidden; }
 .car-track { display: flex; width: 100%; transition: transform .6s cubic-bezier(.4,0,.2,1); }
-.car-slide { flex: 0 0 100%; }
+/* ⚠️ `min-width: 0` 不能省：`.car-slide` 是 flex 项，而 flex 项的 `min-width` 默认是
+   `auto` —— 意味着**它不能小于自己内容的 min-content**。内容一宽（首页 hero 是 1472px），
+   `flex: 0 0 100%` 里的 100% 就形同虚设：slide 撑到 1472，在窄于它的视口里右侧被裁掉
+   （表现就是"轮播错位"）。只在子项上写 `min-width: 0` 是不够的 —— 实测过，
+   子项都改可收缩了、slide 仍是 1472。 */
+.car-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+}
 .car-dots {
   position: absolute; bottom: 26px; left: 50%;
   transform: translateX(-50%);
@@ -885,8 +936,12 @@ body.nav-open .mobile-nav { display: flex; }
 /* 首页 Hero 轮播：slide 继承原 hero 的排版 */
 .hero.carousel { padding: 0; }
 .hero-slide {
-  height: 620px; padding: 0 110px;
-  display: flex; align-items: center; gap: 40px;
+  height: 620px;
+  /* 内边距与间距随视口缩放：写死 110px 时，窄屏光左右内边距就吃掉 220px */
+  padding: 0 clamp(16px, 7vw, 110px);
+  display: flex;
+  align-items: center;
+  gap: clamp(24px, 3vw, 40px);
 }
 
 /* 商城顶部横幅轮播 */

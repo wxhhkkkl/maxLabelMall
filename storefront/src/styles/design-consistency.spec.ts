@@ -113,22 +113,10 @@ describe('新页面视觉一致性 —— 不自带顶栏与页脚（§5 第 6 �
   })
 })
 
-describe('视觉基线 —— `design.css` 必须是设计稿样式表的逐字拷贝', () => {
-  /**
-   * T009 的硬约束是「把 `www/css/style.css` **原样**复制为 `design.css`，
-   * 不改一个字符」。与其在文件头写一句"请勿修改"的注释（注释拦不住任何人，
-   * 还会破坏字节一致），不如把这条不变量变成断言 —— 有人顺手"优化"了 design.css
-   * 就会立刻变红。
-   *
-   * ⚠️ 注意本测试**只读 `www/`**，绝不写它：`www/` 是硬约束禁止改动的目录。
-   */
-  it('与 `www/css/style.css` 字节相同（含 BOM 与文件头）', () => {
-    const root = join(process.cwd(), '..')
-    const design = readFileSync(join(process.cwd(), 'src/styles/design.css'), 'utf8')
-    const source = readFileSync(join(root, 'www/css/style.css'), 'utf8')
-    expect(design).toBe(source)
-  })
-})
+// 这里原本有一条「`design.css` 必须与 `www/css/style.css` 字节相同」的断言。
+// 2026-09-27 随规格修订**一并删除**：设计稿基线（FR-046 / SC-012）已放开，
+// `www/` 目录也已删除，`design.css` 现在是本项目自己的样式基线，可以演进。
+// 见 docs: 宪法 2.1.0 与 spec.md 的 FR-046 / SC-012 改动说明。
 
 describe('新页面视觉一致性 —— 不留写死内容（FR-043）', () => {
   it('全站不再出现设计稿写死的「购物车 (2)」', () => {

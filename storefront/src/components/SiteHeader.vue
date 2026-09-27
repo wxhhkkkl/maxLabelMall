@@ -137,6 +137,9 @@ function isActive(name: string): boolean {
        本意是藏顶栏那个「免费试用软件」按钮；弹层一旦嵌在 `<nav class="header">` 里，
        它的提交按钮（同样是 `.btn-primary`）会在 ≤480px 被**一起藏掉** ——
        手机上表现为"登录弹层能打开，但提交按钮点不动"。
-       这条规则来自设计稿样式表（逐字拷贝、不可改），所以只能把弹层移出去。 -->
+       这条规则来自设计稿样式表（当时是逐字拷贝、不可改），所以只能把弹层移出去。
+       ⚠️ 2026-09-27 起设计稿基线已放开、`design.css` 可改 —— 但**这里不要改回去**：
+       把弹层塞回 `<nav class="header">` 里，等于让弹层的按钮继续受 `.header` 下的
+       后代选择器摆布，是个结构性的坑，不是靠调 CSS 能根治的。 -->
   <LoginDialog :open="loginOpen" @close="closeLogin" @success="onLoginSuccess" />
 </template>

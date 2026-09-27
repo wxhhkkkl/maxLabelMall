@@ -133,15 +133,13 @@ test.describe('移动端 375px —— 无横向滚动（SC-008）', () => {
  * `flex-direction` 改成 `column`、**没有重置 `align-items`** —— 于是子项在交叉轴上
  * 不拉伸，`.mall-right` 按内容最大宽度撑开。
  *
- * 为什么没有直接修：
- * 1. `design.css` 是 `www/css/style.css` 的**逐字拷贝**（硬约束，且有断言盯着），不能改；
- * 2. 在 `store.css` 里写覆盖，等于改动**设计稿页面**在移动端的版式 ——
- *    而 FR-046 只允许六处偏离、SC-012 明令「不存在未经声明的额外偏离」。
- *
- * 这与 T125（顶栏领券入口）是同一类冲突：**规格要求与设计稿基线打架，需项目所有者裁决**
- * （走宪法「例外条款」修订 spec，而不是在任务层自行豁免）。
+ * **修法已经完全放开、只是还没做**：原先这里列过两条"不能修"的理由（`design.css`
+ * 必须与设计稿逐字相同、在 store.css 覆盖等于第七处偏离），**两条都已随
+ * FR-046/SC-012 的修订作废**（设计稿基线放开、`www/` 已删除，见宪法 2.1.0）。
+ * 也就是说：直接改 `.mall-page-main` 的 `align-items`，或在 `store.css` 里覆盖，
+ * **现在都不需要任何声明**。这是一条普通的未修缺陷，不再是"需所有者裁决的冲突"。
  */
-test('【已知冲突，未修】`/mall` 在 375px 下横向溢出 44px', async ({ page }) => {
+test('【已知缺陷，未修】`/mall` 在 375px 下横向溢出 44px', async ({ page }) => {
   test.fail()
   await page.goto('/mall')
   await expect(page.locator('.p-card').first()).toBeVisible()

@@ -47,6 +47,24 @@ const currentSku = computed<ProductSku | null>(() => {
   return skus.value.find((s) => s.id === currentSkuId.value) ?? null
 })
 
+/**
+ * 图集 = 封面 + 轮播图，**去重**。
+ * 后端把封面放在 `picUrl`、轮播图放在 `sliderPicUrls`，两者**可能重复**
+ * （实测的示例商品就是两张同一张图），不去重会出现两个一模一样的缩略图。
+ */
+const galleryPics = computed<string[]>(() => {
+  const list = [spu.value?.picUrl, ...(spu.value?.sliderPicUrls ?? [])]
+  return [...new Set(list.filter((p): p is string => !!p))]
+})
+
+/** 用户点过的图；为空表示还没点过，主图回落到图集第一张 */
+const pickedPic = ref('')
+const mainPic = computed(() => pickedPic.value || galleryPics.value[0] || '')
+
+function pickPic(pic: string): void {
+  pickedPic.value = pic
+}
+
 /** 展示价：多规格未选时用 SPU 的价格区间下界 */
 const price = computed(() => currentSku.value?.price ?? spu.value?.price ?? 0)
 const marketPrice = computed(() => currentSku.value?.marketPrice ?? spu.value?.marketPrice ?? 0)
@@ -139,6 +157,8 @@ async function load() {
     const list = detail.skus ?? []
     // 多规格默认选第一个**有货**的规格；全都无货则不预选
     currentSkuId.value = list.find((s) => s.stock > 0)?.id ?? null
+    // 换了商品要把"用户点过的那张图"清掉，否则会显示上一个商品选中的图
+    pickedPic.value = ''
   } catch {
     // 已下架 / 不存在：后端返回业务异常，这里给出明确提示而非空白页（FR-007）
     notFound.value = true
@@ -173,11 +193,17 @@ watch(() => props.id, load)
     <div class="pd-main">
       <div class="gallery">
         <div class="g-main">
-          <img v-if="spu.picUrl" :src="spu.picUrl" :alt="spu.name" />
+          <img v-if="mainPic" :src="mainPic" :alt="spu.name" />
           <div v-else class="ph g-main-ph">暂无图片</div>
         </div>
         <div class="g-thumbs">
-          <div v-for="(pic, i) in spu.sliderPicUrls" :key="pic" class="g-thumb" :class="{ active: i === 0 }">
+          <div
+            v-for="(pic, i) in galleryPics"
+            :key="pic"
+            class="g-thumb"
+            :class="{ active: pic === mainPic }"
+            @click="pickPic(pic)"
+          >
             <img :src="pic" :alt="`${spu.name} 图 ${i + 1}`" />
           </div>
         </div>

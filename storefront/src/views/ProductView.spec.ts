@@ -113,7 +113,9 @@ describe('ProductView —— 图片区与信息区（FR-005）', () => {
   it('渲染主图与图集缩略图', async () => {
     const w = await mountDetail(spu())
     expect(w.get('.g-main img').attributes('src')).toBe('http://x/main.png')
-    expect(w.findAll('.g-thumb')).toHaveLength(2)
+    // 3 张 = 封面 picUrl + 两张 sliderPicUrls（早期只渲染 sliderPicUrls，
+    // 于是封面不在图集里、也无法被选中）
+    expect(w.findAll('.g-thumb')).toHaveLength(3)
   })
 
   it('展示销量与库存状态', async () => {
@@ -173,6 +175,42 @@ describe('ProductView —— 规格参数表改由 SKU 规格项承载（FR-005a
     const w = await mountDetail(spu())
     expect(w.text()).toContain('版本')
     expect(w.text()).toContain('规格 1')
+  })
+})
+
+describe('ProductView —— 主图与图集（FR-005）', () => {
+  it('默认显示第一张图（封面）', async () => {
+    const w = await mountDetail(spu())
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/main.png')
+    expect(w.get('.g-thumb.active img').attributes('src')).toBe('http://x/main.png')
+  })
+
+  it('图集 = 封面 + 轮播图，逐一渲染出缩略图', async () => {
+    const w = await mountDetail(spu())
+    const srcs = w.findAll('.g-thumb img').map((i) => i.attributes('src'))
+    expect(srcs).toEqual(['http://x/main.png', 'http://x/1.png', 'http://x/2.png'])
+  })
+
+  it('**点击缩略图切换主图，并标出当前项**', async () => {
+    // 这条是补一个真实缺陷：缩略图原先渲染了，但 `active` 写死成 index 0、
+    // 也没有点击处理 —— 点它什么都不发生，主图永远是封面。
+    const w = await mountDetail(spu())
+    await w.findAll('.g-thumb')[2].trigger('click')
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/2.png')
+    expect(w.findAll('.g-thumb')[2].classes()).toContain('active')
+    expect(w.findAll('.g-thumb')[0].classes()).not.toContain('active')
+  })
+
+  it('**封面与轮播图重复时去重**，不出现两张一模一样的缩略图', async () => {
+    const w = await mountDetail(spu({ picUrl: 'http://x/1.png' }))
+    const srcs = w.findAll('.g-thumb img').map((i) => i.attributes('src'))
+    expect(srcs).toEqual(['http://x/1.png', 'http://x/2.png'])
+  })
+
+  it('没有任何图时给占位块，不渲染空 img', async () => {
+    const w = await mountDetail(spu({ picUrl: '', sliderPicUrls: [] }))
+    expect(w.find('.g-main img').exists()).toBe(false)
+    expect(w.find('.g-main-ph').exists()).toBe(true)
   })
 })
 

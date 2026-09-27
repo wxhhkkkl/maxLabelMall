@@ -176,6 +176,11 @@ export default {
     totalShopping: '购物总量',
     monthlySales: '每月销售额',
     userAccessSource: '用户访问来源',
+    // 工作台两张图接的是**真实统计**，标题按数据的真实口径命名：
+    // 饼图是「会员按终端分布」，柱图是「近 7 日订单量」（数据来源见 api/statistics）
+    memberTerminalSource: '会员来源（按终端）',
+    orderCountTrend7d: '近 7 日订单量',
+    terminalOther: '其他终端',
     january: '一月',
     february: '二月',
     march: '三月',

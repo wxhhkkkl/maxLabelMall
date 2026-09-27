@@ -7,7 +7,7 @@
 
 把 `www/` 下 6 页静态设计稿重写为一个 Vue 3 单页应用，并接上 yudao 既有的 app-api，使商品展示、登录、购物车、下单、支付、优惠券、订单全部走真实后台数据。
 
-技术路线：**照搬 `yudao-ui-admin-vue3` 的工程骨架**（Vue 3.5 + Vite 8 + TS 6 + Pinia 3 + vue-router 5 + axios 三层封装），把 API 前缀换成 `/app-api`、认证换成 `/member/auth/*`，**原样复用 `www/css/style.css`** 作为视觉基线，**不引入 UI 组件库**，**不改动后端任何代码**。
+技术路线：**照搬 `yudao-ui-admin-vue3` 的工程骨架**（Vue 3.5 + Vite 8 + TS 6 + Pinia 3 + vue-router 5 + axios 三层封装），把 API 前缀换成 `/app-api`、认证换成 `/member/auth/*`，**原样复用 `www/css/style.css`** 作为视觉基线，**不引入 UI 组件库**。
 
 三处支撑这一路线的前置查证（详见 [research.md](./research.md)）：
 
@@ -29,7 +29,6 @@
 **Project Type**: 前端单页应用（web）。**消费既有后端接口，本期不含任何后端改动**
 **Performance Goals**: 商品列表页与商品详情页首屏内容 ≤ 3 秒可见（SC-004）
 **Constraints**:
-- **不得改动 `yudao-cloud/`**（它是引入的二开基线，保持与上游的 diff 干净）
 - **不得改动 `www/css/style.css`**（设计稿是视觉基线，FR-046）
 - **17 条无设计稿路由 MUST 遵循 [design-new-pages.md](./design-new-pages.md)** 的令牌与组件契约；信息页 MUST NOT 编造业务事实（FR-054）
 - 不引入 UI 组件库（reasoning 见 [research.md](./research.md) R1）
@@ -91,7 +90,7 @@ specs/001-mall-storefront-integration/
 
 ### Source Code (repository root)
 
-新站放在**仓库根的新目录 `storefront/`**，与设计稿 `www/` 平级。**不放进 `yudao-cloud/yudao-ui/`**，以免污染上游基线的 diff。
+新站放在**仓库根的新目录 `storefront/`**，与设计稿 `www/` 平级。不放进 `yudao-cloud/yudao-ui/` —— 那里是管理端与 uniapp 所在处，新站与本特性无关，放一起只会让目录语义变浑（**这已是纯工程取舍，不再是硬约束**：宪法 2.0.0 已删去「保持上游基线 diff 干净」一条）。
 
 ```text
 storefront/
@@ -209,7 +208,7 @@ e2e/pay.spec.ts                       # T114：SC-010 模拟支付后变待发�
 
 - 只有一栋站点，没有第二个消费者，monorepo 是无谓的复杂度（CLAUDE.md 原则 2）。
 - 骨架从 `yudao-ui-admin-vue3` 复制结构但**不建立包依赖** —— 仓库里两个既有前端也是彼此独立的工程（`pnpm-workspace.yaml` 没有 `packages` 字段），照此惯例。
-- 放在仓库根而非 `yudao-cloud/yudao-ui/` 下，是为了让上游基线的 diff 保持干净（CLAUDE.md 原则 3）。
+- 放在仓库根而非 `yudao-cloud/yudao-ui/` 下，是**为了目录语义清晰**（新站与管理端/uniapp 无关）。早期版本此处写的是"让上游基线的 diff 保持干净" —— 该约束已在宪法 2.0.0 中删除。
 
 ## 路由清单与设计稿覆盖情况
 

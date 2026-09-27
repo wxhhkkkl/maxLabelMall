@@ -1,6 +1,33 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.0.0 → 2.0.0
+Bump rationale: **MAJOR** —— 删除了「技术栈与架构约束」里的一条 MUST
+（「yudao 是引入的上游基线，MUST 保持与其 diff 干净」）。移除 MUST 级约束属于
+「移除或重定义原则等向后不兼容的治理变更」，故升 MAJOR。
+
+动机（项目所有者 2026-09-27 决策）：该约束把 yudao-cloud 当作只读基线，但本项目的
+定位是**二开**（secondary development）—— 已经需要改管理端的加载动画、首页看板、
+DocAlert 提示等上游行为。每改一处都要走一次"例外条款"才合法，成本高于收益。
+
+被影响的产物（已同步）：
+  - specs/001-mall-storefront-integration/plan.md —— 约束清单与两处引用该约束的
+    选址理由（原文：放在仓库根"以免污染上游基线的 diff"）
+  - specs/001-mall-storefront-integration/tasks.md —— 「四条硬约束」改为三条
+  - 代码：`yudao-cloud/yudao-ui/yudao-ui-admin-vue3/` 下开始出现本项目自己的改动
+    （index.html 的加载动画、Home/Index.vue 的看板、.env.local 的 DocAlert 开关）
+
+**替代做法（非约束，仅为工程建议）**：改动上游文件时，尽量把改动收敛在少量文件、
+并在提交信息里写明原因 —— 因为**代价从"违规"变成了"将来升级上游时要手工对账"**。
+这条不是 MUST，不参与合规审查。
+
+**明确未受影响**（仍在效力）：
+  - `www/` 不得改动、`storefront/src/styles/design.css` 是 `www/css/style.css` 的
+    逐字拷贝（那是**设计稿**基线，FR-046 / SC-012，与上游代码基线是两回事）
+  - 不引入 UI 组件库、C 端只走 `/app-api`、数据库只用 MySQL 等技术栈约束
+
+---
+
 Version change: (未填写模板) → 1.0.0
 Bump rationale: 首次正式批准（MAJOR）。此前文件是含 15 处占位符的未填写模板，
 本次为初次采纳，无向后兼容问题需要考量，故直接定为 1.0.0。
@@ -141,8 +168,6 @@ MUST NOT 以「先实现，通过后再补测试」的方式交付。补写的�
   管理端一律走 `/admin-api`。MUST NOT 跨用。
 - 服务端本地开发形态为单体聚合启动；微服务网关形态仅在部署时使用，二者本地
   互斥。
-- yudao 是引入的上游基线，MUST 保持与其 diff 干净：本项目自身的代码 MUST NOT
-  放在基线的目录内。
 
 ## 开发工作流与质量门禁
 
@@ -183,4 +208,4 @@ MUST NOT 以「先实现，通过后再补测试」的方式交付。补写的�
 - **运行期指引**：`CLAUDE.md` 承载日常行为准则与当前计划的位置指引，其内容
   MUST NOT 与本宪法冲突。
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-24 | **Last Amended**: 2026-09-24
+**Version**: 2.0.0 | **Ratified**: 2026-09-24 | **Last Amended**: 2026-09-27

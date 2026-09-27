@@ -224,7 +224,11 @@ onMounted(async () => {
         @action="load"
       />
 
-      <div v-else-if="products.length" class="grid-3">
+      <!-- `mall-grid`：列数自适应（卡片不再被撑大）。
+           ⚠️ **不要同时挂 `grid-3`** —— 它的 base 规则 `repeat(3,1fr)` 在样式表里
+           更靠后，同优先级下会覆盖掉 mall-grid 的 auto-fill（实测过：卡片又是 335px）。
+           窄屏的 2 列 / 1 列阶梯已直接写进 `.mall-grid` 的媒体查询。 -->
+      <div v-else-if="products.length" class="mall-grid">
         <ProductCard v-for="p in products" :key="p.id" :spu="p" :badge="badgeOf(p.id)" />
       </div>
 

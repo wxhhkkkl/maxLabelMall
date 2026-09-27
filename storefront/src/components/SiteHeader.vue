@@ -22,12 +22,27 @@ import LoginDialog from './LoginDialog.vue'
  * 打开的都是同一个实例，登录态也天然全站同步（FR-042）。
  */
 
+/**
+ * 导航项。
+ *
+ * **前五项**是设计稿的原有导航；后两项是本项目追加的（FR-026c 要求有领券入口、
+ * FR-034 要求「我的订单」可达）。2026-09-27 设计稿基线放开后，这类追加**不需要
+ * 任何偏离声明** —— 但仍刻意追加在末尾，好让"哪些是设计稿原有的"一眼可见。
+ *
+ * 放主导航而不是右侧 `.header-right`，有两个实际好处：
+ *   ① `.nav` 在 ≤1100px 是 `display:none`，所以**对窄屏顶栏宽度零影响**
+ *      （塞进右侧会把 375px 的顶栏挤爆）；
+ *   ② 移动端汉堡菜单（`.mobile-nav`）与主导航同源，这两个入口在手机上自动可达
+ *      —— 此前未登录访客在手机上够不到领券中心。
+ */
 const NAV = [
   { to: '/', label: '首页', name: 'home' },
   { to: '/mall', label: '商城', name: 'mall' },
   { to: '/software', label: '标签软件', name: 'software' },
   { to: '/solutions', label: '行业方案', name: 'solutions' },
   { to: '/support', label: '服务支持', name: 'support' },
+  { to: '/coupon', label: '领券中心', name: 'coupon' },
+  { to: '/order', label: '我的订单', name: 'order' },
 ] as const
 
 const route = useRoute()

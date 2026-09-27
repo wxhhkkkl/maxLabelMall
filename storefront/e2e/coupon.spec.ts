@@ -31,6 +31,25 @@ async function pickProductAbove(page: Page, minYuan: number) {
  * 只有全程 SPA 才测得到。
  */
 test.describe('US5 优惠券', () => {
+  test('**顶栏能直达领券中心**，未登录也够得到（T125 / FR-026c）', async ({ page }) => {
+    // T125 的意义就在这里：此前 `/coupon` 只能在**登录后**从「我的券」页绕进去，
+    // 未登录访客没有任何入口。现在它进了主导航（因而移动端汉堡菜单里也有）。
+    await page.goto('/')
+    await page.locator('.nav a', { hasText: '领券中心' }).click()
+    await expect(page).toHaveURL(/\/coupon$/)
+    // 免登录也能看到券列表（`coupon-template/list` 是 @PermitAll）
+    await expect(page.locator('.cc-card').first()).toBeVisible()
+  })
+
+  test('移动端汉堡菜单里也有领券中心入口', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/')
+    await page.locator('.nav-toggle').click()
+    await page.locator('.mobile-nav a', { hasText: '领券中心' }).click()
+    await expect(page).toHaveURL(/\/coupon$/)
+  })
+
+
   test('领券后无需刷新即可在结算页选用（SC-014 / FR-026c / FR-026d）', async ({ page }) => {
     const mobile = testMobile()
     await page.goto('/')

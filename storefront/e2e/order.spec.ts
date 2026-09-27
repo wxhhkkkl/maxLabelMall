@@ -12,6 +12,14 @@ import { createAddress, smsLogin, testMobile } from './helpers'
  * —— 早先正是「组件测试全绿、真实链路里 source 恒为默认值、skuId 恒为 undefined」。
  */
 test.describe('US4 结算与下单', () => {
+  test('**顶栏「我的订单」直达订单列表**（T113 / FR-034）', async ({ page }) => {
+    await page.goto('/')
+    await smsLogin(page, testMobile())
+    await page.locator('.nav a', { hasText: '我的订单' }).click()
+    await expect(page).toHaveURL(/\/order$/)
+  })
+
+
   test('详情页「立即购买」→ 提交 → 订单出现在「我的订单」且为待支付（SC-003）', async ({
     page,
   }) => {

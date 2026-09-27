@@ -240,6 +240,7 @@ img { display: block; }
   gap: 24px;
 }
 .p-card {
+  position: relative;
   padding: 16px; border-radius: 16px;
   background: #FFFFFF;
   border: 1px solid #E3E9F4;
@@ -249,7 +250,11 @@ img { display: block; }
 }
 .p-card:hover { transform: translateY(-4px); box-shadow: 0 14px 32px rgba(39,58,98,.14); }
 .p-img { height: 190px; border-radius: 12px; overflow: hidden; }
-.p-tags { display: flex; gap: 8px; }
+/* ⚠️ 角标**脱离布局流**，浮在主图左上角（`.p-card` 是 relative）。
+   若让 `.p-tags` 当一行占位，带角标的卡就比同行的邻居多一行 —— 标题、价格
+   整段下移，一行卡片里参差不齐（实测错位 34px：角标高 22 + gap 12）。
+   角标有底色，压在图上仍然可辨。 */
+.p-tags { position: absolute; top: 16px; left: 16px; z-index: 1; display: flex; gap: 8px; }
 .p-tag {
   padding: 3px 10px; border-radius: 100px;
   font-size: 11px; font-weight: 500;
@@ -265,6 +270,11 @@ img { display: block; }
   padding: 10px 0; text-align: center;
   font-size: 13px; font-weight: 600; color: #2E7CD6;
   cursor: pointer; transition: background .15s;
+  /* ⚠️ `margin-top: auto` 不能省：`.p-card` 是 flex 列，同一行卡片**等高**
+     （栅格 stretch），但卡片内部的元素高度不一致 —— 有简介的卡多一行 `.p-sell`，
+     标题也可能多折一行。不把按钮顶到底部，它就会跟着内容走，
+     同一行里几个「加入购物车」高度参差不齐。 */
+  margin-top: auto;
 }
 .p-btn:hover { background: #D9E6FF; }
 
@@ -832,7 +842,8 @@ body.nav-open .mobile-nav { display: flex; }
   /* 手机端商品卡：竖版大卡 → 横版紧凑列表卡（左图右信息） */
   .p-card { display: grid; grid-template-columns: 104px 1fr; gap: 4px 14px; padding: 14px; align-content: start; }
   .p-card .p-img { grid-column: 1; grid-row: 1 / span 4; width: 104px; height: 104px; border-radius: 10px; flex: none; }
-  .p-card .p-tags { grid-column: 2; align-self: start; }
+  /* 角标仍浮在缩略图左上角（这里的卡片内边距是 14px，不是 16px） */
+  .p-card .p-tags { top: 14px; left: 14px; }
   .p-card .p-title { grid-column: 2; min-height: 0; font-size: 14px; line-height: 1.45; }
   .p-card .p-price { grid-column: 2; font-size: 18px; align-self: end; }
   .p-card .p-btn { grid-column: 2; margin-top: 4px; align-self: end; }

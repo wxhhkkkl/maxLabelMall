@@ -51,10 +51,22 @@ export const useUserStore = defineStore('user', () => {
     }
     try {
       member.value = await getMemberUser()
-    } catch {
-      // 会员信息拉取失败不改写登录态 —— 令牌可能仍有效（例如偶发网络问题），
-      // 真正的失效由响应拦截器的 401 分支处理
+    } catch (e) {
       member.value = null
+      // ⚠️ **后端明确说"这个身份不合法/无权访问"时必须清掉登录态**（2026-09-27 实测）：
+      //    换租户后浏览器里会留着**旧租户签发的令牌**，前端发 `tenant-id=162` + 那个旧令牌
+      //    → 后端 `TenantSecurityWebFilter` 回 **403**「您无权访问该租户的数据」。
+      //    而响应拦截器**只在 401 时**刷新并清空，403 不处理 —— 于是旧令牌永远留着，
+      //    `isLogin` 恒为真、`member` 恒为 null → 顶栏渲染成一个**看不见的空链接**，
+      //    **刷新也没用**（令牌还在）。只有在这里清掉才能自愈。
+      //
+      //    但**不能一律清**：网络异常等临时故障把用户踢下线是 FR-013 明确禁止的，
+      //    所以只认这两个码。
+      const code = (e as { code?: number } | null)?.code
+      if (code === 401 || code === 403) {
+        clearTokens()
+        token.value = ''
+      }
     }
   }
 

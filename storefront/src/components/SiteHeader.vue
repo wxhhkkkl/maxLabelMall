@@ -124,8 +124,11 @@ function isActive(name: string): boolean {
       </RouterLink>
       <!-- 已登录：入口变为个人中心，并显示昵称或脱敏手机号（FR-016）
            未登录：点它打开登录弹层（全站唯一实例） -->
+      <!-- ⚠️ 兜底文案不能省：`displayName` 在"有令牌但会员信息还没回来/拉不到"时是空的，
+           没有兜底就会渲染成一个 **0×0 的空白链接** —— 用户看到的是"个人中心不见了"
+           （实测过：`a` 标签、文字为空、宽高 0）。移动端那处一直有兜底，桌面端漏了。 -->
       <RouterLink v-if="userStore.isLogin" class="login" to="/account">
-        {{ userStore.displayName }}
+        {{ userStore.displayName || '个人中心' }}
       </RouterLink>
       <button v-else class="login login-btn" type="button" @click="openLogin">
         登录 / 注册

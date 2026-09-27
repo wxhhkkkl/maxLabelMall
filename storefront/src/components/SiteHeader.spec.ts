@@ -195,6 +195,19 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     expect(w.get('.login').text()).toBe('张三')
   })
 
+  it('**有令牌但会员信息暂时拉不到时，入口也不能是空文本**', async () => {
+    // 网络异常时登录态**保留**（FR-013），此时 displayName 为空 ——
+    // 若入口没有兜底文案，就会渲染成一个 0×0 的空白链接，
+    // 用户看到的就是"个人中心不见了"（实测确认过：a 标签、文字为空、宽高 0）。
+    const { setTokens } = await import('@/utils/auth')
+    setTokens('at-1', 'rt-1')
+    getMemberUser.mockReset()
+    getMemberUser.mockRejectedValue(new Error('Network Error'))
+    const w = mountHeader()
+    await flushPromises()
+    expect(w.get('.login').text().trim()).not.toBe('')
+  })
+
   it('退出登录后立即恢复未登录态', async () => {
     const w = await mountLoggedIn()
     const { useUserStore } = await import('@/store/user')

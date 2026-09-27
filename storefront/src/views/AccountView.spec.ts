@@ -57,6 +57,26 @@ async function mountView() {
   return w
 }
 
+describe('AccountView —— 侧栏入口（T113 / T125）', () => {
+  it('**侧栏含「我的订单」与「领券中心」** —— 这两处入口归个人中心，不往顶栏加', () => {
+    // 2026-09-27：它们一度加在顶栏主导航里，但顶栏加到 7 项后 1101–1200px
+    // 会挤到每个词都竖排折行；所有者反馈"放个人中心更合理"，于是移到此处。
+    return mountView().then((w) => {
+      const items = w
+        .findAll('.sidebar .s-item')
+        .map((a) => [a.text(), a.attributes('href')])
+      expect(items).toContainEqual(['我的订单', '/order'])
+      expect(items).toContainEqual(['领券中心', '/coupon'])
+    })
+  })
+
+  it('侧栏仍保留个人中心 / 收货地址 / 我的券', async () => {
+    const w = await mountView()
+    const labels = w.findAll('.sidebar .s-item').map((a) => a.text())
+    expect(labels).toEqual(['个人中心', '我的订单', '领券中心', '收货地址', '我的券'])
+  })
+})
+
 describe('AccountView —— 设置密码（FR-011）', () => {
   it('提交时把**密码与手机验证码一起**送出', async () => {
     updatePassword.mockResolvedValue(true)

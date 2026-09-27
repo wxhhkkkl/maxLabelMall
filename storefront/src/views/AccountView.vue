@@ -119,6 +119,10 @@ async function onLogout() {
     <aside class="sidebar">
       <RouterLink class="s-item active" to="/account">个人中心</RouterLink>
       <RouterLink class="s-item" to="/order">我的订单</RouterLink>
+      <!-- 领券中心：需要登录才能看到本页，所以未登录访客没有它的入口 ——
+           这是所有者 2026-09-27 的取舍（此前它一度在顶栏主导航里，
+           但顶栏加到 7 项后窄屏会挤到逐字折行）。 -->
+      <RouterLink class="s-item" to="/coupon">领券中心</RouterLink>
       <RouterLink class="s-item" to="/account/address">收货地址</RouterLink>
       <RouterLink class="s-item" to="/coupon/mine">我的券</RouterLink>
     </aside>

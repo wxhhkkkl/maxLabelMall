@@ -23,17 +23,15 @@ import LoginDialog from './LoginDialog.vue'
  */
 
 /**
- * 导航项。
+ * 导航项 —— **固定为设计稿的这五项，不再往顶栏加入口**。
  *
- * **前五项**是设计稿的原有导航；后两项是本项目追加的（FR-026c 要求有领券入口、
- * FR-034 要求「我的订单」可达）。2026-09-27 设计稿基线放开后，这类追加**不需要
- * 任何偏离声明** —— 但仍刻意追加在末尾，好让"哪些是设计稿原有的"一眼可见。
+ * 「领券中心」与「我的订单」一度放在这里（T125 / T113），但**已移到个人中心**
+ * （2026-09-27，按所有者反馈：「放在个人中心里面比较合理」）。移到 `AccountView`
+ * 的侧栏里，见那里的「领券中心」「我的订单」两项。
  *
- * 放主导航而不是右侧 `.header-right`，有两个实际好处：
- *   ① `.nav` 在 ≤1100px 是 `display:none`，所以**对窄屏顶栏宽度零影响**
- *      （塞进右侧会把 375px 的顶栏挤爆）；
- *   ② 移动端汉堡菜单（`.mobile-nav`）与主导航同源，这两个入口在手机上自动可达
- *      —— 此前未登录访客在手机上够不到领券中心。
+ * 顺带解决了一个真实缺陷：顶栏加到 7 项后，1101–1200px 这段空间不够，
+ * 而 header 里的文字**没有 `nowrap`**，于是每一个子项都逐字竖排折行
+ * （「赋签」变成上下两个字）。回到 5 项 + 补 `nowrap` 之后不再出现。
  */
 const NAV = [
   { to: '/', label: '首页', name: 'home' },
@@ -41,8 +39,6 @@ const NAV = [
   { to: '/software', label: '标签软件', name: 'software' },
   { to: '/solutions', label: '行业方案', name: 'solutions' },
   { to: '/support', label: '服务支持', name: 'support' },
-  { to: '/coupon', label: '领券中心', name: 'coupon' },
-  { to: '/order', label: '我的订单', name: 'order' },
 ] as const
 
 const route = useRoute()

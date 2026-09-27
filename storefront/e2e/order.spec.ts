@@ -12,10 +12,12 @@ import { createAddress, smsLogin, testMobile } from './helpers'
  * —— 早先正是「组件测试全绿、真实链路里 source 恒为默认值、skuId 恒为 undefined」。
  */
 test.describe('US4 结算与下单', () => {
-  test('**顶栏「我的订单」直达订单列表**（T113 / FR-034）', async ({ page }) => {
+  test('**从个人中心侧栏进「我的订单」**（T113 / FR-034）', async ({ page }) => {
+    // 入口在个人中心侧栏，不在顶栏（理由同 coupon.spec.ts 里那条）
     await page.goto('/')
     await smsLogin(page, testMobile())
-    await page.locator('.nav a', { hasText: '我的订单' }).click()
+    await page.goto('/account')
+    await page.locator('.sidebar .s-item', { hasText: '我的订单' }).click()
     await expect(page).toHaveURL(/\/order$/)
   })
 

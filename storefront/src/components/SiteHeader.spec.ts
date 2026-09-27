@@ -76,40 +76,28 @@ describe('SiteHeader —— 静态结构', () => {
     expect(w.get('.logo-en').text()).toBe('MaxLabel')
   })
 
-  it('导航**前五项与设计稿一致**，其后是本项目追加的入口', () => {
-    // 断言"前五项相等 + 追加项存在"，而不是把整个数组写死 ——
-    // 后者每加一个入口就要改一次，且改的时候容易看不出"前五项才是设计稿原样"。
+  it('**固定渲染设计稿的五个导航项 —— 新增入口一律不往顶栏加**', () => {
+    // 2026-09-27：一度把「领券中心」「我的订单」加在这里，但顶栏加到 7 项后
+    // 1101–1200px 挤到每个词都竖排折行。所有者反馈"放个人中心更合理"，
+    // 于是回退 —— 顶栏保持 5 项，那两处入口在 `AccountView` 的侧栏里
+    // （相关断言见 AccountView.spec.ts）。
     const labels = mountHeader()
       .findAll('.nav a')
       .map((a) => a.text())
-    expect(labels.slice(0, 5)).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
-    // 2026-09-27 设计稿基线放开后，这类追加不再需要任何偏离声明
-    expect(labels).toContain('领券中心')
-    expect(labels).toContain('我的订单')
+    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
   })
 
-  it('**导航含「领券中心」且指向 /coupon**（FR-026c）', () => {
-    const nav = mountHeader()
-      .findAll('.nav a')
-      .map((a) => [a.text(), a.attributes('href')])
-    expect(nav).toContainEqual(['领券中心', '/coupon'])
-  })
-
-  it('**顶栏含「我的订单」入口**（FR-034 / T113）', () => {
-    // 不绑死放在哪个容器里 —— 要求只是"顶栏够得到"。实现上放在主导航，
-    // 好处是它对 ≤1100px 的顶栏宽度零影响（`.nav` 那个断点下是 display:none）。
-    const link = mountHeader().find('.header a[href="/order"]')
-    expect(link.exists()).toBe(true)
-    expect(link.text()).toContain('我的订单')
+  it('**顶栏不再出现「领券中心」「我的订单」**（它们归个人中心）', () => {
+    const w = mountHeader()
+    expect(w.find('.header a[href="/coupon"]').exists()).toBe(false)
+    expect(w.find('.header a[href="/order"]').exists()).toBe(false)
   })
 
   it('导航项指向正确的路由（不是设计稿里的 .html）', () => {
     const hrefs = mountHeader()
       .findAll('.nav a')
       .map((a) => a.attributes('href'))
-    expect(hrefs.slice(0, 5)).toEqual(['/', '/mall', '/software', '/solutions', '/support'])
-    expect(hrefs).toContain('/coupon')
-    expect(hrefs).toContain('/order')
+    expect(hrefs).toEqual(['/', '/mall', '/software', '/solutions', '/support'])
   })
 
   it('渲染购物车入口、登录入口与主按钮', () => {
@@ -128,13 +116,11 @@ describe('SiteHeader —— 静态结构', () => {
     expect(w.text()).not.toContain('购物车 (2)')
   })
 
-  it('移动端导航与主导航同源 —— 汉堡菜单里也要够得到领券与订单', () => {
+  it('移动端导航也渲染同样五项（汉堡菜单与主导航同源）', () => {
     const labels = mountHeader()
       .findAll('.mobile-nav a')
       .map((a) => a.text())
-    expect(labels.slice(0, 5)).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
-    expect(labels).toContain('领券中心')
-    expect(labels).toContain('我的订单')
+    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
   })
 
   it('渲染汉堡按钮，点击切换 body 的 nav-open（沿用设计稿机制）', async () => {

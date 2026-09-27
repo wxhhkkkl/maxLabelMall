@@ -88,7 +88,19 @@ export async function createAddress(page: Page, name = '测试收件人'): Promi
   // 新账号一条地址都没有，走的是空状态里的「新增地址」；已有地址时才是列表下方的
   // `#addAddress` —— 按可见文案定位才能两条路都走通。
   await page.getByRole('button', { name: '新增地址' }).click()
+  await fillAddressForm(page, name)
+  await page.locator('#addrSave').click()
+  await page.locator('.ml-modal').waitFor({ state: 'detached' })
+}
 
+/**
+ * 填地址表单 —— **不负责打开弹层与保存**。
+ *
+ * 抽出来是因为两个地方都要填它：地址管理页（`/account/address`）与**结算页**
+ * （原地弹层新增，见 `order.spec.ts`）。两处用的是同一个组件
+ * `AddressFormDialog.vue`，字段与 id 完全一致。
+ */
+export async function fillAddressForm(page: Page, name = '测试收件人'): Promise<void> {
   await page.locator('#addrName').fill(name)
   await page.locator('#addrMobile').fill('13800001111')
 
@@ -108,6 +120,4 @@ export async function createAddress(page: Page, name = '测试收件人'): Promi
 
   await page.locator('#addrDetail').fill('测试路 1 号')
   await checkMlCheck(page, '.ml-modal')
-  await page.locator('#addrSave').click()
-  await page.locator('.ml-modal').waitFor({ state: 'detached' })
 }

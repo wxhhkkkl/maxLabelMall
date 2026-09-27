@@ -10,6 +10,7 @@ import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlSteps from '@/components/base/MlSteps.vue'
+import AddressFormDialog from '@/components/AddressFormDialog.vue'
 import { useToasts } from '@/components/base/useToasts'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
@@ -55,6 +56,8 @@ const cartRows = ref<CartItem[]>([])
 
 const couponPickerOpen = ref(false)
 const addressPickerOpen = ref(false)
+/** 「新增收货地址」弹层 —— **不跳转**，就地新增。跳走会让本页填的东西全丢 */
+const addressFormOpen = ref(false)
 
 const submitting = ref(false)
 const submitError = ref('')
@@ -128,6 +131,18 @@ function pickAddress(id: number) {
   addressPickerOpen.value = false
   // 换地址要**重新结算**，否则运费还是按旧地址算的（FR-028）
   void load()
+}
+
+/** 新增地址保存成功：重拉列表、把新地址选上，并重新结算（FR-028） */
+async function onAddressSaved(id: number) {
+  addressFormOpen.value = false
+  try {
+    addresses.value = await listAddress()
+  } catch {
+    // 拉不到就保持原列表 —— 别把用户已有选择清掉
+  }
+  addressId.value = id
+  await load()
 }
 
 async function onSubmit() {
@@ -242,7 +257,10 @@ watch(
           </div>
           <div v-else>
             <p class="ml-hint">还没有收货地址，先添加一个</p>
-            <RouterLink class="btn-cyan" to="/account/address">新增收货地址</RouterLink>
+            <!-- 就地弹层新增，**不跳转** —— 跳走会丢掉本页已选的券/地址/备注 -->
+            <button id="coAddAddress" class="btn-cyan" type="button" @click="addressFormOpen = true">
+              新增收货地址
+            </button>
           </div>
         </div>
 
@@ -363,8 +381,17 @@ watch(
         <div class="addr-line"><b>{{ a.name }}</b><span>{{ a.mobile }}</span></div>
         <p class="addr-text">{{ a.areaName }} {{ a.detailAddress }}</p>
       </div>
-      <RouterLink class="btn-cyan" to="/account/address">新增收货地址</RouterLink>
+      <button class="btn-cyan" type="button" @click="addressFormOpen = true">
+        新增收货地址
+      </button>
     </MlModal>
+
+    <!-- 新增地址弹层（与地址管理页共用同一个组件） -->
+    <AddressFormDialog
+      :open="addressFormOpen"
+      @close="addressFormOpen = false"
+      @saved="onAddressSaved"
+    />
   </div>
 </template>
 

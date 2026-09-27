@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { createAddress, smsLogin, testMobile } from './helpers'
+import { createAddress, fillAddressForm, smsLogin, testMobile } from './helpers'
 
 /**
  * US4 结算与下单 —— 端到端（按故事测试先行交付）。
@@ -12,6 +12,29 @@ import { createAddress, smsLogin, testMobile } from './helpers'
  * —— 早先正是「组件测试全绿、真实链路里 source 恒为默认值、skuId 恒为 undefined」。
  */
 test.describe('US4 结算与下单', () => {
+  test('**结算页可原地新增地址，不跳走**（FR-027 / FR-028）', async ({ page }) => {
+    // 这里原本放的是指向 `/account/address` 的链接：一点就离开结算页，
+    // **已选的券、地址、备注全丢**。改成就地弹层（与地址管理页共用同一个组件）。
+    await page.goto('/')
+    await smsLogin(page, testMobile())
+    // 新账号没有地址 → 从详情页直购进结算页
+    await page.goto('/mall')
+    await page.locator('.p-card .p-title').first().click()
+    await page.locator('.btn-buy').click()
+    await expect(page).toHaveURL(/\/checkout/)
+    await page.locator('#coAddAddress').click()
+    await expect(page.locator('.ml-modal')).toBeVisible()
+
+    await fillAddressForm(page)
+    await page.locator('#addrSave').click()
+    await page.locator('.ml-modal').waitFor({ state: 'detached' })
+
+    // 关键：**仍停在结算页**，而且新地址已经选上（右侧出现「更换地址」入口）
+    await expect(page).toHaveURL(/\/checkout/)
+    await expect(page.locator('#addressPicker')).toBeVisible()
+    await expect(page.locator('.addr-text').first()).toContainText('测试路 1 号')
+  })
+
   test('**从个人中心侧栏进「我的订单」**（T113 / FR-034）', async ({ page }) => {
     // 入口在个人中心侧栏，不在顶栏（理由同 coupon.spec.ts 里那条）
     await page.goto('/')

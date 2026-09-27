@@ -350,10 +350,31 @@ describe('CheckoutView —— 地址与运费（FR-027 / FR-028）', () => {
     expect(w.text()).toContain('xx 路 1 号')
   })
 
-  it('没有地址时引导去新增', async () => {
+  it('**没有地址时「新增收货地址」就地弹层，不跳转** —— 跳走会丢掉本页已填内容', async () => {
+    // 这里原本放的是指向 `/account/address` 的 RouterLink：一点就离开结算页，
+    // 已选的券、地址、备注**全丢**。改成就地弹层（与地址管理页共用同一个组件）。
     listAddress.mockResolvedValue([])
+    await router.push('/checkout')
     const w = await mountCheckout()
-    expect(w.text()).toContain('新增收货地址')
+
+    await w.get('#coAddAddress').trigger('click')
+    await flushPromises()
+
+    expect(w.find('.ml-modal').exists()).toBe(true)
+    expect(router.currentRoute.value.path).toBe('/checkout')
+  })
+
+  it('地址选择弹层里的「新增收货地址」同样不跳转', async () => {
+    await router.push('/checkout')
+    const w = await mountCheckout()
+    await w.get('#addressPicker').trigger('click')
+    await flushPromises()
+    // 弹层里有多个 .ml-modal（选择器 + 表单），取新增按钮所在的那个
+    const addBtn = w.findAll('button').find((b) => b.text() === '新增收货地址')
+    expect(addBtn).toBeTruthy()
+    await addBtn!.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/checkout')
   })
 
   it('**切换地址后重新结算（运费会随之变化）**', async () => {

@@ -5,9 +5,9 @@
 
 ## Summary
 
-把 `www/` 下 6 页静态设计稿重写为一个 Vue 3 单页应用，并接上 yudao 既有的 app-api，使商品展示、登录、购物车、下单、支付、优惠券、订单全部走真实后台数据。
+把设计稿的 6 页静态稿重写为一个 Vue 3 单页应用（设计稿 `www/` 已于 2026-09-27 删除），并接上 yudao 既有的 app-api，使商品展示、登录、购物车、下单、支付、优惠券、订单全部走真实后台数据。
 
-技术路线：**照搬 `yudao-ui-admin-vue3` 的工程骨架**（Vue 3.5 + Vite 8 + TS 6 + Pinia 3 + vue-router 5 + axios 三层封装），把 API 前缀换成 `/app-api`、认证换成 `/member/auth/*`，**原样复用 `www/css/style.css`** 作为视觉基线，**不引入 UI 组件库**。
+技术路线：**照搬 `yudao-ui-admin-vue3` 的工程骨架**（Vue 3.5 + Vite 8 + TS 6 + Pinia 3 + vue-router 5 + axios 三层封装），把 API 前缀换成 `/app-api`、认证换成 `/member/auth/*`，**沿用设计稿的视觉语言**（其样式表已搬入为 `storefront/src/styles/design.css`，现为本项目可演进的基线），**不引入 UI 组件库**。
 
 三处支撑这一路线的前置查证（详见 [research.md](./research.md)）：
 
@@ -29,7 +29,7 @@
 **Project Type**: 前端单页应用（web）。**消费既有后端接口，本期不含任何后端改动**
 **Performance Goals**: 商品列表页与商品详情页首屏内容 ≤ 3 秒可见（SC-004）
 **Constraints**:
-- **不得改动 `www/css/style.css`**（设计稿是视觉基线，FR-046）
+> **2026-09-27 修订**：本条（原「不得改动 `www/css/style.css`」）**已删除** —— 设计稿基线随 FR-046 修订一并放开，`www/` 目录也已从仓库删除。
 - **17 条无设计稿路由 MUST 遵循 [design-new-pages.md](./design-new-pages.md)** 的令牌与组件契约；信息页 MUST NOT 编造业务事实（FR-054）
 - 不引入 UI 组件库（reasoning 见 [research.md](./research.md) R1）
 - 后端**可由 `java -jar yudao-server/target/yudao-server.jar` 启动**（2026-09-24 实测确认，Tomcat 绑定 48080、约 70 秒启动完成）。⛔ 绝不能加 `--spring.profiles.active=local`，那会覆盖 `application.yaml` 里的 `local,my` 并导致连本机 MySQL 而启动失败。改代码后必须重新 `mvn package`
@@ -47,7 +47,7 @@
 | I | **测试先行（Test-First，不可协商）** | ✅ | 本计划的三层测试策略（见「测试策略」）明确要求测试先写、先失败、再实现；[tasks.md](./tasks.md) 中每个故事内测试任务排在其实现任务之前。**本条曾一度违规** —— 早期版本以"后端只能从 IDE 启动"为由不做端到端自动化，该依据已于 2026-09-24 实测推翻（`java -jar` 可无头启动），计划已相应修订 |
 | II | **先澄清，不猜测（Clarify Before Change）** | ✅ | 三轮 `/speckit-clarify` 共确认 12 项决策；未决项列入 spec 的「另经筛选确认不做」；[research.md](./research.md) 每条决策都记了「被否决的方案」 |
 | III | **复用既有能力（Reuse Over Rebuild）** | ✅ | 不新建任何后端能力；[contracts/app-api.md](./contracts/app-api.md) §8 **显式列出不调用的 9 个接口族**，防止实现期顺手接入范围外能力。价格、库存、券可用性、订单状态的裁决权全部留给服务端 |
-| IV | **最小改动（Surgical Change）** | ✅ | 不改 `yudao-cloud/`、不改 `www/css/style.css`、保留设计稿 class 名；新代码全部落在新的 `storefront/` 目录内。不引入 UI 组件库；唯一的框架级新增是测试工具（宪法原则 I 要求，非投机性引入） |
+| IV | **最小改动（Surgical Change）** | ✅ | 沿用设计稿 class 名；新代码全部落在新的 `storefront/` 目录内。不引入 UI 组件库；唯一的框架级新增是测试工具（宪法原则 I 要求，非投机性引入） |
 | V | **增量可验证（Verifiable Increments）** | ⚠️ | 21 条 SC 均为可度量指标，每条都指明验证方式。**明确声明不验证的有五项**（原先只写了 SC-006，经交叉验证补齐）：SC-006（100 并发不超卖）、FR-033 的超时释放半段、SC-018 的超时自动取消半段、SC-013 的券单次使用半段、SC-002/SC-003 的上限判定（e2e 只记录不硬断言） —— 理由与验证归属逐条写在 [quickstart.md](./quickstart.md) §5，由 [tasks.md](./tasks.md) T134 核对。**这四项已写入 [quickstart.md](./quickstart.md) §5**（逐条含理由与归属） |
 
 **技术栈与架构约束**：全部满足。Web 前端用 Vue 3 + Vite + TS，**只走 `/app-api`**（不跨用 `/admin-api`），数据库无涉及（前端不持久化业务数据），`yudao-cloud/` 保持零改动。
@@ -90,7 +90,7 @@ specs/001-mall-storefront-integration/
 
 ### Source Code (repository root)
 
-新站放在**仓库根的新目录 `storefront/`**，与设计稿 `www/` 平级。不放进 `yudao-cloud/yudao-ui/` —— 那里是管理端与 uniapp 所在处，新站与本特性无关，放一起只会让目录语义变浑（**这已是纯工程取舍，不再是硬约束**：宪法 2.0.0 已删去「保持上游基线 diff 干净」一条）。
+新站放在**仓库根的新目录 `storefront/`**（原与设计稿 `www/` 平级，该目录已于 2026-09-27 删除）。不放进 `yudao-cloud/yudao-ui/` —— 那里是管理端与 uniapp 所在处，新站与本特性无关，放一起只会让目录语义变浑（**这已是纯工程取舍，不再是硬约束**：宪法 2.0.0 已删去「保持上游基线 diff 干净」一条）。
 
 ```text
 storefront/
@@ -107,7 +107,7 @@ storefront/
 │   └── purchase-journey.spec.ts  # 注册→加购→下单→模拟支付（SC-010）
 ├── public/
 │   └── assets/
-│       └── logo.png              # ← www/assets/logo.png 原样搬入（设计稿唯一的图片资产，18 处引用）
+│       └── logo.png              # ← 搬自设计稿 assets/logo.png（唯一的图片资产，18 处引用）；设计稿已删除，这是站点实际使用的资产
 └── src/
     ├── main.ts
     ├── App.vue
@@ -169,7 +169,7 @@ storefront/
     │   ├── orderStatus.ts      # 5 态映射（FR-041a）
     │   └── badge.ts            # 热销 / 新品派生（FR-008a）
     ├── styles/
-    │   ├── design.css          # ← www/css/style.css 原样搬入，不改
+    │   ├── design.css          # ← 搬自设计稿 style.css；2026-09-27 起可演进，不再要求逐字一致
     │   └── store.css           # 新增页面样式，沿用同一套配色与字号
     └── types/                  # 后端契约的 TS 类型
 ```
@@ -308,7 +308,7 @@ Phase 1 产物（`data-model.md`、`contracts/app-api.md`、`quickstart.md`）�
 - **I 测试先行**：设计过程确认了可测试的边界 —— 三层测试的对象都已明确到文件级（见上），且 [tasks.md](./tasks.md) 内测试任务前置于实现任务。**此条在早期版本曾违规**（依据一条被推翻的"后端无法无头启动"），已于 2026-09-24 更正。✅
 - **II 先澄清，不猜测**：设计过程新暴露的契约陷阱（`pointStatus` 必填、`refreshToken` 走 query、列表 VO 与详情 VO 字段不同、`--spring.profiles.active=local` 会覆盖 `local,my`）均已写入 `contracts/app-api.md` 与 `research.md`，未遗留隐含假设。✅
 - **III 复用既有能力**：`data-model.md` 明确声明"不新建持久化实体"，全部为读取-适配-展示；`contracts/app-api.md` 第 8 节显式列出不调用的 9 个接口族。✅
-- **IV 最小改动**：Phase 1 未引入 UI 库、未建 monorepo、未改 `yudao-cloud/` 与 `www/`。唯一的框架级新增是测试工具，且是宪法原则 I 强制要求。✅
+- **IV 最小改动**：Phase 1 未引入 UI 库、未建 monorepo（当时也未改 `yudao-cloud/` 与 `www/` —— 这两条约束此后均已删除）。唯一的框架级新增是测试工具，且是宪法原则 I 强制要求。✅
 - **V 增量可验证**：21 条 SC 均可追溯到具体验证方式；每条 SC 的验证手段已逐条落到 [tasks.md](./tasks.md)。**明确声明不验证的是五项**（与上方 Constitution Check 表一致）：SC-006、FR-033 的超时释放半段、SC-018 的超时自动取消半段、SC-013 的券单次使用半段，理由均写在 [quickstart.md](./quickstart.md) §5。⚠️（原文此处仅写 SC-006，与同文件上方矛盾，已更正）
 
 **Gate 结论：无违反项。可以进入 `/speckit-tasks`。**

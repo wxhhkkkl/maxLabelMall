@@ -1,6 +1,17 @@
 <!-- SPECKIT START -->
+读当前计划之前，先读项目宪法（最高效力约定，含技术栈与四端约束）：
+.specify/memory/constitution.md
+
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+specs/001-mall-storefront-integration/plan.md
+
+Supporting artifacts for the active feature:
+- specs/001-mall-storefront-integration/spec.md — 功能规格（含 12 项已确认决策）
+- specs/001-mall-storefront-integration/research.md — 技术决策与被否决方案
+- specs/001-mall-storefront-integration/data-model.md — 实体映射、派生数据、状态流转
+- specs/001-mall-storefront-integration/contracts/app-api.md — 消费的 app-api 契约
+- specs/001-mall-storefront-integration/quickstart.md — 手工验证清单
 <!-- SPECKIT END -->
 
 # CLAUDE.md

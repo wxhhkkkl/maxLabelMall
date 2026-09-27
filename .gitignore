@@ -3,6 +3,10 @@
 *.iml
 .vscode/
 
+# 依赖与构建缓存（storefront/ 另有自己的 .gitignore 管它自己的 node_modules/dist）
+# 根目录这个是 vitest 留下的缓存目录，不该入库
+node_modules/
+
 # 敏感信息（服务器地址、密码等），禁止提交
 .env
 .env.local

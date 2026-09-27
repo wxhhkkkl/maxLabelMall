@@ -11,7 +11,25 @@ import json
 import urllib.request
 
 BASE = 'http://localhost:48080/admin-api'
-PIC = '/assets/logo.png'   # 设计稿里唯一的图片资产就是 logo；示例数据沿用它
+PIC = '/assets/logo.png'          # 封面：设计稿的 logo
+# 图集用的示例图（`storefront/public/assets/sample-*.svg`）—— 800×800 浅蓝底 +
+# 大号序号 + 「示例图 N」，**一眼可辨不是真实产品图**。有 3 张不同的图，
+# 「点缩略图切换主图」这个功能才看得出来。
+GALLERY = ['/assets/sample-1.svg', '/assets/sample-2.svg', '/assets/sample-3.svg']
+
+# 示例详情富文本：**只演示排版能力，不编造产品参数**。
+# 真实商品请到后台「商品管理 → 商品详情」替换。
+DESCRIPTION = (
+    '<h3>这是示例商品详情</h3>'
+    '<p>本段用于演示详情区的富文本排版：标题、段落、列表、图片与表格都能正常渲染，'
+    '并保留后台配置的样式。请到后台「商品管理 → 商品详情」把它替换为真实内容。</p>'
+    '<ul>'
+    '<li>列表样式：就像这样</li>'
+    '<li>图集在主图下方，点缩略图可以切换主图</li>'
+    '<li>富文本渲染前会做安全过滤，脚本与 on* 事件属性会被剔除</li>'
+    '</ul>'
+    '<p>以上均为示例文案，<strong>不含任何真实产品参数</strong>。</p>'
+)
 
 
 def call(method, path, body=None, token=None):
@@ -88,30 +106,42 @@ PRODUCTS = [
     ('【示例】无线扫码枪 SR-10', '扫码设备', 18900, 30),
 ]
 
-existing = {p['name'] for p in (need(
-    call('GET', '/product/spu/page?pageNo=1&pageSize=100', token=token), '读商品')['list'] or [])}
+# 已存在的按名字取出 id。本脚本**幂等且收敛**：已存在就**更新** ——
+# 早期版本是「已存在就跳过」，于是改了示例文案/图集后重跑不会生效。
+existing = {
+    p['name']: p['id']
+    for p in (need(call('GET', '/product/spu/page?pageNo=1&pageSize=100', token=token), '读商品')['list'] or [])
+}
 
 for name, leaf, price, stock in PRODUCTS:
-    if name in existing:
-        print('· 商品已存在，跳过：%s' % name)
-        continue
-    spu_id = need(call('POST', '/product/spu/create', {
-        'name': name, 'keyword': name,
+    body = {
+        'name': name,
+        'keyword': name,
         'introduction': '示例商品，请在后台替换为真实商品信息',
-        'description': '<p>示例商品详情，请在后台替换。</p>',
+        'description': DESCRIPTION,
         'categoryId': leaf_ids[leaf],
         'brandId': brand_id,
-        'picUrl': PIC, 'sliderPicUrls': [PIC],
+        'picUrl': GALLERY[0],
+        'sliderPicUrls': GALLERY,
         'sort': 1,
         'specType': False,        # 单规格：前台不渲染规格表
         'deliveryTypes': [1],     # 1 = 快递
         'giveIntegral': 0,
         'subCommissionType': False,
         'skus': [{
-            'name': name, 'price': price, 'marketPrice': price,
-            'picUrl': PIC, 'stock': stock, 'weight': 0.2,
+            # marketPrice 刻意留 0：等于售价会让前台显示成「¥45.00 ¥45.00」
+            # （现价 + 一模一样的划线价）。也不编一个假原价去凑折扣。
+            'name': name, 'price': price, 'marketPrice': 0,
+            'picUrl': GALLERY[0], 'stock': stock, 'weight': 0.2,
         }],
-    }, token=token), '建商品 ' + name)
-    print('✓ 商品 %s id=%s 价 ¥%.2f 库存 %d' % (name, spu_id, price / 100, stock))
+    }
+    if name in existing:
+        need(call('PUT', '/product/spu/update', dict(body, id=existing[name]), token=token),
+             '更新商品 ' + name)
+        print('OK 已更新 %s id=%s 价 CNY%.2f 库存 %d' % (name, existing[name], price / 100, stock))
+    else:
+        spu_id = need(call('POST', '/product/spu/create', body, token=token), '建商品 ' + name)
+        print('OK 新建 %s id=%s 价 CNY%.2f 库存 %d' % (name, spu_id, price / 100, stock))
 
-print('\n完成。')
+print()
+print('完成。')

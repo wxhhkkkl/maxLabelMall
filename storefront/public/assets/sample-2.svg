@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#EAF1FF"/>
+  <rect x="24" y="24" width="752" height="752" fill="none" stroke="#2E7CD6" stroke-width="3" stroke-dasharray="14 10" opacity="0.5"/>
+  <text x="400" y="380" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif"
+        font-size="200" font-weight="700" fill="#2E7CD6" opacity="0.85">2</text>
+  <text x="400" y="470" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif"
+        font-size="40" fill="#5B6C8F">示例图 2</text>
+</svg>

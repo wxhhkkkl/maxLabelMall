@@ -872,6 +872,16 @@ US4 需等 US1 与 US2 的接口稳定后再开工。
 | 3 | 商品卡片固定每行 3 个，大屏被撑得很大 | 首页 `.product-grid` 写死 `repeat(4,1fr)`、商城 `.grid-3` 写死 `repeat(3,1fr)` | 改 `repeat(auto-fill, minmax(240px, 1fr))`。商城另起 `.mall-grid`（`.grid-3` 还被领券中心/企业权益共用）。**注意不能同时挂两个类**：`.grid-3` 的 base 规则在样式表更靠后，同优先级会覆盖 auto-fill（第一版就这么写错了，靠实测卡片宽度才发现） |
 | 4 | 商品详情图不能点击切换 | 缩略图的 `active` **写死 `i === 0`**、无点击处理。设计稿其实已给可点提示（`.g-thumb` 自带 `cursor:pointer` + active 蓝边） | 图集改「封面 + 轮播图**去重**」+ 选中状态 + 换商品重置。实测点第 3 张 → 主图切换 |
 | 5 | 领券中心 / 我的订单应在个人中心，不在顶栏 | 见 T125 那条（同一批改动） | 移入 `AccountView` 侧栏；顶栏保持设计稿的 5 项。**另给顶栏文字补 `white-space: nowrap`** —— 之前加到 7 项时 1101–1200px 会把每个词逐字竖排折行（「赋签」变成上下两个字），而**横向溢出探测发现不了它**（折行恰好避开了溢出） |
+| 6 | **结算页「新增收货地址」是跳转** | 两处都是指向 `/account/address` 的 `RouterLink` | 改为**就地弹层**：把地址表单从 `AddressView` 抽成共用组件 `AddressFormDialog.vue`（地址管理页也用同一个），保存后重拉地址、**自动选上新地址并重算运费**（FR-028）。e2e：结算页原地新增 → 仍停在 `/checkout` 且新地址已选上 |
+| 7 | **点进个人中心的子页就没了左侧菜单** | 只有 `/account` 自带侧栏；`/account/address`、`/order`、`/order/:id`、`/coupon`、`/coupon/mine` 都没有 | 抽出共用组件 `AccountSidebar.vue` + 把两列布局（`.account-wrap`/`.account-main`）放进 `store.css`，**6 个页面统一使用**。实测 5 条路径侧栏均常驻且**恰好一项高亮** |
+| 8 | 侧栏明明写了 200px 栅格列，实际却是 250px 宽、顶到右侧内容上 | 设计稿的 `.sidebar { width: 250px }` **覆盖了栅格列宽** —— 栅格项带显式宽度时不会拉伸到轨道宽 | `.account-sidebar` 覆盖 `width: 100%`。**这是自查时量出来的**（`getBoundingClientRect` 宽 250、与内容左缘间距为 0），肉眼只觉得"两栏挤在一起" |
+| 9 | `/coupon/mine` 页侧栏**同时点亮两项** | 高亮用 `startsWith`，而 `/coupon/mine` 同时匹配 `/coupon` 与 `/coupon/mine` | 有子路由的项（`/account`、`/coupon`）改**精确匹配**。**是自查时 `allInnerTexts()` 拿到 2 个高亮项发现的**（Playwright 严格模式下单元素取值会抛错，早先被 `.catch` 吞掉了） |
+
+**另一件（非代码）**：所有者反馈"浏览器有缓存，隐私模式能看到个人中心出来了"——
+即修复已生效、但**普通窗口里是旧资源**。这不是配置问题（Vite dev 对 HTML 发 `no-cache`），
+而是 **dev server 被我反复重启、旧页面连不上 HMR** 导致的：旧页面会一直跑旧代码直到手动刷新。
+处置：保持一个 dev server 稳定运行 + 提示 `Ctrl+Shift+R` 硬刷新。
+
 
 **两条经验**（都值得记住）：
 - **`min-width: 0` 是 flex 收缩的前提**。子项都改可收缩、父项仍是 `min-width: auto` 时，父项照旧撑到 min-content —— 这类"改了没生效"必须靠**量数值**而不是看截图来发现。

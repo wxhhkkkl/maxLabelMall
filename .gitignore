@@ -12,6 +12,11 @@ node_modules/
 .env.local
 *.env
 
+# 例外：storefront 的 .env 只有非敏感配置（标题/租户/端口/输出目录），
+# 而**租户号必须随仓库走** —— 它决定前台连的是哪一套数据。
+# 后端地址与凭据仍在 .env.local（仍被忽略）。
+!storefront/.env
+
 # 模块建表 SQL：除仓库自带的两个外，其余是按模块从芋道知识星球下载的授权材料，不入库
 # （这两个是 yudao 仓库自带的，保持跟踪）
 yudao-cloud/sql/mysql/*.sql

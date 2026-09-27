@@ -40,7 +40,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // ⚠️ **给 e2e 覆盖租户**：`.env` 里前台默认跑租户 **162（御旺宸发）**，
+    // 但 162 目前只有一套「【示例】」占位商品，撑不起这里 22 条用例
+    // （它们要商品、订单、可用的券）。所以 e2e 明确指回**有完整种子数据的租户 1**。
+    //
+    // 这是 `set VAR=value&&` 的 Windows 写法（cmd.exe；本项目开发环境是 Windows）。
+    // Vite 会把 `process.env` 里 `VITE_` 前缀的变量并入 `import.meta.env`，
+    // 因此这里设的值**优先于 `.env` 文件**。
+    command: 'set VITE_TENANT_ID=1&& pnpm dev',
     url: 'http://localhost:5173',
     reuseExistingServer: true,
     timeout: 120_000,

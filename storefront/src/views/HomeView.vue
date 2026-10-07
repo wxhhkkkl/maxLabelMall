@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { listCategories } from '@/api/category'
 import { pageProducts, SORT_FIELD } from '@/api/product'
@@ -15,8 +15,9 @@ import { deriveBadges } from '@/utils/badge'
 /**
  * 首页 —— 按设计稿 `www/index.html` 还原，沿用其 class 名。
  *
- * 商品区取**后台真实商品**：按销量降序取前 4（FR-008）。销量全为 0 时后端
- * 会退化为默认排序，商品区仍有内容，不会空白。
+ * 商品区取**后台真实商品**：按销量降序，取几个由视口宽度决定 —— 超宽屏 6、其余 4
+ * （FR-008，2026-10-07 修订）。销量全为 0 时后端会退化为默认排序，商品区仍有
+ * 内容，不会空白。
  *
  * ⚠️ 设计稿的信任背书区带**未确认的业务声明**（客户公司名、服务企业数、
  * 客户证言）与营销承诺 —— 全部经 `PendingText` 渲染（FR-056）。业务方在
@@ -32,10 +33,36 @@ const error = ref(false)
 
 const HERO_COUNT = 3
 
+/**
+ * 商品区取几个 —— **由视口宽度决定**（2026-10-07 所有者决策）：超宽屏 6 个、其余 4 个。
+ *
+ * ⚠️ `WIDE_VIEWPORT` 与 design.css 里控制 `.product-grid` 列数的
+ * `@media (max-width: 1600px)` 是**互补的两半，必须同时改**：超宽屏一行 6 列、
+ * 其余 4 列。只改一边就会错位 —— 取 6 个却排 4 列（第三张卡孤零零占一行），
+ * 或取 4 个却排 6 列（右侧空出两格，正是首页最初那个空白的成因）。
+ *
+ * 门槛取 1601 而不是 1101：6 列在 1440px 上每张卡只剩约 193px，比设计稿的
+ * 240px 下限窄，而且会出现「1100→1101 卡片反而变窄」的倒挂。
+ * 见 design.css 里那条 `@media (max-width: 1600px)` 的注释。
+ */
+const WIDE_VIEWPORT = '(min-width: 1601px)'
+const PRODUCT_COUNT_WIDE = 6
+const PRODUCT_COUNT_NARROW = 4
+
+const viewportQuery = window.matchMedia(WIDE_VIEWPORT)
+
+function productCount(): number {
+  return viewportQuery.matches ? PRODUCT_COUNT_WIDE : PRODUCT_COUNT_NARROW
+}
+
+/** 上一次实际请求的条数 —— 用于判断跨断点后要不要重新取 */
+let requestedCount = 0
+
 async function loadProducts() {
+  requestedCount = productCount()
   const res = await pageProducts({
     pageNo: 1,
-    pageSize: 4,
+    pageSize: requestedCount,
     sortField: SORT_FIELD.sales,
     sortAsc: false,
   })
@@ -64,7 +91,22 @@ async function loadAll() {
   }
 }
 
-onMounted(loadAll)
+/**
+ * 跨断点时重新取数。`matchMedia` 的 `change` **只在跨过断点时触发** ——
+ * 拖动窗口时逐像素变化不会反复发请求，只有 1101px 这条线被越过才重取。
+ */
+function onViewportChange(): void {
+  if (productCount() !== requestedCount) void loadProducts()
+}
+
+onMounted(() => {
+  viewportQuery.addEventListener('change', onViewportChange)
+  void loadAll()
+})
+
+onBeforeUnmount(() => {
+  viewportQuery.removeEventListener('change', onViewportChange)
+})
 
 /** 信任背书区的数字（全部来自占位符，业务方确认前不当作事实） */
 const trustStats = RENDERED.inheritedClaims.stats
@@ -73,8 +115,26 @@ const testimonial = RENDERED.inheritedClaims.testimonial
 </script>
 
 <template>
-  <!-- Hero 首屏轮播（3 张，与设计稿一致） -->
+  <!-- Hero 首屏轮播（3 张，与设计稿一致）。
+       顺序按所有者要求调整：「标签耗材」那张（原第 2 张）提到第一张 —— 首屏第一眼
+       先看到商城导流。第 1、3 张的相对次序不变。 -->
   <BaseCarousel class="hero" :count="HERO_COUNT">
+    <div class="car-slide hero-slide">
+      <div class="hero-left">
+        <div class="hero-badge">商城大促 · 耗材囤货季</div>
+        <h1 class="hero-title">标签耗材设备
+一站购齐更省心</h1>
+        <p class="hero-sub">热敏纸 / 铜版纸 / PET / 碳带 / 打印机 现货速发</p>
+        <div class="hero-cta">
+          <RouterLink class="btn-cyan" to="/mall">立即选购</RouterLink>
+          <RouterLink class="btn-ghost-white" to="/product/1">看看明星单品</RouterLink>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="ph hero-visual">商城精选商品图</div>
+      </div>
+    </div>
+
     <div class="car-slide hero-slide">
       <div class="hero-left">
         <div class="hero-badge">全新 MaxLabel 3.0 · 云标签时代</div>
@@ -97,22 +157,6 @@ const testimonial = RENDERED.inheritedClaims.testimonial
           <div class="glass-chip"><b>赋签 M3 Pro</b><span>双模高速 · 300dpi</span></div>
           <div class="glass-chip"><b>MaxLabel 云标签</b><span>多端同步 · 批量打印</span></div>
         </div>
-      </div>
-    </div>
-
-    <div class="car-slide hero-slide">
-      <div class="hero-left">
-        <div class="hero-badge">商城大促 · 耗材囤货季</div>
-        <h1 class="hero-title">标签耗材设备
-一站购齐更省心</h1>
-        <p class="hero-sub">热敏纸 / 铜版纸 / PET / 碳带 / 打印机 现货速发</p>
-        <div class="hero-cta">
-          <RouterLink class="btn-cyan" to="/mall">立即选购</RouterLink>
-          <RouterLink class="btn-ghost-white" to="/product/1">看看明星单品</RouterLink>
-        </div>
-      </div>
-      <div class="hero-right">
-        <div class="ph hero-visual">商城精选商品图</div>
       </div>
     </div>
 

@@ -216,7 +216,7 @@ e2e/pay.spec.ts                       # T114：SC-010 模拟支付后变待发�
 
 | 路由 | 来源 | 说明 |
 |---|---|---|
-| `/` | 设计稿 index.html | 首页；商品区按销量取前 4（FR-008） |
+| `/` | 设计稿 index.html | 首页；商品区按销量取前 N（超宽屏 6 / 其余 4，FR-008） |
 | `/mall` | 设计稿 mall.html | 商城；移除两组筛选项与侧栏计数（FR-004a / FR-002a） |
 | `/product/:id` | 设计稿 product.html | 详情；规格参数表改由 SKU 规格项承载（FR-005a）+ 富文本详情 |
 | `/software` | 设计稿 software.html | 纯内容页；版本卡需链到商品 |

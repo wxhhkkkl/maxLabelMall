@@ -75,7 +75,7 @@
 - 检索在后台全量范围内进行，**不是**过滤当前页已加载的卡片（FR-003）。
 - 商品已下架时 `/get-detail` 会返回明确的业务错误码（非空响应），前端据此展示「商品已下架」而不是空白页（FR-007）。
 
-**首页商品区**：复用 `/product/spu/page`，传 `sortField=salesCount&sortAsc=false&pageSize=4`，取前 4 个（FR-008）。
+**首页商品区**：复用 `/product/spu/page`，传 `sortField=salesCount&sortAsc=false`，`pageSize` 由视口宽度决定 —— 超宽屏（≥1601px）取 6 个、其余取 4 个（FR-008，2026-10-07 修订）。跨断点时重新请求一次；`matchMedia` 的 `change` 只在越过该宽度时触发，拖动窗口不会反复请求。
 
 ---
 

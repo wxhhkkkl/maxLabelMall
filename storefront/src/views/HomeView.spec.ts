@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { ProductSpu } from '@/types'
@@ -66,17 +66,58 @@ async function mountHome(products: ProductSpu[] = [spu(1), spu(2), spu(3), spu(4
   return w
 }
 
+/**
+ * 视口宽度桩。
+ *
+ * jsdom **不实现** `matchMedia` 的媒体查询求值（`matches` 恒为 false），所以
+ * "宽屏取 6 个"这条分支没法靠真实宽度测到，必须把 `matchMedia` 换成桩。
+ * 组件在 `setup` 里就读它，所以**必须在 `mount` 之前**调用。
+ */
+function stubViewport(wide: boolean): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: wide,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }))
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
   window.localStorage.clear()
+  // 默认按窄屏。需要宽屏的用例自己在 mount 之前再调一次 stubViewport(true)。
+  stubViewport(false)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('HomeView —— 商品区用真实商品填充', () => {
-  it('按销量取前 4 个（FR-008）', async () => {
+  /**
+   * 取几个由**视口宽度**决定（2026-10-07 所有者决策）：超宽屏 6 个、其余 4 个。
+   * 门槛 1601px 与 design.css 里 `.product-grid` 的 `@media (max-width: 1600px)`
+   * **严格互补** —— 取 6 个却排 4 列的话第三张卡会孤零零占一行。
+   * （断点值本身由 `src/styles/product-grid.spec.ts` 钉住，这里只测取数行为。）
+   */
+  it('未达门槛（≤1600px）按销量取前 4 个', async () => {
+    stubViewport(false)
     await mountHome()
     expect(pageProducts).toHaveBeenCalledWith(
       expect.objectContaining({ sortField: 'salesCount', sortAsc: false, pageSize: 4 }),
     )
+  })
+
+  it('超宽屏（≥1601px）按销量取前 6 个，并渲染 6 张卡', async () => {
+    stubViewport(true)
+    const six = [spu(1), spu(2), spu(3), spu(4), spu(5), spu(6)]
+    const w = await mountHome(six)
+    expect(pageProducts).toHaveBeenCalledWith(
+      expect.objectContaining({ sortField: 'salesCount', sortAsc: false, pageSize: 6 }),
+    )
+    expect(w.findAll('.p-card')).toHaveLength(6)
   })
 
   it('展示的是**后台真实商品**，不是设计稿写死的那 4 个', async () => {
@@ -114,6 +155,13 @@ describe('HomeView —— 轮播用设计稿的结构', () => {
     expect(w.findAll('.hero .car-slide')).toHaveLength(3)
     expect(w.findAll('.hero .car-dot')).toHaveLength(3)
   })
+
+  it('第一张是讲「标签耗材」的那张（商城导流放在首屏第一眼）', async () => {
+    const w = await mountHome()
+    const first = w.findAll('.hero .car-slide')[0]!
+    expect(first.text()).toContain('标签耗材设备')
+    expect(first.text()).toContain('一站购齐更省心')
+  })
 })
 
 describe('HomeView —— 信任背书区的未确认声明走占位符（FR-056）', () => {
@@ -137,10 +185,15 @@ describe('HomeView —— 信任背书区的未确认声明走占位符（FR-056
     expect(quote.findAll('[data-content-pending]').length).toBeGreaterThan(0)
   })
 
-  it('**不出现写死的「50,000+」等未经确认的数字**', async () => {
+  it('**未经确认的数字仍被标记为待确认**（方括号不再显示，改由属性保证）', async () => {
     const w = await mountHome()
-    // 占位符里会带 [[ ]]，但绝不能是裸的已确认数字
-    expect(w.text()).not.toMatch(/50,000\+\s*企业用户/)
+    const stat = w.findAll('.stat')[0]!
+    expect(stat.text()).toContain('50,000+')
+    // ⚠️ 这条断言原先写作 `not.toMatch(/50,000\+\s*企业用户/)`，它**靠方括号才通过**：
+    // 渲染成 `[[50,000+]][[企业用户]]` 时中间隔着 `]] [[`，正则匹配不上。方括号不再显示后
+    // textContent 变成 `50,000+企业用户`，而 `\s*` 允许零空格，那条断言会**误报失败**。
+    // 「未经确认」这个事实现在只能靠属性表达 —— 所以要断言属性在，而不是去匹配文本。
+    expect(stat.findAll('[data-content-pending]')).toHaveLength(2) // 数字、标签各一处
   })
 })
 

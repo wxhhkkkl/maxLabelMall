@@ -16,6 +16,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.spec.ts'],
+    // 补齐 jsdom 缺失、而浏览器必然存在的 API（目前是 matchMedia）
+    setupFiles: ['./src/test/setup.ts'],
     // e2e 由 Playwright 单独运行（需要后端在线），不进单元测试套件
     exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
   },

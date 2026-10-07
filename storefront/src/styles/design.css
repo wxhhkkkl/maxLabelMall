@@ -226,19 +226,29 @@ img { display: block; }
 }
 .tab.active { background: #2E7CD6; color: #FFFFFF; font-weight: 600; }
 .tab:hover:not(.active) { background: #E4EBF7; }
-/* 商品卡片网格 —— **自适应列数**，不写死每行几个。
-   原来首页是 `repeat(4, 1fr)`、商城是 `repeat(3, 1fr)`：列数固定，于是屏幕越宽
-   卡片被撑得越大 —— 1440px 下商城每张卡 400px+，图片和留白都很夸张。
-   改用 `auto-fill + minmax(240px, 1fr)` 后：容器多宽就排多少列，卡片宽度**始终
-   在 240px 上下**（1440px 商城约 4 列、首页约 5 列；375px 自动落成 1 列）。
-   `.mall-grid` 用在商城页（那里的网格原本借用了通用的 `.grid-3`，而 `.grid-3`
-   还被领券中心、企业权益等页面共用，不该被商品卡片的需求带跑）。 */
+/* 商品卡片网格 —— 两处的策略不同，所以列数分开写。
+   · `.mall-grid`（商城页）保持 `auto-fill + minmax(240px, 1fr)` 自适应：商城是分页
+     列表，商品多、要填满，容器多宽就排多少列，卡片宽度**始终在 240px 上下**
+     （1440px 约 4 列、375px 落成 1 列）。
+     （`.mall-grid` 用在商城页；那里的网格原本借用通用的 `.grid-3`，而 `.grid-3`
+     还被领券中心、企业权益等页面共用，不该被商品卡片的需求带跑。）
+   · `.product-grid`（首页）宽屏**固定 6 列**。首页按视口宽度取商品：宽屏 6 个、
+     窄屏 4 个（见 HomeView.vue 的 `WIDE_VIEWPORT`）。列数之所以写死而不交给
+     `auto-fill`：`.mall` 是**全宽容器**（无 max-width），auto-fill 在 1920px 能排出
+     6 列以上 —— 商品数对不上就排不满，**右侧空出一格**，看着像没加载完。
+     分档是三段，每段都让一行正好放满取回的商品数：
+       基线（≥1601px）6 列、≤1600px 4 列、≤768px 1 列（此时卡片改横版，两列会挤坏）。
+     6 列的门槛为什么不放在 1100px —— 理由见下面那条 `@media (max-width: 1600px)` 的注释。
+     ⚠️ 门槛值与 HomeView 的 `WIDE_VIEWPORT` 是**互补的两半，必须同时改** ——
+     只改一边就会出现"取了 4 个却排 6 列"这类错位。
+     `src/styles/product-grid.spec.ts` 会在这两处不同步时报错。 */
 .product-grid,
 .mall-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 24px;
 }
+.product-grid { grid-template-columns: repeat(6, 1fr); }
+.mall-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .p-card {
   position: relative;
   padding: 16px; border-radius: 16px;
@@ -786,6 +796,17 @@ body.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-7px) rotate
 }
 body.nav-open .mobile-nav { display: flex; }
 
+/* ---------- 响应式：首页商品网格的 6 列门槛 ---------- */
+/* 6 列**只在超宽屏**启用，门槛取 1600px 而不是 1100px。原因两条：
+   ① 6 列在 1440px 上每张卡只剩约 193px，比设计稿的 240px 卡片下限窄不少；
+   ② 门槛放在 1100 会出现**宽度倒挂** —— 从 1100 拖到 1101，卡片从 217px 突然缩到 137px。
+   抬到 1600 之后：6 列最小约 220px；769–1600px 这段走 4 列（约 134–342px）。
+   ⚠️ 1600 与 HomeView.vue 的 `WIDE_VIEWPORT`（`min-width: 1601px`）是
+   **互补的两半，必须同时改** —— `src/styles/product-grid.spec.ts` 会在两处不同步时报错。 */
+@media (max-width: 1600px) {
+  .product-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
 /* ---------- 响应式：平板 ≤1100px ---------- */
 @media (max-width: 1100px) {
   .nav { display: none; }
@@ -793,7 +814,7 @@ body.nav-open .mobile-nav { display: flex; }
   .hero { flex-direction: column; height: auto; padding: 56px 40px; gap: 32px; }
   .hero-left, .hero-right { width: 100%; }
   .hero-right { justify-content: center; flex-wrap: wrap; }
-  .product-grid, .mall-grid, .grid-3, .f-grid, .i-grid, .s-grid, .sup-entries, .contact { grid-template-columns: repeat(2, 1fr); }
+  .mall-grid, .grid-3, .f-grid, .i-grid, .s-grid, .sup-entries, .contact { grid-template-columns: repeat(2, 1fr); }
   .price-cards { grid-template-columns: 1fr; max-width: 480px; }
   .sol-grid { grid-template-columns: repeat(3, 1fr); }
   .mall-page-main, .pd-main, .case, .feature-row, .params-row { flex-direction: column; }

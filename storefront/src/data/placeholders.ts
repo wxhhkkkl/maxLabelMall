@@ -9,7 +9,10 @@
  *     版本日志、模板数量、协议条款、备案号），由实现者编造等于在正式站点上发布
  *     虚假信息；
  *   - 用 `[[ ]]` 包裹后，布局能正常渲染（字符串长度已按真实文案量级给足，方便你
- *     直接看着调版式），但**不可能被误当成真实信息发布出去**。
+ *     直接看着调版式）。⚠️ 方括号**只存在于本文件里** —— 页面上由 `PendingText`
+ *     经 `displayText()` 去掉包裹后才显示，页面上看不见方括号。"这句还没确认"这一事实
+ *     改由 `data-content-pending` 属性承载：门禁① 扫本文件、门禁② 扫 DOM 属性，
+ *     两条都不受影响。
  *
  * ── 替换流程（只需改这一个文件） ─────────────────────────────────────────────
  *   视图统一用 `<PendingText :value="seed.xxx.yyy" />` 渲染业务文案，该组件**从值
@@ -49,6 +52,17 @@ const p = (s: string) => `${L}${s}${R}`;
  */
 export function isPending(v: unknown): boolean {
   return typeof v === 'string' && v.startsWith(L) && v.endsWith(R);
+}
+
+/**
+ * 渲染用文本 —— 占位文案**去掉首尾那对方括号**，其余原样返回。
+ *
+ * 方括号是种子文件里的标识，不该出现在页面上。去掉显示后，"未确认"由
+ * `PendingText` 的 `data-content-pending` 属性承载（门禁② 仍能扫到）。
+ * ⚠️ 只剥首尾各一层，值内部的方括号（如「型号 [A3] 待确认」）必须原样保留。
+ */
+export function displayText(v: string): string {
+  return isPending(v) ? v.slice(L.length, -R.length) : v;
 }
 
 /** 供 `placeholders.spec.ts` 断言：RENDERED 中任何一处仍带占位标记即返回 true */

@@ -16,10 +16,16 @@ import { useToasts } from './useToasts'
 const PENDING_ATTR = 'data-content-pending'
 
 describe('PendingText —— 占位标记从值派生（替换只需改一个文件）', () => {
-  it('值是占位文案时带上 data-content-pending', () => {
+  it('值是占位文案时带上 data-content-pending，且**不显示包裹的 [[ ]] **', () => {
     const w = mount(PendingText, { props: { value: '[[公司简介待补充]]' } })
+    // 标记仍在（门禁② 靠它发现未替换内容），只是不再显示成方括号
     expect(w.get('span').attributes(PENDING_ATTR)).toBeDefined()
-    expect(w.text()).toBe('[[公司简介待补充]]')
+    expect(w.text()).toBe('公司简介待补充')
+  })
+
+  it('只去掉首尾的占位包裹，值内部的方括号原样保留', () => {
+    const w = mount(PendingText, { props: { value: '[[型号 [A3] 待确认]]' } })
+    expect(w.text()).toBe('型号 [A3] 待确认')
   })
 
   it('值是真实文案时**不渲染**该属性（而不是渲染成 false）', () => {

@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import PendingText from '@/components/base/PendingText.vue'
-import { RENDERED } from '@/data/placeholders'
-
 /**
  * 标签软件页 —— 按设计稿 `www/software.html` 还原，沿用其 class 名。
  *
- * ⚠️ 三个版本档的价格与能力声明（¥0 / ¥199/年 / ¥899/年、「200 次打印/月」、
- * 「无限次打印 · 全部 2,000+ 模板」、「私有化部署」等）**都是对外的报价与承诺**，
- * 全部经 `PendingText` 渲染（FR-056）。其中「2,000+ 模板」正是 FR-055 禁止
- * 未经确认就沿用的数字。业务方在 `placeholders.ts` 里确认后替换。
+ * ⚠️ 版本价格区（原「选择适合你的版本」的三档价格 ¥0 / ¥199/年 / ¥899/年，以及
+ * 「200 次打印/月」「无限次打印 · 全部 2,000+ 模板」「私有化部署」等能力声明）
+ * **按所有者要求暂时下线** —— 那些都是对外的报价与承诺，业务方尚未确认。
+ * 原位置改为一句「马上上线，敬请期待」。数据仍在 `placeholders.ts` 的
+ * `softwarePlans` 里，软件上线时取回来即可，视图这边不用重写。
+ *
+ * ⚠️ 下方 hero 里的「2,000+ 行业模板」是**写死在模板里的未经确认数字**，
+ * 未走占位符（本次按所有者要求不动）—— 上线前仍需业务方确认，见 FR-055。
  */
-const plans = RENDERED.softwarePlans
 </script>
 
 <template>
@@ -53,23 +53,11 @@ const plans = RENDERED.softwarePlans
     </div>
   </section>
 
-  <!-- 版本选择。价格与能力声明均为占位（FR-056） -->
+  <!-- 版本价格区暂时下线：三档价格与能力声明都是**对外的报价与承诺**，业务方尚未确认，
+       与其展示了再改，不如等软件真正上线。数据仍在 placeholders.ts 的 softwarePlans 里。 -->
   <section class="features">
     <div>
-      <h2 class="section-title" style="text-align: center">选择适合你的版本</h2>
-      <p class="section-desc">免费开始，按需升级</p>
-    </div>
-    <div class="price-cards">
-      <div v-for="plan in plans" :key="plan.name" class="plan-card">
-        <div class="plan-name"><PendingText :value="plan.name" /></div>
-        <div class="plan-price"><PendingText :value="plan.price" /></div>
-        <ul class="plan-feat">
-          <li v-for="f in plan.features" :key="f"><PendingText :value="f" /></li>
-        </ul>
-        <button class="plan-btn" :class="plan.ctaKind" type="button">
-          <PendingText :value="plan.cta" />
-        </button>
-      </div>
+      <h2 class="section-title" style="text-align: center">马上上线，敬请期待</h2>
     </div>
   </section>
 

@@ -200,9 +200,13 @@ const loginData = reactive({
   captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
   tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE !== 'false',
   loginForm: {
-    tenantName: '芋道源码',
-    username: 'admin',
-    password: 'admin123',
+    // ⚠️ 与 LoginForm.vue 保持同一套来源（env），**不要写死**：
+    // 本路由（/social-login）是公网可达的，写死上游默认值等于把平台超管的
+    // 默认口令（芋道源码/admin/admin123）印在页面上。部署构建用 .env.deploy
+    // 把这三个值置空即可，无需改代码。
+    tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
+    username: import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '',
+    password: import.meta.env.VITE_APP_DEFAULT_LOGIN_PASSWORD || '',
     captchaVerification: '',
     rememberMe: false
   }

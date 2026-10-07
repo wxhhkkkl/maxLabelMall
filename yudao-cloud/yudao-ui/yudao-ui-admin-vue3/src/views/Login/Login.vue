@@ -12,7 +12,11 @@
           <img alt="" class="mr-10px h-48px w-48px" src="@/assets/imgs/logo.png" />
           <span class="text-20px font-bold">{{ underlineToHump(appStore.getTitle) }}</span>
         </div>
-        <!-- 左边的背景图 + 欢迎语 -->
+        <!-- 左边的背景图 + 欢迎语
+             ⚠️ 上游在「欢迎使用本系统」下面还有一行 `t('login.message')`
+             （「开箱即用的中后台管理系统」），是上游对自家产品的描述，与本站无关，已去掉。
+             要加回内容请直接放在下面这个 TransitionGroup **内部并带 key** ——
+             它的子节点必须有 key。 -->
         <div class="h-[calc(100%-60px)] flex items-center justify-center">
           <TransitionGroup
             appear
@@ -21,9 +25,6 @@
           >
             <img key="1" alt="" class="w-350px" src="@/assets/svgs/login-box-bg.svg" />
             <div key="2" class="text-3xl text-white">{{ t('login.welcome') }}</div>
-            <div key="3" class="mt-5 text-14px font-normal text-white">
-              {{ t('login.message') }}
-            </div>
           </TransitionGroup>
         </div>
       </div>

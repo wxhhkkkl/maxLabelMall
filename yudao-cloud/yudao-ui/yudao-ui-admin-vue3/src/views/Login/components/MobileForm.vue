@@ -126,7 +126,9 @@ const loginData = reactive({
   },
   loginForm: {
     uuid: '',
-    tenantName: '芋道源码',
+    // 与 LoginForm.vue 同源（env）：原先写死「芋道源码」会让短信登录默认落到租户 1，
+    // 而不是业务租户。部署构建由 .env.deploy 指定。
+    tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
     mobileNumber: '',
     code: ''
   }

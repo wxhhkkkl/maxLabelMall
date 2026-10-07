@@ -29,3 +29,16 @@ yudao-cloud/sql/mysql/*.sql
 data-collection*.xlsx
 # 导入前备份（是一整份线上数据快照，同样含个人信息）
 scripts/_backup/
+
+# 旧商城全量抓取快照：含 91 个会员的手机号/地址/密码哈希、395 张订单的收件人
+# 姓名与联系电话，属个人信息；另含后台会话缓存。抓取脚本 scripts/scrape_old_mall.py 入库，
+# 它产出的数据本身不进版本库。
+oldMallData/
+
+# 旧商城财务流水台账：含会员编号/昵称、每笔充值消费的金额与支付时间，属个人信息
+scripts/legacy-mall-finance-archive.csv
+
+# 一次性代码生成脚手架：产物已落到 storefront/src/ 下，脚本本身是一次性的，不复用
+_gen_base.py
+_scaffold1.py
+_scaffold2.py

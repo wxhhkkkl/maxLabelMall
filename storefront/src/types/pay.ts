@@ -29,4 +29,6 @@ export interface PayOrder {
   price: number
   channelCode: string
   payTime?: string
+  /** 所属支付应用编号 —— 界面用它查「这个应用启用了哪些渠道」，避免前端记死应用编号 */
+  appId: number
 }

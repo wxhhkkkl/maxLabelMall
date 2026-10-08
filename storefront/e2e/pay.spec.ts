@@ -10,6 +10,7 @@ import { createAddress, smsLogin, testMobile } from './helpers'
  *
  * 链路（见 contracts/app-api.md §6）：
  *   下单 → 响应 { id（交易订单）, payOrderId（支付单） }
+ *   → 页面上选中 mock 渠道（`[data-channel="mock"]`）
  *   → `POST /pay/order/submit { id: payOrderId, channelCode: 'mock' }`
  *   → MockPayClient 立即返回成功
  *   → 支付模块在事务提交后**异步**回调 `/app-api/trade/order/update-paid`
@@ -38,7 +39,12 @@ test.describe('US5 支付闭环', () => {
     // 待支付就该给出支付入口
     const payBtn = page.locator('#payOrder')
     await expect(payBtn).toBeVisible()
-    // 支付渠道是模拟通道，不涉及任何商户号
+
+    // ⚠️ 必须**先显式选中 mock 渠道**，不能再靠"默认就是 mock"：
+    //    前端已改成从后端拉启用的渠道列表再渲染选择器（渠道码不再写死），
+    //    而 e2e 跑的是租户 1，它名下还开着 alipay_pc 等渠道 —— 不点的话
+    //    默认会选中排在前面的支付宝，那要真实商户号且应用已上线，CI 里必然失败。
+    await page.locator('[data-channel="mock"]').click()
     await payBtn.click()
 
     // 状态以后端为准：等回调把订单推进到「待发货」。

@@ -2,7 +2,7 @@ import { get, post } from '@/config/http'
 import type { PayOrder, PayOrderSubmitResp } from '@/types'
 
 /**
- * 支付接口（`/app-api/pay/order/**`）。
+ * 支付接口（`/app-api/pay/order/**`、`/app-api/pay/channel/**`）。
  *
  * ⚠️ `id` 是**支付单号 `payOrderId`**，不是交易订单号。`createOrder` 的响应里两者
  * 并存（`id` 是交易订单、`payOrderId` 是支付单），传错会「找不到支付单」。
@@ -13,24 +13,42 @@ import type { PayOrder, PayOrderSubmitResp } from '@/types'
  * 调用方 MUST 先判断，**不得把 null 传给本模块**（FR-037 / FR-038）。
  */
 
-/** 本期唯一的支付渠道：模拟通道。不接任何第三方商户号（SC-010） */
-export const MOCK_CHANNEL_CODE = 'mock'
-
 /**
  * 提交支付。
  *
- * 模拟通道下**提交即成功**，但交易订单的状态要等后端**异步回调**
- * `/app-api/trade/order/update-paid` 才推进到「待发货」。所以提交成功后必须
- * 重新拉取订单详情来确认状态，**不得由前端把订单标记为已支付**（FR-039）。
+ * `channelCode` **由调用方传入** —— 不再像上一版那样写死成 `mock`
+ * （当时的规格约束 SC-010 是「本期不接第三方商户号」，已随接入支付宝/微信一并去掉）。
+ * 渠道码的可用性来自 {@link listEnabledChannelCodes}，界面只负责让用户选。
+ *
+ * ⚠️ 支付**不是**提交即成功：真实渠道要跳收银台、模拟通道也要等后端**异步回调**
+ * `/app-api/trade/order/update-paid` 才把交易订单推进到「待发货」。所以提交成功后
+ * 必须重新拉取订单详情来确认状态，**不得由前端把订单标记为已支付**（FR-039）。
  */
-export function submitPay(payOrderId: number): Promise<PayOrderSubmitResp> {
+export function submitPay(payOrderId: number, channelCode: string): Promise<PayOrderSubmitResp> {
   return post<PayOrderSubmitResp>('/pay/order/submit', {
     id: payOrderId,
-    channelCode: MOCK_CHANNEL_CODE,
+    channelCode,
   })
 }
 
-/** 查询支付单。`sync=true` 会主动同步渠道状态 */
+/**
+ * 查询支付单。`sync=true` 会主动同步渠道状态。
+ *
+ * 返回里带 `appId` —— 界面靠它去查「这个应用启用了哪些渠道」，
+ * 免得前端自己记一个租户相关的应用编号（换个租户就错）。
+ */
 export function getPayOrder(id: number, sync = false): Promise<PayOrder> {
   return get<PayOrder>('/pay/order/get', sync ? { id, sync: true } : { id })
+}
+
+/**
+ * 获得指定支付应用**已启用**的渠道编码列表。
+ *
+ * 后端接口：`/app-api/pay/channel/get-enable-code-list`。
+ * 失败或返回空时回落成空数组 —— 界面据此降级为「暂无可用渠道」，
+ * 而不是抛错把整个订单详情页带崩。
+ */
+export async function listEnabledChannelCodes(appId: number): Promise<string[]> {
+  const codes = await get<string[]>('/pay/channel/get-enable-code-list', { appId })
+  return Array.isArray(codes) ? codes : []
 }

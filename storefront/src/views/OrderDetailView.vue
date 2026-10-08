@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { cancelOrder, getOrderDetail } from '@/api/order'
-import { submitPay } from '@/api/pay'
+import { getPayOrder, listEnabledChannelCodes, submitPay } from '@/api/pay'
 import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
@@ -13,6 +13,7 @@ import type { OrderDetail } from '@/types'
 import { OrderStatus } from '@/types'
 import { formatYuan, reconcile } from '@/utils/money'
 import { orderStatusText } from '@/utils/orderStatus'
+import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
 import { formatDateTime } from '@/utils/time'
 
 /**
@@ -43,6 +44,13 @@ const message = ref('')
 const cancelOpen = ref(false)
 const paying = ref(false)
 
+/**
+ * 可选支付渠道。**可用性来自后端**（`/pay/channel/get-enable-code-list`），
+ * 前端只做「编码 → 中文名」的展示映射，不自己判断哪个渠道能用。
+ */
+const channelOptions = ref<ChannelOption[]>([])
+const selectedChannel = ref('')
+
 const statusText = computed(() => (order.value ? orderStatusText(order.value.status) : ''))
 const isUnpaid = computed(() => order.value?.status === OrderStatus.UNPAID)
 /**
@@ -69,11 +77,39 @@ const STATUS_HINT: Record<number, string> = {
  * （`AppTradeOrderController.getOrderDetail` 的 `sync` 分支会调
  * `syncOrderPayStatusQuietly`）。
  */
+/**
+ * 拉该订单可用的支付渠道。
+ *
+ * 走两步：支付单里带 `appId` → 查这个应用启用哪些渠道码。
+ * **刻意不把应用编号写死在前端** —— 那是租户相关的（线上 162 是 10），写死了换个租户就错。
+ *
+ * 只在「待支付且有支付单」时才拉：已付款的订单没有支付可言，白拉一次请求。
+ * 失败不抛 —— 渠道拉不到只该让支付入口降级，不该把整个订单详情页带崩。
+ */
+async function loadChannels() {
+  const payOrderId = order.value?.payOrderId
+  if (!isUnpaid.value || !payOrderId) {
+    channelOptions.value = []
+    return
+  }
+  try {
+    const payOrder = await getPayOrder(payOrderId)
+    const codes = await listEnabledChannelCodes(payOrder.appId)
+    channelOptions.value = buildChannelOptions(codes)
+    // 默认选中第一个可用的；一个都没有就留空（按钮置灰）
+    selectedChannel.value = channelOptions.value.find((c) => c.enabled)?.code ?? ''
+  } catch {
+    channelOptions.value = []
+    selectedChannel.value = ''
+  }
+}
+
 async function load(sync = false) {
   loading.value = true
   error.value = false
   try {
     order.value = await getOrderDetail(Number(props.id), sync)
+    await loadChannels()
   } catch {
     error.value = true
     order.value = null
@@ -94,10 +130,12 @@ async function onPay() {
   const payOrderId = order.value?.payOrderId
   // 契约要求：payOrderId 为空时不得提交（全额抵扣的订单没有支付单）
   if (!payOrderId) return
+  // 没有可用渠道时不提交 —— 免得发一个渠道码为空、必定被后端拒的请求
+  if (!selectedChannel.value) return
   message.value = ''
   paying.value = true
   try {
-    await submitPay(payOrderId)
+    await submitPay(payOrderId, selectedChannel.value)
     await load(true)
   } catch (e) {
     // 支付放弃/中断/失败：订单仍是「待支付」，入口留着让用户再发起（FR-038）
@@ -244,6 +282,24 @@ onMounted(async () => {
 
         <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
         <div v-if="isUnpaid" class="od-actions">
+          <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
+               后台配好后不用改代码就会变成可选 -->
+          <div v-if="!needsNoPay && channelOptions.length" class="pay-channels">
+            <button
+              v-for="c in channelOptions"
+              :key="c.code"
+              :data-channel="c.code"
+              class="pay-channel"
+              :class="{ 'is-disabled': !c.enabled, 'is-active': c.code === selectedChannel }"
+              type="button"
+              :disabled="!c.enabled"
+              @click="selectedChannel = c.code"
+            >
+              {{ c.label }}
+              <span v-if="c.comingSoon" class="pay-channel-soon">即将上线</span>
+            </button>
+          </div>
+
           <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
           <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
           <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
@@ -254,7 +310,7 @@ onMounted(async () => {
             id="payOrder"
             class="btn-buy"
             type="button"
-            :disabled="paying"
+            :disabled="paying || !selectedChannel"
             @click="onPay"
           >
             {{ paying ? '支付中…' : '立即支付' }}
@@ -359,10 +415,50 @@ onMounted(async () => {
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+/* 渠道选择在窄屏下另起一行，避免把两个按钮挤变形 */
+.pay-channels {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
+}
+.pay-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #e3e9f4;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 14px;
+  color: #16233f;
+  cursor: pointer;
+}
+.pay-channel.is-active {
+  border-color: #2e7cd6;
+  color: #2e7cd6;
+  background: #f0f4fb;
+}
+.pay-channel.is-disabled {
+  color: #b4c0d8;
+  background: #f5f8ff;
+  cursor: not-allowed;
+}
+/* 编码没有中文名时回落显示编码本身，字号小一点免得撑破按钮 */
+.pay-channel-soon {
+  font-size: 12px;
+  color: #b4c0d8;
 }
 .od-nopay {
   font-size: 14px;
   color: var(--ml-text-sub);
+}
+@media (max-width: 768px) {
+  .pay-channels {
+    width: 100%;
+    margin-right: 0;
+  }
 }
 @media (max-width: 768px) {
   .od-item {

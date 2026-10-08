@@ -8,6 +8,8 @@ import { OrderStatus, type OrderDetail } from '@/types'
 const getOrderDetail = vi.fn()
 const cancelOrder = vi.fn()
 const submitPay = vi.fn()
+const getPayOrder = vi.fn()
+const listEnabledChannelCodes = vi.fn()
 vi.mock('@/api/order', () => ({
   getOrderDetail: (...a: unknown[]) => getOrderDetail(...a),
   cancelOrder: (...a: unknown[]) => cancelOrder(...a),
@@ -18,8 +20,8 @@ vi.mock('@/api/order', () => ({
 }))
 vi.mock('@/api/pay', () => ({
   submitPay: (...a: unknown[]) => submitPay(...a),
-  getPayOrder: vi.fn(),
-  MOCK_CHANNEL_CODE: 'mock',
+  getPayOrder: (...a: unknown[]) => getPayOrder(...a),
+  listEnabledChannelCodes: (...a: unknown[]) => listEnabledChannelCodes(...a),
 }))
 vi.mock('@/api/cart', () => ({
   getCartCount: vi.fn().mockResolvedValue(0),
@@ -117,6 +119,12 @@ beforeEach(async () => {
   cancelOrder.mockResolvedValue(true)
   submitPay.mockReset()
   submitPay.mockResolvedValue({ status: 10, displayMode: 'url', displayContent: '' })
+  // 支付单带 appId —— 界面靠它查该应用启用了哪些渠道（前端不记死应用编号）
+  getPayOrder.mockReset()
+  getPayOrder.mockResolvedValue({ id: 8899, appId: 10, status: 0, channelCode: '' })
+  // 默认：只开了支付宝（线上 162 就是这状态，微信等商户号）
+  listEnabledChannelCodes.mockReset()
+  listEnabledChannelCodes.mockResolvedValue(['alipay_pc'])
   await router.push('/order/1')
   await router.isReady()
 })
@@ -299,7 +307,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await flushPromises()
 
     // 交易订单号是 1，支付单号是 8899 —— 必须传后者，传错会「找不到支付单」
-    expect(submitPay).toHaveBeenCalledWith(8899)
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc')
     // 状态以后端返回为准（不是前端自己改的）
     expect(w.get('.ml-pill').text()).toBe('待发货')
     expect(w.find('#payOrder').exists()).toBe(false)
@@ -313,7 +321,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await w.get('#payOrder').trigger('click')
     await flushPromises()
 
-    expect(submitPay).toHaveBeenCalledWith(8899)
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc')
     // 不得乐观地翻成「待发货」或「已支付」
     expect(w.get('.ml-pill').text()).toBe('待支付')
     expect(w.text()).not.toContain('待发货')
@@ -330,6 +338,47 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     expect(w.text()).toContain('无需支付')
     // 绝不能把 null 提交给支付接口
     expect(submitPay).not.toHaveBeenCalled()
+  })
+
+  it('**渠道码由后端给的启用列表决定**，不再是写死的 mock', async () => {
+    await mountDetail()
+    expect(listEnabledChannelCodes).toHaveBeenCalledWith(10)
+    expect(submitPay).not.toHaveBeenCalled() // 只是加载，不该自动提交
+  })
+
+  it('待支付时展示渠道选择器：支付宝可选、微信置灰占位', async () => {
+    const w = await mountDetail()
+    const opts = w.findAll('.pay-channel')
+    // 共两个入口、顺序固定：支付宝在前、微信在后
+    expect(opts).toHaveLength(2)
+    expect(opts[0].text()).toContain('支付宝')
+    expect(opts[1].text()).toContain('微信支付')
+    expect(opts[0].classes()).not.toContain('is-disabled')
+    expect(opts[1].classes()).toContain('is-disabled')
+    // 未开通的渠道要写明原因，不然用户会以为点了没反应
+    expect(opts[1].text()).toContain('即将上线')
+  })
+
+  it('两个渠道都启用时，微信也可选', async () => {
+    listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_native'])
+    const w = await mountDetail()
+    const opts = w.findAll('.pay-channel')
+    expect(opts.every((o) => !o.classes().includes('is-disabled'))).toBe(true)
+    expect(w.text()).not.toContain('即将上线')
+  })
+
+  it('切换渠道后提交的是**选中的那个**渠道码', async () => {
+    listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_native'])
+    const w = await mountDetail()
+    await w.findAll('.pay-channel')[1].trigger('click')
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_native')
+  })
+
+  it('**已付款的订单不拉渠道列表** —— 没有支付可言，别白发请求', async () => {
+    await mountDetail(detail({ status: OrderStatus.UNDELIVERED }))
+    expect(listEnabledChannelCodes).not.toHaveBeenCalled()
   })
 
   it('提交失败时仍是「待支付」，给出提示**并可再次发起**（FR-038 / T118）', async () => {

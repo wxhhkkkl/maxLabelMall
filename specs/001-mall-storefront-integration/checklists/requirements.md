@@ -54,7 +54,7 @@ All three markers resolved and the spec updated:
 
 - **Q1 落地形态 → 组件化前端工程重写**。FR-047 (which held the marker) was removed; the decision now lives in the new 落地决策 table and is reflected in FR-046 (设计稿作为视觉基准、逐页还原) and Success Criteria SC-012. Added an explicit **本期明确不做** list to stop scope creep now that the rewrite is authorized.
 - **Q2 登录方式 → 手机号 + 密码 与 手机号 + 短信验证码 双通道**。FR-010 split into FR-010 / FR-010a / FR-010b（验证码有效期、频率、错误次数）。US2 从 8 条场景扩到 10 条以覆盖第二种登录方式与验证码边界。Added SC-011（两种方式进入同一账号）and a 验证码边界 row to Edge Cases.
-- **Q3 支付范围 → 仅模拟支付通道**。US5 retitled 支付闭环（模拟支付通道）并重写场景，FR-038 明确"不接入真实第三方渠道"，新增 FR-041b（支付渠道与订单状态解耦，便于后续替换）。Added SC-010（无商户号即可端到端验证）and a 支付中断 edge case.
+- **Q3 支付范围 → 仅模拟支付通道**。US5 retitled 支付闭环（模拟支付通道）并重写场景，FR-038 明确"不接入真实第三方渠道"，新增 FR-041b（支付渠道与订单状态解耦，便于后续替换）。Added SC-010（无商户号即可端到端验证）and a 支付中断 edge case. ← **2026-10-08：SC-010 已删除**（生产改为接入真实支付宝渠道，见 spec.md FR-038 / 决策表 Q3）。此处「模拟支付」改指**测试租户的 mock 渠道** —— e2e 显式点选 `[data-channel="mock"]`，生产链路改为人工验收。
 
 Checklist now fully passes. No blocking items. Ready for `/speckit-plan`.
 

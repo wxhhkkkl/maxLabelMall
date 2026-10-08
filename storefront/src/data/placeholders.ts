@@ -462,6 +462,33 @@ export const PRIVACY_POLICY_CHECKLIST = [
  * 若这些公司并非真实客户，公开宣传可能构成虚假宣传与商标侵权；
  * 匿名署名且不可核实的客户证言同样不应发布。
  */
+/**
+ * 首页 Hero **三张幻灯片右侧的玻璃小标签**（设计稿三张都有）。
+ *
+ * ⚠️ 顺序与幻灯片一致：① 耗材商城 ② 打印机 ③ 软件 —— 改幻灯片顺序时这里要跟着改。
+ *
+ * 设计稿原文里有三处**不能被当作事实发布**的内容，已包成占位符（FR-056）：
+ *   · `¥12.9 /卷 起` —— 报价。项目规矩是**连引导性表述都不要**，必须业务方给准数；
+ *   · `2,000+ 持续更新` —— 数字声明（与信任背书区的「行业模板 2,000+」同源）；
+ *   · `效率提升 10 倍` —— 效果承诺。首页功能卡里的同一句已被软化成「大幅提升」，
+ *     这里不能又冒出一个「10 倍」。
+ * 其余是商品名/规格/功能名，属可核对的事实，不加占位。
+ */
+export const heroChips: Array<Array<{ title: string; sub: string }>> = [
+  [
+    { title: '三防热敏纸', sub: p('¥12.9 /卷 起') },
+    { title: '蜡基碳带', sub: '110mm×300m' },
+  ],
+  [
+    { title: '赋签 M3 Pro', sub: '双模高速 · 300dpi' },
+    { title: 'MaxLabel 云标签', sub: '多端同步 · 批量打印' },
+  ],
+  [
+    { title: '海量模板库', sub: p('2,000+ 持续更新') },
+    { title: 'Excel 批量打印', sub: p('效率提升 10 倍') },
+  ],
+];
+
 export const inheritedClaims = {
   /** index.html 的客户 logo 行 —— 6 个真实第三方公司名，需业务方确认是否已获授权 */
   partnerNames: [
@@ -514,6 +541,7 @@ export const RENDERED = {
   enterprise,
   softwarePlans,
   legal,
+  heroChips,
   inheritedClaims,
 };
 

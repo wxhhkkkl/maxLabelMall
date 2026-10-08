@@ -110,6 +110,8 @@ onBeforeUnmount(() => {
 
 /** 信任背书区的数字（全部来自占位符，业务方确认前不当作事实） */
 const trustStats = RENDERED.inheritedClaims.stats
+/** Hero 右侧小标签 —— 三张幻灯片各一组，索引与幻灯片顺序一一对应 */
+const heroChips = RENDERED.heroChips
 const partnerNames = RENDERED.inheritedClaims.partnerNames
 const testimonial = RENDERED.inheritedClaims.testimonial
 </script>
@@ -131,7 +133,13 @@ const testimonial = RENDERED.inheritedClaims.testimonial
         </div>
       </div>
       <div class="hero-right">
-        <div class="ph hero-visual">商城精选商品图</div>
+        <img class="hero-visual" src="/assets/hero-mall.png" alt="赋签商城在售的标签打印机、热敏纸卷与碳带" />
+        <div class="hero-chips">
+          <div v-for="c in heroChips[0] ?? []" :key="c.title" class="glass-chip">
+            <PendingText tag="b" :value="c.title" />
+            <PendingText tag="span" :value="c.sub" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -152,10 +160,12 @@ const testimonial = RENDERED.inheritedClaims.testimonial
         </p>
       </div>
       <div class="hero-right">
-        <div class="ph hero-visual">标签打印机产品图</div>
+        <img class="hero-visual" src="/assets/hero-printer.png" alt="赋签标签打印机正在打印条码标签" />
         <div class="hero-chips">
-          <div class="glass-chip"><b>赋签 M3 Pro</b><span>双模高速 · 300dpi</span></div>
-          <div class="glass-chip"><b>MaxLabel 云标签</b><span>多端同步 · 批量打印</span></div>
+          <div v-for="c in heroChips[1] ?? []" :key="c.title" class="glass-chip">
+            <PendingText tag="b" :value="c.title" />
+            <PendingText tag="span" :value="c.sub" />
+          </div>
         </div>
       </div>
     </div>
@@ -173,7 +183,13 @@ Windows / macOS / iOS / Android 全平台云同步</p>
         </div>
       </div>
       <div class="hero-right">
-        <div class="ph hero-visual">软件编辑器界面图</div>
+        <img class="hero-visual" src="/assets/hero-software.png" alt="MaxLabel 标签编辑软件的编辑器界面" />
+        <div class="hero-chips">
+          <div v-for="c in heroChips[2] ?? []" :key="c.title" class="glass-chip">
+            <PendingText tag="b" :value="c.title" />
+            <PendingText tag="span" :value="c.sub" />
+          </div>
+        </div>
       </div>
     </div>
   </BaseCarousel>
@@ -225,18 +241,22 @@ Windows / macOS / iOS / Android 全平台云同步</p>
     </div>
     <div class="f-grid">
       <div class="f-card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="14" y="3" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="3" y="14" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="14" y="14" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /></svg>
         <h3>海量模板 · 一键套用</h3>
         <p>覆盖零售、物流、服装、烘焙等行业的精品模板，选好即改，改完即打。</p>
       </div>
       <div class="f-card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9V3h12v6" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="3" y="9" width="18" height="8" rx="2" stroke="#6FC8FF" stroke-width="2" /><path d="M7 14h10v7H7z" stroke="#6FC8FF" stroke-width="2" stroke-linejoin="round" /></svg>
         <h3>Excel 批量打印</h3>
         <p>导入 Excel / TXT 数据源，自动生成流水号与可变内容，批量打印效率大幅提升。</p>
       </div>
       <div class="f-card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4 1.7A4 4 0 0 0 7 19h10.5z" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <h3>多端云同步</h3>
         <p>Windows / iOS / Android / Web 四端实时同步，换设备、重装系统标签数据永不丢失。</p>
       </div>
       <div class="f-card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v4" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <h3>主流打印机兼容</h3>
         <p>兼容市面主流桌面与便携打印机，支持 TSPL / CPCL / ESC-POS 标准指令集。</p>
       </div>
@@ -331,18 +351,22 @@ Windows / macOS / iOS / Android 全平台云同步</p>
     </div>
     <div class="s-grid">
       <div class="s-card">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M4 13v3a3 3 0 0 0 3 3h1v-6H7a3 3 0 0 0-3 3z" fill="#1B66FF" /></svg>
         <h3>7×12 在线客服</h3>
         <p>工作日 9:00-21:00 随时响应打印问题</p>
       </div>
       <div class="s-card">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <h3>驱动与手册下载</h3>
         <p>全型号驱动 · 快速指南，持续更新一键获取</p>
       </div>
       <div class="s-card">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="#1B66FF" stroke-width="2" /><path d="M10 8.5l6 3.5-6 3.5v-7z" fill="#1B66FF" /></svg>
         <h3>视频教程学院</h3>
         <p>从入门到进阶，手把手教你玩转标签</p>
       </div>
       <div class="s-card">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z" stroke="#1B66FF" stroke-width="2" stroke-linejoin="round" /><path d="M9 12l2 2 4-4" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <h3>整机一年质保</h3>
         <p>打印机整机质保一年，耗材支持无理由退换</p>
       </div>

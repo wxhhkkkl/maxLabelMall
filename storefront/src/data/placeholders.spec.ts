@@ -65,6 +65,7 @@ describe('RENDERED —— 只含会渲染的内容', () => {
       'templates',
       'enterprise',
       'legal',
+      'heroChips',
       'inheritedClaims',
     ]) {
       expect(Object.keys(RENDERED)).toContain(key)

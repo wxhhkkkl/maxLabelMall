@@ -193,9 +193,16 @@ img { display: block; }
 .btn-ghost-white:hover { background: rgba(255,255,255,.08); }
 .trust-line { font-size: 13px; color: #8FA6D9; }
 .hero-right { display: flex; align-items: center; gap: 20px; flex: 1; justify-content: flex-end; }
+/* Hero 配图（2026-10-08 起是真实 `<img>`，之前是 `.ph` 占位块）。
+   三张图自带深蓝背景，`cover` 让它们铺满这个 500×440 的框、由 border-radius 收圆角，
+   看起来是一块整体；`contain` 会在上下留出条带，与 hero 的渐变背景接不上缝。
+   ⚠️ 商城 / 打印机两张是 1536×944（1.63:1），比这个框宽 —— `cover` 会各裁掉约 15%
+   的左右边缘；软件那张是 1100×968（1.14:1），恰好等于框的比例，完全不裁。
+   换图时请先确认主体在中间 70% 宽度内，否则会被裁掉。 */
 .hero-visual {
   width: clamp(300px, 36vw, 500px);
   height: 440px;
+  object-fit: cover;
   border-radius: 20px;
   flex-shrink: 1;
   min-width: 0;

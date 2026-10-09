@@ -2,7 +2,7 @@ import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setTokens } from '@/utils/auth'
+import { AUTH_KEYS, setTokens } from '@/utils/auth'
 
 const getMemberUser = vi.fn()
 vi.mock('@/api/member', () => ({
@@ -59,7 +59,7 @@ describe('登录态', () => {
     getMemberUser.mockRejectedValue({ code: 403, message: '您无权访问该租户的数据' })
     await useUserStore().loadMember()
     expect(useUserStore().isLogin).toBe(false)
-    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBeNull()
+    expect(window.localStorage.getItem(AUTH_KEYS.ACCESS_TOKEN_KEY)).toBeNull()
   })
 
   it('**但临时故障（网络异常）不能把用户踢下线**（FR-013）', async () => {
@@ -68,7 +68,7 @@ describe('登录态', () => {
     await useUserStore().loadMember()
     // 令牌还在：可能只是偶发网络问题，真正的失效由 401 分支处理
     expect(useUserStore().isLogin).toBe(true)
-    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBe('at-1')
+    expect(window.localStorage.getItem(AUTH_KEYS.ACCESS_TOKEN_KEY)).toBe('at-1')
   })
 
   it('退出登录清空令牌与会员信息', async () => {
@@ -79,7 +79,7 @@ describe('登录态', () => {
     await s.logout()
     expect(s.isLogin).toBe(false)
     expect(s.member).toBeNull()
-    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBeNull()
+    expect(window.localStorage.getItem(AUTH_KEYS.ACCESS_TOKEN_KEY)).toBeNull()
   })
 })
 

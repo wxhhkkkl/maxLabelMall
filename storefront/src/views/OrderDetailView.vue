@@ -14,7 +14,8 @@ import MlPill from '@/components/base/MlPill.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
 import type { OrderDetail } from '@/types'
 import { OrderStatus } from '@/types'
-import { afterSaleItemStatusText, canApplyRefund } from '@/utils/afterSale'
+import { cancelAfterSale } from '@/api/afterSale'
+import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
 import { formatYuan, reconcile } from '@/utils/money'
 import { orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
@@ -70,6 +71,11 @@ const paying = ref(false)
  */
 const refundItem = ref<OrderDetail['items'][number] | null>(null)
 const refundOpen = ref(false)
+
+/** 正在撤销申请的那个订单项（撤销要按**售后单编号**，见 `canCancelAfterSale`） */
+const cancelRefundItem = ref<OrderDetail['items'][number] | null>(null)
+const cancelRefundOpen = ref(false)
+const cancelRefunding = ref(false)
 
 /**
  * 微信公众号的 JSAPI 渠道码。这里**只用来分派「怎么把收银台唤起来」**，
@@ -324,6 +330,42 @@ function openRefund(it: OrderDetail['items'][number]) {
   refundOpen.value = true
 }
 
+// ========== 撤销退款申请 ==========
+
+/** 该商品能不能撤销申请（判定与口径说明见 `utils/afterSale.ts`） */
+function canCancelRefund(it: OrderDetail['items'][number]): boolean {
+  return canCancelAfterSale(it)
+}
+
+function openCancelRefund(it: OrderDetail['items'][number]) {
+  message.value = ''
+  cancelRefundItem.value = it
+  cancelRefundOpen.value = true
+}
+
+/**
+ * 确认撤销。与「取消订单」同一套写法：**先关弹层再发请求**，
+ * 成功/失败都以后端为准（撤销成功后订单项回到「未售后」，两个入口会跟着变）。
+ */
+async function confirmCancelRefund() {
+  const target = cancelRefundItem.value
+  cancelRefundOpen.value = false
+  cancelRefundItem.value = null
+  // 没有售后单编号就发不出撤销请求（这里是兜底，界面上本就不给入口）
+  if (!target?.afterSaleId) return
+  message.value = ''
+  cancelRefunding.value = true
+  try {
+    await cancelAfterSale(target.afterSaleId)
+    await load()
+  } catch (e) {
+    // 例如后端说「售后单状态不允许取消」（商家已收货待退款）—— 原样透出
+    message.value = (e as { message?: string })?.message || '撤销失败，请稍后重试'
+  } finally {
+    cancelRefunding.value = false
+  }
+}
+
 function onRefundSubmitted() {
   message.value = '退款申请已提交，商家审核后处理'
 }
@@ -436,16 +478,28 @@ onMounted(async () => {
               </div>
               <!-- 售后入口/状态。**放在 .od-info 内部** —— 外面那层是 4 列 grid，
                    多塞一个直接子元素会撑坏整行布局 -->
-              <div v-if="afterSaleText(it)" class="od-aftersale">{{ afterSaleText(it) }}</div>
-              <button
-                v-else-if="canRefund(it)"
-                class="od-refund"
-                type="button"
-                :data-item="it.id"
-                @click="openRefund(it)"
-              >
-                申请退款
-              </button>
+              <div class="od-sale-actions">
+                <span v-if="afterSaleText(it)" class="od-aftersale">{{ afterSaleText(it) }}</span>
+                <!-- 两者互斥：可撤销时项状态是「售后中」，可申请时是「未售后」 -->
+                <button
+                  v-if="canCancelRefund(it)"
+                  class="od-cancel-refund"
+                  type="button"
+                  :data-item="it.id"
+                  @click="openCancelRefund(it)"
+                >
+                  撤销申请
+                </button>
+                <button
+                  v-else-if="canRefund(it)"
+                  class="od-refund"
+                  type="button"
+                  :data-item="it.id"
+                  @click="openRefund(it)"
+                >
+                  申请退款
+                </button>
+              </div>
             </div>
             <div class="od-price">{{ formatYuan(it.price) }}</div>
             <div class="od-count">×{{ it.count }}</div>
@@ -545,6 +599,32 @@ onMounted(async () => {
     </template>
   </MlModal>
 
+  <!-- 撤销退款申请：先确认再发请求（照「取消订单」那套） -->
+  <MlModal :open="cancelRefundOpen" title="撤销退款申请" @close="cancelRefundOpen = false">
+    <p class="ml-hint">
+      确认撤销「{{ cancelRefundItem?.spuName }}」的退款申请？撤销后该商品需重新申请，商家将不再受理这一条。
+    </p>
+    <template #foot>
+      <button
+        id="dismissCancelRefund"
+        class="btn-cart"
+        type="button"
+        @click="cancelRefundOpen = false"
+      >
+        再想想
+      </button>
+      <button
+        id="confirmCancelRefund"
+        class="btn-buy"
+        type="button"
+        :disabled="cancelRefunding"
+        @click="confirmCancelRefund"
+      >
+        {{ cancelRefunding ? '撤销中…' : '确认撤销' }}
+      </button>
+    </template>
+  </MlModal>
+
   <!-- 申请退款（按单个商品）。提交后等商家审核，状态由后端给 -->
   <RefundApplyDialog
     :open="refundOpen"
@@ -619,13 +699,18 @@ onMounted(async () => {
   margin-top: 4px;
 }
 /* 售后入口/状态 —— 放在 .od-info 里（外层是 4 列 grid，不能加直接子元素） */
-.od-aftersale {
+.od-sale-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 6px;
+}
+.od-aftersale {
   font-size: 12px;
   color: var(--ml-primary);
 }
-.od-refund {
-  margin-top: 6px;
+.od-refund,
+.od-cancel-refund {
   padding: 2px 10px;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius-pill);
@@ -634,7 +719,8 @@ onMounted(async () => {
   font-size: 12px;
   cursor: pointer;
 }
-.od-refund:hover {
+.od-refund:hover,
+.od-cancel-refund:hover {
   border-color: var(--ml-primary);
   color: var(--ml-primary);
 }

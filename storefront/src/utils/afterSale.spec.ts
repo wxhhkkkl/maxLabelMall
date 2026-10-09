@@ -5,6 +5,7 @@ import { OrderStatus } from '@/types'
 
 import {
   afterSaleItemStatusText,
+  canCancelAfterSale,
   afterSaleWayLabel,
   allowsReturnRefund,
   canApplyRefund,
@@ -75,6 +76,22 @@ describe('allowsReturnRefund —— 「退货退款」只在已发货之后可�
   it('待支付 / 已取消也不可选（这两个状态本就不给退款入口）', () => {
     expect(allowsReturnRefund(OrderStatus.UNPAID)).toBe(false)
     expect(allowsReturnRefund(OrderStatus.CANCELED)).toBe(false)
+  })
+})
+
+describe('canCancelAfterSale —— 能不能撤销申请', () => {
+  it('售后中且有售后单编号 → 可以撤销', () => {
+    expect(canCancelAfterSale({ afterSaleStatus: AfterSaleItemStatus.APPLY, afterSaleId: 2048 })).toBe(true)
+  })
+
+  it('未售后 / 已退款都没有可撤销的东西', () => {
+    expect(canCancelAfterSale({ afterSaleStatus: AfterSaleItemStatus.NONE, afterSaleId: 2048 })).toBe(false)
+    expect(canCancelAfterSale({ afterSaleStatus: AfterSaleItemStatus.SUCCESS, afterSaleId: 2048 })).toBe(false)
+  })
+
+  it('**缺售后单编号时不给入口** —— 没有 id 根本发不出撤销请求', () => {
+    expect(canCancelAfterSale({ afterSaleStatus: AfterSaleItemStatus.APPLY })).toBe(false)
+    expect(canCancelAfterSale({ afterSaleStatus: AfterSaleItemStatus.APPLY, afterSaleId: 0 })).toBe(false)
   })
 })
 

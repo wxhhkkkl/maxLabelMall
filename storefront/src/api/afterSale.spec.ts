@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const post = vi.fn()
+const del = vi.fn()
 vi.mock('@/config/http', () => ({
   get: vi.fn(),
   post: (...a: unknown[]) => post(...a),
   put: vi.fn(),
-  del: vi.fn(),
+  del: (...a: unknown[]) => del(...a),
 }))
 
-const { createAfterSale } = await import('./afterSale')
+const { cancelAfterSale, createAfterSale } = await import('./afterSale')
 
 beforeEach(() => {
   post.mockReset()
+  del.mockReset()
 })
 
 /**
@@ -88,5 +90,24 @@ describe('申请售后', () => {
     await expect(
       createAfterSale({ orderItemId: 11, way: 10, refundPrice: 7000, applyReason: 'x' }),
     ).rejects.toMatchObject({ message: '订单项已申请售后，无法重复申请' })
+  })
+})
+
+/**
+ * 撤销退款申请。
+ *
+ * ⚠️ 参数是**售后单编号**（订单项上的 `afterSaleId`），不是订单项编号、更不是订单编号。
+ * ⚠️ 走 **DELETE**，参数在 **query** 上（后端是 `@RequestParam`），不是 body。
+ */
+describe('撤销售后申请', () => {
+  it('按售后单编号撤销，参数走 query', async () => {
+    del.mockResolvedValue(true)
+    await cancelAfterSale(2048)
+    expect(del).toHaveBeenCalledWith('/trade/after-sale/cancel', { id: 2048 })
+  })
+
+  it('失败要向上抛 —— 状态不允许撤销时（如商家已收货待退款）后端会拒，文案要能透给用户', async () => {
+    del.mockRejectedValue({ message: '售后单状态不允许取消' })
+    await expect(cancelAfterSale(2048)).rejects.toMatchObject({ message: '售后单状态不允许取消' })
   })
 })

@@ -17,10 +17,12 @@ import { OrderStatus } from '@/types'
  * 要加也得后端先加）；② 不因为某一项在售后中而禁用整单（后端查重只看单项）。
  */
 
-/** 判定用的订单项视图 —— 只取用得上的两个字段 */
+/** 判定用的订单项视图 —— 只取用得上的几个字段 */
 export interface RefundableItem {
   payPrice?: number
   afterSaleStatus?: number
+  /** 售后单编号 —— 撤销申请时要把它传给后端 */
+  afterSaleId?: number
 }
 
 /** 后端允许申请售后的订单状态：已支付且未取消 */
@@ -41,6 +43,23 @@ export function canApplyRefund(item: RefundableItem, orderStatus: number): boole
   if ((item.afterSaleStatus ?? AfterSaleItemStatus.NONE) !== AfterSaleItemStatus.NONE) return false
   // 实付为 0 或字段缺失 → 没有可退金额（后端 refundPrice 要求 > 0）
   return (item.payPrice ?? 0) > 0
+}
+
+/**
+ * 该订单项能不能**撤销退款申请**。
+ *
+ * ⚠️ 后端允许撤销的**售后单**状态是「申请中 / 卖家同意 / 待卖家收货」三种，
+ * 而订单项只暴露 `afterSaleStatus`（0/10/20），**看不出**售后单具体走到哪一步 ——
+ * 所以这里只能在「售后中」时一律给入口，真到不可撤销时（例如商家已收货待退款）
+ * 由后端拒，前端把它的文案透出来。**不猜**。
+ *
+ * 没有 `afterSaleId` 就发不出撤销请求（那是接口的唯一参数），故不给入口。
+ */
+export function canCancelAfterSale(item: RefundableItem): boolean {
+  return (
+    (item.afterSaleStatus ?? AfterSaleItemStatus.NONE) === AfterSaleItemStatus.APPLY &&
+    (item.afterSaleId ?? 0) > 0
+  )
 }
 
 /**

@@ -1,4 +1,4 @@
-import { post } from '@/config/http'
+import { del, post } from '@/config/http'
 import type { AfterSaleCreateReq } from '@/types'
 
 /**
@@ -27,4 +27,18 @@ export function createAfterSale(req: AfterSaleCreateReq): Promise<number> {
     body.applyPicUrls = req.applyPicUrls
   }
   return post<number>('/trade/after-sale/create', body)
+}
+
+/**
+ * 撤销退款申请（买家自己撤）。
+ *
+ * ⚠️ `id` 是**售后单编号**（订单项上的 `afterSaleId`）—— 不是订单项编号、更不是订单编号。
+ * ⚠️ 走 **DELETE**，参数在 **query** 上（后端是 `@RequestParam`）。
+ *
+ * 后端只在售后单处于「申请中 / 卖家同意 / 待卖家收货」时允许撤销；
+ * 再往后（商家已收货待退款等）会拒，把它的文案透出来即可。
+ * 撤销成功后**订单项的售后状态会回到未售后**，所以两个入口都要跟着重生。
+ */
+export function cancelAfterSale(id: number): Promise<boolean> {
+  return del<boolean>('/trade/after-sale/cancel', { id })
 }

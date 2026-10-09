@@ -354,6 +354,7 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 | 用途 | 方法与路径 | 说明 |
 |---|---|---|
 | 申请退款 | `POST /app-api/trade/after-sale/create` | body `{orderItemId, way, refundPrice, applyReason, applyDescription?, applyPicUrls?}`；返回**售后单编号** |
+| 撤销申请 | `DELETE /app-api/trade/after-sale/cancel` | query `id` = **售后单编号**（订单项上的 `afterSaleId`）。后端只允许售后单处于「申请中 / 卖家同意 / 待卖家收货」时撤销；**撤销后订单项的售后状态回到未售后**，两个入口都会重现 |
 
 **请求体的四个必填字段**：
 
@@ -371,8 +372,14 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 **订单项的售后状态**（`AppTradeOrderItemRespVO.afterSaleStatus`，**订单项级**、不同商品互相独立）：
 `0` 未售后 / `10` 售后中（「退款处理中」）/ `20` 售后成功（「已退款」）。
 
-**本期的展示口径**：订单项上显示入口或状态标签，提交成功后**重拉订单详情**以后端为准
-（不做本地乐观更新，与支付后 `sync` 同一口径）。凭证图片、独立售后列表页本期不做。
+**本期的展示口径**：订单项上显示入口或状态标签，提交/撤销成功后都**重拉订单详情**以后端为准
+（不做本地乐观更新，与支付后 `sync` 同一口径）。
+
+**「撤销申请」的入口判定**：订单项只暴露 `afterSaleStatus`（0/10/20），**看不出**售后单走到了
+哪一步 —— 所以「售后中」时一律给撤销入口（有 `afterSaleId` 的前提下），真到不可撤销的状态
+（如商家已收货待退款）由后端拒、前端把它「售后单状态不允许取消」的原样透出来。**前端不猜。**
+
+凭证图片、独立售后列表页本期不做。
 
 ---
 

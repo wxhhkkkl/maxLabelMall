@@ -41,8 +41,10 @@ const getSocialUser = vi.fn()
 const bindSocialUser = vi.fn()
 const getSocialAuthRedirectUrl = vi.fn()
 const createAfterSale = vi.fn()
+const cancelAfterSale = vi.fn()
 vi.mock('@/api/afterSale', () => ({
   createAfterSale: (...a: unknown[]) => createAfterSale(...a),
+  cancelAfterSale: (...a: unknown[]) => cancelAfterSale(...a),
 }))
 
 vi.mock('@/api/social', () => ({
@@ -155,6 +157,8 @@ beforeEach(async () => {
   listEnabledChannelCodes.mockResolvedValue(['alipay_pc'])
   createAfterSale.mockReset()
   createAfterSale.mockResolvedValue(2048)
+  cancelAfterSale.mockReset()
+  cancelAfterSale.mockResolvedValue(true)
   getSocialUser.mockReset()
   getSocialUser.mockResolvedValue(null)
   bindSocialUser.mockReset()
@@ -850,5 +854,90 @@ describe('OrderDetailView —— 申请退款', () => {
     expect(w.get('.ml-pill').text()).toBe('已取消')
     expect(w.find('.od-refund').exists()).toBe(false)
     expect(w.find('.empty-state').exists()).toBe(false)
+  })
+})
+
+/**
+ * 撤销退款申请（买家自己撤）。
+ *
+ * ⚠️ 撤销用的一定是**售后单编号**（订单项上的 `afterSaleId`），不是订单项/订单编号。
+ * 撤销成功后订单项回到「未售后」，所以「申请退款」入口要重现。
+ */
+describe('OrderDetailView —— 撤销退款申请', () => {
+  /** 一笔已付款订单，某个商品在售后中 */
+  function applying(over: Record<string, unknown> = {}) {
+    const d = detail({ status: OrderStatus.UNDELIVERED })
+    return detail({
+      status: OrderStatus.UNDELIVERED,
+      items: [{ ...d.items[0], afterSaleStatus: 10, afterSaleId: 2048, ...over }],
+    })
+  }
+
+  it('售后中的商品显示「撤销申请」，不再显示「申请退款」', async () => {
+    const w = await mountDetail(applying())
+    expect(w.find('.od-cancel-refund').exists()).toBe(true)
+    expect(w.find('.od-refund').exists()).toBe(false)
+    expect(w.text()).toContain('退款处理中')
+  })
+
+  it('未售后的商品只有「申请退款」，没有撤销', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.UNDELIVERED }))
+    expect(w.find('.od-refund').exists()).toBe(true)
+    expect(w.find('.od-cancel-refund').exists()).toBe(false)
+  })
+
+  it('已退款（售后成功）两个入口都没有', async () => {
+    const d = detail({ status: OrderStatus.UNDELIVERED })
+    const w = await mountDetail(
+      detail({ status: OrderStatus.UNDELIVERED, items: [{ ...d.items[0], afterSaleStatus: 20 }] }),
+    )
+    expect(w.find('.od-refund').exists()).toBe(false)
+    expect(w.find('.od-cancel-refund').exists()).toBe(false)
+  })
+
+  it('**缺售后单编号时不给撤销入口** —— 没有 id 根本发不出请求', async () => {
+    const w = await mountDetail(applying({ afterSaleId: undefined }))
+    expect(w.find('.od-cancel-refund').exists()).toBe(false)
+    // 但状态标签还在
+    expect(w.text()).toContain('退款处理中')
+  })
+
+  it('点「撤销申请」先弹确认，**确认后才发请求**，并按售后单编号撤', async () => {
+    const w = await mountDetail(applying())
+    const before = getOrderDetail.mock.calls.length
+
+    await w.get('.od-cancel-refund').trigger('click')
+    await flushPromises()
+    expect(cancelAfterSale).not.toHaveBeenCalled()
+    expect(w.find('#confirmCancelRefund').exists()).toBe(true)
+
+    await w.get('#confirmCancelRefund').trigger('click')
+    await flushPromises()
+
+    expect(cancelAfterSale).toHaveBeenCalledWith(2048)
+    // 状态以后端为准：撤销后重拉详情
+    expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('点「再想想」不发请求', async () => {
+    const w = await mountDetail(applying())
+    await w.get('.od-cancel-refund').trigger('click')
+    await flushPromises()
+    await w.get('#dismissCancelRefund').trigger('click')
+    await flushPromises()
+
+    expect(cancelAfterSale).not.toHaveBeenCalled()
+    expect(w.find('#confirmCancelRefund').exists()).toBe(false)
+  })
+
+  it('撤销失败（例如后端说状态不允许）→ 原样透出后端文案', async () => {
+    cancelAfterSale.mockRejectedValue({ message: '售后单状态不允许取消' })
+    const w = await mountDetail(applying())
+    await w.get('.od-cancel-refund').trigger('click')
+    await flushPromises()
+    await w.get('#confirmCancelRefund').trigger('click')
+    await flushPromises()
+
+    expect(w.text()).toContain('售后单状态不允许取消')
   })
 })

@@ -68,6 +68,12 @@ const paying = ref(false)
  */
 const WX_PUB_CHANNEL = 'wx_pub'
 
+/** 后端的「跳转型」展示方式 —— `displayContent` 是收银台地址，必须真的跳过去 */
+const PAY_DISPLAY_MODE_URL = 'url'
+
+/** 前端还没实现、但**不能装作没发生**的展示方式（要渲染二维码/表单，得引库） */
+const UNSUPPORTED_DISPLAY_MODES: string[] = ['qr_code', 'qr_code_url', 'form']
+
 /**
  * 付款要用的公众号 openid。**只放内存不落盘**：
  * 一是后端 `/member/social-user/get` 已经能查到绑定关系（下次付款自动取到，不必重复授权），
@@ -229,6 +235,39 @@ async function handleWechatCallback() {
 }
 
 /**
+ * 提交支付，并按后端给的 `displayMode` **把这次支付接下去**。
+ *
+ * 这是后端与前端之间的一条契约，**漏掉一个分支的表现就是「点了没反应」**：
+ *
+ *   · `url`      —— 跳收银台（支付宝电脑网站支付）。`displayContent` 就是收银台地址，
+ *                   **拿到地址却不跳 = 用户眼里什么都没发生**（2026-10-09 线上实况）。
+ *   · `qr_code` / `qr_code_url` / `form` —— 前端尚未实现（要渲染二维码，得引库）。
+ *                   **必须明说**，不能静默：静默就是同一类 bug。
+ *   · `app`      —— 唤起 App/微信内的收银台，本项目由 `wx_pub` 那条分支自己处理。
+ *   · 不设（null）—— 例如 `mock`：渠道自己受理了，重拉详情确认状态即可。
+ */
+async function submitAndContinue(payOrderId: number) {
+  // returnUrl：跳转型渠道付完把浏览器送回本页（不传会停在渠道自己的页面上）
+  const resp = await submitPay(
+    payOrderId,
+    selectedChannel.value,
+    undefined,
+    window.location.href,
+  )
+  if (resp.displayMode === PAY_DISPLAY_MODE_URL) {
+    redirectTo(resp.displayContent)
+    // 页面即将离开，不必（也不该）再去拉详情
+    return
+  }
+  if (UNSUPPORTED_DISPLAY_MODES.includes(resp.displayMode)) {
+    message.value = '该渠道需要扫码完成支付，当前页面暂不支持，请换一个渠道'
+    return
+  }
+  // 其余（渠道已受理，如 mock 的提交即成功）→ 重拉详情确认状态（FR-039）
+  await load(true)
+}
+
+/**
  * 立即支付。
  *
  * ⚠️ **提交成功后不把订单标成已支付**：交易订单要等后端回调
@@ -248,8 +287,7 @@ async function onPay() {
     if (selectedChannel.value === WX_PUB_CHANNEL) {
       await payByWechatJsapi(payOrderId)
     } else {
-      await submitPay(payOrderId, selectedChannel.value)
-      await load(true)
+      await submitAndContinue(payOrderId)
     }
   } catch (e) {
     // 支付放弃/中断/失败：订单仍是「待支付」，入口留着让用户再发起（FR-038）

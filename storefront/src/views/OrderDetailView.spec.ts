@@ -137,7 +137,11 @@ beforeEach(async () => {
   cancelOrder.mockReset()
   cancelOrder.mockResolvedValue(true)
   submitPay.mockReset()
-  submitPay.mockResolvedValue({ status: 10, displayMode: 'url', displayContent: '' })
+  // ⚠️ 默认取「渠道已受理、**没有** displayMode」那条路 —— 即提交后重拉详情确认状态。
+  //    这个值**不能随便写**：`displayMode: 'url'` 意味着「跳收银台」，组件会直接
+  //    `redirectTo` 并返回，**不会重拉详情** —— 于是所有断言「提交后重拉一次详情」的
+  //    用例都会因为压根没重拉而失败。凡是测 url 跳转的用例，各自显式设置该字段。
+  submitPay.mockResolvedValue({ status: 10, displayMode: '', displayContent: '' })
   // 支付单带 appId —— 界面靠它查该应用启用了哪些渠道（前端不记死应用编号）
   getPayOrder.mockReset()
   getPayOrder.mockResolvedValue({ id: 8899, appId: 10, status: 0, channelCode: '' })
@@ -332,7 +336,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await flushPromises()
 
     // 交易订单号是 1，支付单号是 8899 —— 必须传后者，传错会「找不到支付单」
-    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc')
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc', undefined, expect.any(String))
     // 状态以后端返回为准（不是前端自己改的）
     expect(w.get('.ml-pill').text()).toBe('待发货')
     expect(w.find('#payOrder').exists()).toBe(false)
@@ -346,7 +350,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await w.get('#payOrder').trigger('click')
     await flushPromises()
 
-    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc')
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc', undefined, expect.any(String))
     // 不得乐观地翻成「待发货」或「已支付」
     expect(w.get('.ml-pill').text()).toBe('待支付')
     expect(w.text()).not.toContain('待发货')
@@ -398,7 +402,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await w.findAll('.pay-channel')[1].trigger('click')
     await w.get('#payOrder').trigger('click')
     await flushPromises()
-    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_native')
+    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_native', undefined, expect.any(String))
   })
 
   it('**已付款的订单不拉渠道列表** —— 没有支付可言，别白发请求', async () => {
@@ -648,5 +652,86 @@ describe('OrderDetailView —— 微信公众号 JSAPI 支付（wx_pub）', () =
 
     expect(submitPay).not.toHaveBeenCalled()
     expect(w.text()).toContain('请在微信中打开')
+  })
+})
+
+/**
+ * 按后端给的 `displayMode` 把支付**接下去** —— 这是「点了立即支付没反应」的根因所在。
+ *
+ * 后端用 `displayMode` 告诉前端「这次支付该怎么继续」：
+ *   · `url`   —— 跳收银台（支付宝电脑网站支付）。**拿到地址却不跳 = 什么都没发生**
+ *   · `app`   —— 唤起 App/微信公众号内的收银台（本项目由 `wx_pub` 分支自己处理）
+ *   · `qr_code` / `qr_code_url` / `form` —— 前端尚未实现，必须**明说**而不是静默
+ *   · 不设（null）—— 例如 `mock`：渠道自己受理了，重拉详情确认状态即可
+ */
+describe('OrderDetailView —— 按 displayMode 继续支付', () => {
+  it('**displayMode=url 时真的跳转到收银台地址**（这就是「没反应」的根因）', async () => {
+    submitPay.mockResolvedValue({
+      status: 0,
+      displayMode: 'url',
+      displayContent: 'https://openapi.alipay.com/gateway.do?charset=UTF-8&...',
+    })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(redirectTo).toHaveBeenCalledWith('https://openapi.alipay.com/gateway.do?charset=UTF-8&...')
+  })
+
+  it('跳走之后**不再重拉详情** —— 页面已经离开了，请求没意义', async () => {
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'url', displayContent: 'https://x' })
+    const w = await mountDetail()
+    const before = getOrderDetail.mock.calls.length
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(getOrderDetail.mock.calls.length).toBe(before)
+  })
+
+  it('提交时带上 **returnUrl = 当前页地址**，付完能回到订单页', async () => {
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'url', displayContent: 'https://x' })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    const args = submitPay.mock.calls[0]
+    expect(args[0]).toBe(8899)
+    expect(args[1]).toBe('alipay_pc')
+    // 就是「当前页地址」；且必须是**绝对 URL** —— 后端 returnUrl 上有 @URL 校验，
+    // 传相对路径会被判「回跳地址的格式必须是 URL」。
+    // （组件测试跑在 memory history 下，jsdom 的地址就是根路径，不会有路由前缀）
+    expect(args[3]).toBe(window.location.href)
+    expect(String(args[3])).toMatch(/^https?:\/\//)
+  })
+
+  it('前端接不住的 displayMode（二维码/表单）→ **明确提示**，不静默什么都不做', async () => {
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'qr_code', displayContent: 'weixin://wxpay/...' })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(w.text()).toContain('扫码')
+    expect(redirectTo).not.toHaveBeenCalled()
+    // 订单仍待支付，入口留着让用户换渠道再试
+    expect(w.find('#payOrder').exists()).toBe(true)
+  })
+
+  it('没有 displayMode 时（mock 那种）保持原行为：重拉详情确认状态', async () => {
+    submitPay.mockResolvedValue({ status: 10, displayMode: '', displayContent: '' })
+    getOrderDetail
+      .mockResolvedValueOnce(detail())
+      .mockResolvedValue(detail({ status: OrderStatus.UNDELIVERED }))
+    const w = mount(OrderDetailView, { props: { id: 1 }, global: { plugins: [router, createPinia()] } })
+    await flushPromises()
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(redirectTo).not.toHaveBeenCalled()
+    expect(w.get('.ml-pill').text()).toBe('待发货')
   })
 })

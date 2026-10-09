@@ -135,7 +135,10 @@ export function invokeWxPay(p: WxJsapiParams, hooks: WxPayHooks = {}): Promise<W
   })
 }
 
-/** 整页跳转（去微信授权页）。抽出来是为了让组件测试能替换掉它。 */
+/**
+ * 整页跳转。两个调用点：微信授权页（`wx_pub` 取 openid）与支付收银台（`url` 型渠道）。
+ * 抽出来是为了让组件测试能替换掉它 —— jsdom 里赋值 `location.href` 会报 not implemented。
+ */
 export function redirectTo(url: string): void {
   window.location.href = url
 }

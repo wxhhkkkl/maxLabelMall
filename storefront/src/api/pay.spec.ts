@@ -71,6 +71,24 @@ describe('提交支付', () => {
     // `toHaveBeenCalledWith` 对 `{a:1,b:undefined}` 是宽容的，所以单独钉一次键集
     expect(Object.keys(post.mock.calls[0][1] as object)).toEqual(['id', 'channelCode'])
   })
+
+  it('传了 returnUrl 时放进 body —— 支付宝付完要靠它把浏览器送回订单页', async () => {
+    post.mockResolvedValue(true)
+    await submitPay(8899, 'alipay_pc', undefined, 'https://new.yuwangchenfa.com/order/762')
+    expect(post).toHaveBeenCalledWith('/pay/order/submit', {
+      id: 8899,
+      channelCode: 'alipay_pc',
+      returnUrl: 'https://new.yuwangchenfa.com/order/762',
+    })
+  })
+
+  it('没传 returnUrl 时 body **不含该键**（与 channelExtras 同一口径）', async () => {
+    post.mockResolvedValue(true)
+    await submitPay(8899, 'alipay_pc', { openid: 'o-1' })
+    const body = post.mock.calls[0][1] as Record<string, unknown>
+    expect(Object.keys(body)).toEqual(['id', 'channelCode', 'channelExtras'])
+    expect('returnUrl' in body).toBe(false)
+  })
 })
 
 describe('查询支付单', () => {

@@ -11,8 +11,10 @@ import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
+import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
 import type { OrderDetail } from '@/types'
 import { OrderStatus } from '@/types'
+import { afterSaleItemStatusText, canApplyRefund } from '@/utils/afterSale'
 import { formatYuan, reconcile } from '@/utils/money'
 import { orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
@@ -61,6 +63,13 @@ const error = ref(false)
 const message = ref('')
 const cancelOpen = ref(false)
 const paying = ref(false)
+
+/**
+ * 正在申请退款的那个订单项（null = 弹层没开）。
+ * 售后是**按订单项**申请的 —— 一笔订单里每个商品各是一条售后单。
+ */
+const refundItem = ref<OrderDetail['items'][number] | null>(null)
+const refundOpen = ref(false)
 
 /**
  * 微信公众号的 JSAPI 渠道码。这里**只用来分派「怎么把收银台唤起来」**，
@@ -297,6 +306,41 @@ async function onPay() {
   }
 }
 
+// ========== 申请退款（按订单项） ==========
+
+/** 该项的售后状态文案；未售后返回空串（不渲染标签） */
+function afterSaleText(it: OrderDetail['items'][number]): string {
+  return afterSaleItemStatusText(it.afterSaleStatus)
+}
+
+/** 该项现在能不能申请退款（判定与口径说明见 `utils/afterSale.ts`） */
+function canRefund(it: OrderDetail['items'][number]): boolean {
+  return order.value ? canApplyRefund(it, order.value.status) : false
+}
+
+function openRefund(it: OrderDetail['items'][number]) {
+  message.value = ''
+  refundItem.value = it
+  refundOpen.value = true
+}
+
+function onRefundSubmitted() {
+  message.value = '退款申请已提交，商家审核后处理'
+}
+
+/**
+ * 弹层关闭时重拉一次详情。
+ *
+ * 两个作用：① 申请成功后把订单项的售后状态换成后端给的值（**不做本地乐观更新**）；
+ * ② 万一申请失败是因为「已在别处申请过」这类竞态，重拉能把界面拉回后端真相。
+ * 提交与关闭是两条事件，都走这里 → **只发一次请求**。
+ */
+async function onRefundClosed() {
+  refundOpen.value = false
+  refundItem.value = null
+  await load()
+}
+
 async function confirmCancel() {
   cancelOpen.value = false
   const target = order.value
@@ -390,6 +434,18 @@ onMounted(async () => {
                   {{ p.propertyName }}：{{ p.valueName }}
                 </template>
               </div>
+              <!-- 售后入口/状态。**放在 .od-info 内部** —— 外面那层是 4 列 grid，
+                   多塞一个直接子元素会撑坏整行布局 -->
+              <div v-if="afterSaleText(it)" class="od-aftersale">{{ afterSaleText(it) }}</div>
+              <button
+                v-else-if="canRefund(it)"
+                class="od-refund"
+                type="button"
+                :data-item="it.id"
+                @click="openRefund(it)"
+              >
+                申请退款
+              </button>
             </div>
             <div class="od-price">{{ formatYuan(it.price) }}</div>
             <div class="od-count">×{{ it.count }}</div>
@@ -488,6 +544,15 @@ onMounted(async () => {
       </button>
     </template>
   </MlModal>
+
+  <!-- 申请退款（按单个商品）。提交后等商家审核，状态由后端给 -->
+  <RefundApplyDialog
+    :open="refundOpen"
+    :item="refundItem"
+    :order-status="order?.status ?? -1"
+    @close="onRefundClosed"
+    @submitted="onRefundSubmitted"
+  />
 </template>
 
 <style scoped>
@@ -552,6 +617,26 @@ onMounted(async () => {
   font-size: 12px;
   color: var(--ml-text-ph);
   margin-top: 4px;
+}
+/* 售后入口/状态 —— 放在 .od-info 里（外层是 4 列 grid，不能加直接子元素） */
+.od-aftersale {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ml-primary);
+}
+.od-refund {
+  margin-top: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-pill);
+  background: var(--ml-bg-card);
+  color: var(--ml-text-sub);
+  font-size: 12px;
+  cursor: pointer;
+}
+.od-refund:hover {
+  border-color: var(--ml-primary);
+  color: var(--ml-primary);
 }
 .od-price,
 .od-count {

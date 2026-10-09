@@ -81,8 +81,17 @@ export interface OrderPageItem {
     count: number
     /** 商品原价（单价），单位：分 */
     price: number
-    /** 该项应付金额（总），单位：分 */
+    /** 该项应付金额（总），单位：分。**也是「申请退款」的金额上限**（后端按它校验） */
     payPrice?: number
+    /**
+     * 该订单项的**售后**编号与状态（后端 `AppTradeOrderItemRespVO`）。
+     * `afterSaleStatus`：0 未售后 / 10 售后中 / 20 售后成功 —— 见 `@/types/afterSale`。
+     *
+     * ⚠️ 这是**订单项级**的：一笔订单里不同商品各自独立，某项在售后中**不影响**其它项申请。
+     * ⚠️ 卖家拒绝后后端会把它重置回 0，所以别在前端缓存"申请过"。
+     */
+    afterSaleId?: number
+    afterSaleStatus?: number
   }>
 }
 

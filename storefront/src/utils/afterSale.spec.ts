@@ -1,0 +1,97 @@
+import { describe, expect, it } from 'vitest'
+
+import { AfterSaleItemStatus, AfterSaleWay } from '@/types'
+import { OrderStatus } from '@/types'
+
+import {
+  afterSaleItemStatusText,
+  afterSaleWayLabel,
+  allowsReturnRefund,
+  canApplyRefund,
+} from './afterSale'
+
+/**
+ * 「能不能申请退款」的判定 —— 抽成纯函数就是为了能把它**穷举**掉。
+ *
+ * 口径全部来自后端 `AfterSaleServiceImpl.validateOrderItemApplicable`：
+ *   · 订单必须**已支付且未取消**（待支付、已取消都会被拒）；
+ *   · 该**订单项**必须未被申请过（`afterSaleStatus !== 0` 会被拒）；
+ *   · 退款金额不得超过该项实付 → 所以**实付为 0 的项不给入口**；
+ *   · 「退货退款」要求**已发货**。
+ */
+
+/** 造一个订单项，只关心判定用到的那两个字段 */
+function item(over: { id?: number; payPrice?: number; afterSaleStatus?: number } = {}) {
+  return { id: 11, payPrice: 7000, afterSaleStatus: 0, ...over }
+}
+
+describe('canApplyRefund —— 订单项上该不该出现「申请退款」', () => {
+  it('待发货 / 已发货 / 已完成都可以申请（都是已支付且未取消）', () => {
+    for (const status of [OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.COMPLETED]) {
+      expect(canApplyRefund(item(), status)).toBe(true)
+    }
+  })
+
+  it('**待支付不行** —— 后端对未支付订单直接拒', () => {
+    expect(canApplyRefund(item(), OrderStatus.UNPAID)).toBe(false)
+  })
+
+  it('**已取消不行** —— 后端对已取消订单直接拒', () => {
+    expect(canApplyRefund(item(), OrderStatus.CANCELED)).toBe(false)
+  })
+
+  it('**已经申请过的项不行**（售后中 / 售后成功）', () => {
+    expect(canApplyRefund(item({ afterSaleStatus: AfterSaleItemStatus.APPLY }), OrderStatus.UNDELIVERED)).toBe(false)
+    expect(canApplyRefund(item({ afterSaleStatus: AfterSaleItemStatus.SUCCESS }), OrderStatus.UNDELIVERED)).toBe(false)
+  })
+
+  it('状态字段缺省时按「未售后」处理（老数据/字段缺失不该让入口消失）', () => {
+    expect(canApplyRefund(item({ afterSaleStatus: undefined }), OrderStatus.UNDELIVERED)).toBe(true)
+  })
+
+  it('**实付为 0 的项不给入口** —— 后端 refundPrice 必须 > 0，没有可退金额', () => {
+    expect(canApplyRefund(item({ payPrice: 0 }), OrderStatus.UNDELIVERED)).toBe(false)
+  })
+
+  it('实付字段缺省时也不给入口（宁可少一个入口，也不发一枪必被拒的请求）', () => {
+    expect(canApplyRefund(item({ payPrice: undefined }), OrderStatus.UNDELIVERED)).toBe(false)
+  })
+
+  it('未知的售后状态按「已申请过」保守处理 —— 不发请求', () => {
+    expect(canApplyRefund(item({ afterSaleStatus: 99 }), OrderStatus.UNDELIVERED)).toBe(false)
+  })
+})
+
+describe('allowsReturnRefund —— 「退货退款」只在已发货之后可选', () => {
+  it('**未发货（待发货）不可选** —— 后端会拒「订单未发货，无法申请【退货退款】售后」', () => {
+    expect(allowsReturnRefund(OrderStatus.UNDELIVERED)).toBe(false)
+  })
+
+  it('已发货 / 已完成为可选', () => {
+    expect(allowsReturnRefund(OrderStatus.DELIVERED)).toBe(true)
+    expect(allowsReturnRefund(OrderStatus.COMPLETED)).toBe(true)
+  })
+
+  it('待支付 / 已取消也不可选（这两个状态本就不给退款入口）', () => {
+    expect(allowsReturnRefund(OrderStatus.UNPAID)).toBe(false)
+    expect(allowsReturnRefund(OrderStatus.CANCELED)).toBe(false)
+  })
+})
+
+describe('文案映射', () => {
+  it('订单项的售后状态：未售后无标签、售后中、已退款', () => {
+    expect(afterSaleItemStatusText(AfterSaleItemStatus.NONE)).toBe('')
+    expect(afterSaleItemStatusText(AfterSaleItemStatus.APPLY)).toBe('退款处理中')
+    expect(afterSaleItemStatusText(AfterSaleItemStatus.SUCCESS)).toBe('已退款')
+  })
+
+  it('未知状态不抛错，回落成空串（后端新增状态时不至于白屏）', () => {
+    expect(afterSaleItemStatusText(undefined)).toBe('')
+    expect(afterSaleItemStatusText(99)).toBe('')
+  })
+
+  it('售后方式的中文名与后端 AfterSaleWayEnum 一致', () => {
+    expect(afterSaleWayLabel(AfterSaleWay.REFUND_ONLY)).toBe('仅退款')
+    expect(afterSaleWayLabel(AfterSaleWay.RETURN_AND_REFUND)).toBe('退货退款')
+  })
+})

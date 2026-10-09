@@ -346,6 +346,36 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 
 ---
 
+## 6.2 申请退款（售后，按订单项）
+
+**复用 yudao 既有的售后能力，后端与管理端都不改**；审核在管理端「售后退款」页完成
+（`/admin-api/trade/after-sale/{agree,disagree}`），运营点同意/拒绝。
+
+| 用途 | 方法与路径 | 说明 |
+|---|---|---|
+| 申请退款 | `POST /app-api/trade/after-sale/create` | body `{orderItemId, way, refundPrice, applyReason, applyDescription?, applyPicUrls?}`；返回**售后单编号** |
+
+**请求体的四个必填字段**：
+
+| 字段 | 值 | 说明 |
+|---|---|---|
+| `orderItemId` | 订单项编号 | ⚠️ **不是订单编号** —— 传错会「订单项不存在」。一笔订单里**每个商品各一条**售后单 |
+| `way` | `10` 仅退款 / `20` 退货退款 | 后端 `AfterSaleWayEnum`，**是 10/20 不是 1/2** |
+| `refundPrice` | 分，`≥1` | **不得超过该订单项的实付** `payPrice`（后端按它校验） |
+| `applyReason` | 字符串 | 必填，**自由文本**（后端无枚举）；"可选理由清单"属业务规则，不由前端编 |
+
+**服务端校验**（前端据此**不给入口/不发请求**，口径详见 `spec.md` FR-041e）：
+订单必须已支付且未取消；该**订单项**未被申请过（卖家拒绝后后端重置回未售后 → 入口自动重现）；
+`refundPrice ≤ payPrice`；`way=20` 要求订单**已发货**。
+
+**订单项的售后状态**（`AppTradeOrderItemRespVO.afterSaleStatus`，**订单项级**、不同商品互相独立）：
+`0` 未售后 / `10` 售后中（「退款处理中」）/ `20` 售后成功（「已退款」）。
+
+**本期的展示口径**：订单项上显示入口或状态标签，提交成功后**重拉订单详情**以后端为准
+（不做本地乐观更新，与支付后 `sync` 同一口径）。凭证图片、独立售后列表页本期不做。
+
+---
+
 ## 7. 优惠券
 
 | 用途 | 方法与路径 | 关键参数 / 返回 |
@@ -381,7 +411,6 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 | `/promotion/diy-page/*` | DIY 页面装修不在本期 |
 | `/promotion/kefu-message/*` | 站内客服不在本期 |
 | `/product/comment/*`、`/product/favorite/*`、`/product/browse-history/*` | 设计稿无对应界面 |
-| `/trade/after-sale/*` | 售后不在本期 |
 | `/trade/delivery/pick-up-store/*` | 自提不在本期（FR-027a） |
 | `/trade/brokerage-*` | 分销不在本期 |
 | `/pay/wallet/*`、`/pay/wallet-recharge/*` | 余额与充值不在本期 |

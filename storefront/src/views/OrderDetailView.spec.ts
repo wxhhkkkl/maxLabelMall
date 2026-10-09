@@ -40,6 +40,11 @@ vi.mock('@/api/member', () => ({
 const getSocialUser = vi.fn()
 const bindSocialUser = vi.fn()
 const getSocialAuthRedirectUrl = vi.fn()
+const createAfterSale = vi.fn()
+vi.mock('@/api/afterSale', () => ({
+  createAfterSale: (...a: unknown[]) => createAfterSale(...a),
+}))
+
 vi.mock('@/api/social', () => ({
   SOCIAL_TYPE_WECHAT_MP: 31,
   getSocialUser: (...a: unknown[]) => getSocialUser(...a),
@@ -148,6 +153,8 @@ beforeEach(async () => {
   // 默认：只开了支付宝（线上 162 就是这状态，微信等商户号）
   listEnabledChannelCodes.mockReset()
   listEnabledChannelCodes.mockResolvedValue(['alipay_pc'])
+  createAfterSale.mockReset()
+  createAfterSale.mockResolvedValue(2048)
   getSocialUser.mockReset()
   getSocialUser.mockResolvedValue(null)
   bindSocialUser.mockReset()
@@ -733,5 +740,115 @@ describe('OrderDetailView —— 按 displayMode 继续支付', () => {
 
     expect(redirectTo).not.toHaveBeenCalled()
     expect(w.get('.ml-pill').text()).toBe('待发货')
+  })
+})
+
+/**
+ * 申请退款（按单个商品）。
+ *
+ * 判定口径全部来自后端 `AfterSaleServiceImpl`：订单必须已支付且未取消、
+ * 该**订单项**未被申请过、退款金额不超过该项实付（所以实付为 0 不给入口）。
+ * 这里断言的重点同样是**请求体**与**是否重拉详情**，不是按钮长什么样。
+ */
+describe('OrderDetailView —— 申请退款', () => {
+  /** 造一笔「已支付」的订单（默认 fixture 是待支付） */
+  function paid(over: Partial<OrderDetail> = {}) {
+    return detail({ status: OrderStatus.UNDELIVERED, ...over })
+  }
+
+  /** 两项商品，各自给不同的售后状态 */
+  function twoItems(first: Record<string, unknown>, second: Record<string, unknown>) {
+    const d = paid()
+    return detail({
+      status: OrderStatus.UNDELIVERED,
+      items: [{ ...d.items[0], ...first }, { ...d.items[0], id: 12, spuName: '另一件商品', ...second }],
+    })
+  }
+
+  it('待支付的订单没有退款入口（后端对未支付直接拒）', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.UNPAID }))
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
+  it('已取消的订单没有退款入口', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.CANCELED }))
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
+  it.each([OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.COMPLETED])(
+    '订单状态 %s 时有退款入口',
+    async (status) => {
+      const w = await mountDetail(detail({ status }))
+      expect(w.find('.od-refund').exists()).toBe(true)
+    },
+  )
+
+  it('**已申请过的项显示状态标签、不再有按钮**（售后中 / 已退款）', async () => {
+    const applying = paid()
+    const w = await mountDetail(
+      detail({ status: OrderStatus.UNDELIVERED, items: [{ ...applying.items[0], afterSaleStatus: 10 }] }),
+    )
+    expect(w.find('.od-refund').exists()).toBe(false)
+    expect(w.text()).toContain('退款处理中')
+
+    const refunded = paid()
+    const w2 = await mountDetail(
+      detail({ status: OrderStatus.DELIVERED, items: [{ ...refunded.items[0], afterSaleStatus: 20 }] }),
+    )
+    expect(w2.find('.od-refund').exists()).toBe(false)
+    expect(w2.text()).toContain('已退款')
+  })
+
+  it('**一项在售后中不影响另一项申请**（后端查重只看单项）', async () => {
+    const w = await mountDetail(twoItems({ afterSaleStatus: 10 }, { afterSaleStatus: 0 }))
+    expect(w.findAll('.od-refund')).toHaveLength(1)
+    // 按项定位：可申请的是第二项（id=12）
+    expect(w.get('.od-refund').attributes('data-item')).toBe('12')
+  })
+
+  it('实付为 0 的项不给入口（后端要求退款金额 > 0）', async () => {
+    const d = paid()
+    const w = await mountDetail(
+      detail({ status: OrderStatus.UNDELIVERED, items: [{ ...d.items[0], payPrice: 0 }] }),
+    )
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
+  it('点「申请退款」打开弹层', async () => {
+    const w = await mountDetail(paid())
+    await w.get('.od-refund').trigger('click')
+    await flushPromises()
+    expect(w.find('#refundSubmit').exists()).toBe(true)
+  })
+
+  it('**提交成功后重新拉详情**确认售后状态（不本地乐观更新）', async () => {
+    getOrderDetail.mockResolvedValue(paid())
+    const w = mount(OrderDetailView, { props: { id: 1 }, global: { plugins: [router, createPinia()] } })
+    await flushPromises()
+    const before = getOrderDetail.mock.calls.length
+
+    await w.get('.od-refund').trigger('click')
+    await flushPromises()
+    await w.get('#refundReason').setValue('不想要了')
+    await w.get('#refundSubmit').trigger('click')
+    await flushPromises()
+
+    expect(createAfterSale).toHaveBeenCalledWith({
+      orderItemId: 11,
+      way: 10,
+      refundPrice: 7000,
+      applyReason: '不想要了',
+    })
+    expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('全部项退款成功后订单被取消，页面仍能正常渲染', async () => {
+    const d = detail({ status: OrderStatus.CANCELED })
+    const w = await mountDetail(
+      detail({ status: OrderStatus.CANCELED, items: [{ ...d.items[0], afterSaleStatus: 20 }] }),
+    )
+    expect(w.get('.ml-pill').text()).toBe('已取消')
+    expect(w.find('.od-refund').exists()).toBe(false)
+    expect(w.find('.empty-state').exists()).toBe(false)
   })
 })

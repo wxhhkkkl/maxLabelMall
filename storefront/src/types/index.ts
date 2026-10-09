@@ -1,3 +1,4 @@
+export * from './afterSale'
 export * from './common'
 export * from './member'
 export * from './product'

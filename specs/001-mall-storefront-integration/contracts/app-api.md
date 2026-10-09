@@ -29,17 +29,61 @@
 |---|---|---|
 | 密码登录 | `POST /member/auth/login` | body: `mobile`、`password` |
 | 验证码登录（**兼隐式注册**） | `POST /member/auth/sms-login` | body: `mobile`、`code`；手机号不存在时后端自动建号 |
-| 发送验证码 | `POST /member/auth/send-sms-code` | body: `mobile`、`scene`；**无同意字段**，同意由前端门禁保证 |
+| 发送验证码 | `POST /member/auth/send-sms-code` | body: `mobile`、`scene`、`captchaVerification?`（见 §1.1）；**无同意字段**，同意由前端门禁保证 |
 | 校验验证码 | `POST /member/auth/validate-sms-code` | 用于分步校验（可选） |
 | 刷新令牌 | `POST /member/auth/refresh-token` | query: `refreshToken` |
 | 登出 | `POST /member/auth/logout` | — |
 | 当前会员 | `GET /member/user/get` | 顶栏昵称/手机号 |
-| 设置密码 | `PUT /member/user/update-password` | 登录后设置密码（FR-011） |
+| 设置密码 | `PUT /member/user/update-password` | 登录后设置密码（FR-011）；body `password` + **scene 3** 的短信码 |
+| **忘记密码** | `PUT /member/user/reset-password` | **免登录**（`@PermitAll`）；body `mobile` + `password` + **scene 4** 的短信码 |
 
 **登录/刷新的响应字段**（`AppAuthLoginRespVO`）：`accessToken`、`refreshToken`、`expiresTime`、`userId`。
 **存储约定**：`accessToken → ACCESS_TOKEN`、`refreshToken → REFRESH_TOKEN`（照搬 admin-vue3 的 key，不与 uniapp 的 `token` 混用）。
 
-**明确不调用**：`social-login`、`weixin-mini-app-login`、`create-weixin-jsapi-signature`（本期无微信授权）。
+**三个短信场景不可互换**（服务端按场景核销）：`1` 登录、`3` 改密、`4` 忘记密码。
+
+**明确不调用**（本期）：`social-login`、`weixin-mini-app-login`。
+`social-auth-redirect` / `social-user/bind` 已在 §6.1 启用（微信 JSAPI 取 openid 用）。
+
+### 1.1 图形验证码（滑块）—— 发短信前的闸门
+
+**目的**：发短信是真金白银，挡脚本刷短信。**校验点在服务端**（`MemberAuthServiceImpl.sendSmsCode`
+的第一步），前端这套只是把凭据拿回来 —— 只画个滑块而服务端不校验等于没加。
+
+| 用途 | 方法与路径 | 说明 |
+|---|---|---|
+| 开关 | `GET /app-api/system/captcha/enable` | 返回 `Boolean`。**开关的权威在服务端**（`yudao.captcha.enable`），前端不读自己的环境变量 |
+| 取码 | `POST /app-api/system/captcha/get` | body `{captchaType}`；返回 `{originalImageBase64, jigsawImageBase64, token, secretKey}` |
+| 校验 | `POST /app-api/system/captcha/check` | body `{captchaType, token, pointJson}`；返回 `{success, msg}` |
+
+**这几个接口是本期新增的 app-api 控制器**（`AppCaptchaController`）—— 管理端那套挂在
+`/admin-api/system/captcha/*` 下，C 端不能去碰（宪法：C 端只走 `/app-api`）。它把 aj-captcha
+原本的 `{repCode, repData}` **重新包成了项目的 `CommonResult` 信封**，前端因此走常规解包。
+
+**完整链路**：
+
+```
+点「获取验证码」
+  → GET /app-api/system/captcha/enable        关 → 直接发短信（本地开发与 e2e 走这条）
+  → POST .../captcha/get                      取图（原图 310×155，拼图块 47×155）+ token + secretKey
+  → 用户拖动 → x = 拖动像素 × 310 / 渲染宽度    ⚠️ 必须换算回原图坐标
+  → POST .../captcha/check {token, pointJson}  pointJson = AES({x, y:5}, secretKey)
+  → 通过 → captchaVerification = AES(token---{x, y:5}, secretKey)   ← 注意 token 用**明文**拼接
+  → POST /member/auth/send-sms-code {mobile, scene, captchaVerification}
+```
+
+**四条必须遵守的约束**：
+
+- **加密是 AES-128-ECB + PKCS7**，密钥取 `secretKey` 的 UTF-8 字节（服务端没下发时用默认
+  `XwKsGlMcdPMEhR1B`）。浏览器原生 WebCrypto **不提供 ECB**，故作弊不得 —— 本项目引入
+  `crypto-js`，实现与上游管理端 `Verifition/src/utils/ase.ts` 一致。
+- **`captchaVerification` 服务端从不生成**（aj-captcha 里只有 `CaptchaVO` 上的 setter，
+  没有任何地方调用），必须由前端按上式算出；服务端在 `check` 通过时就把同一串存进缓存，
+  业务接口只做「存在与否」的比对 —— 所以**这一串必须逐字一致**。
+- **验证码一次性**：`check` 不通过必须重新取图，同一张图不能反复作答。
+- **`captchaVerification` 是可选的**：服务端开关关闭时前端不传，此时
+  `CaptchaApi.verification` 直接放行。开关的判定**只在服务端一处**，不会出现
+  「前端弹了滑块、服务端没校验」或反过来的错配。
 
 ---
 
@@ -192,7 +236,7 @@ payPrice === totalPrice - couponPrice - pointPrice - discountPrice + deliveryPri
 
 ---
 
-## 6. 支付（模拟通道）
+## 6. 支付
 
 **关键结论：模拟通道下「提交支付即成功」，不存在也不需要单独的「标记支付成功」接口。**
 
@@ -227,6 +271,73 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 **前置条件**：`pay_channel` 表中需存在 `code='mock'` 且 `app_id=1` 的记录（仓库种子 `yudao-cloud/sql/mysql/pay-2026-04-18.sql` 已包含，`status=0` 启用）。若缺该行，提交支付会因渠道不可用而失败。
 
 **回调地址**：种子数据里 `pay_app.order_notify_url` 写死为 `http://127.0.0.1:48080/app-api/trade/order/update-paid`，与本地单体端口一致，本地无需改动。
+
+### 6.1 微信公众号 JSAPI（渠道码 `wx_pub`）
+
+**这个渠道有两个别处没有的前置条件**，两者缺一都只能报错、拿不到钱：
+
+1. **必须有该会员在「同一个公众号」下的 `openid`** —— 提交支付时要放进
+   `channelExtras.openid`。缺了后端 `WxPubPayClient.getOpenid` 直接抛
+   「支付请求的 openid 不能为空」。
+2. **只能在微信内置浏览器里唤起收银台** —— 网页里没有别的办法调起微信付款。
+
+**取 openid 用上游既有的三个接口，不新建后端能力**（`type` 固定 `31` =
+`SocialTypeEnum.WECHAT_MP`）：
+
+| 用途 | 方法与路径 | 关键参数 / 返回 |
+|---|---|---|
+| 取微信授权页地址 | `GET /member/auth/social-auth-redirect` | `type=31`、`redirectUri`（**完整页面 URL**，须落在公众号「网页授权域名」下）；返回可直接整页跳转的 URL |
+| 用 `code` 换 openid | `POST /member/social-user/bind` | body `{type:31, code, state}`；**返回 openid 字符串**，并把该公众号绑到当前登录会员 |
+| 查已绑定的 openid | `GET /member/social-user/get` | `type=31`；未绑定时 `data` 为 `null` |
+
+**完整链路**：
+
+```
+微信内 · 订单详情页点「微信支付（公众号）」
+  →（内存/后端都查不到 openid 时）GET /member/auth/social-auth-redirect?type=31&redirectUri=<当前订单页>
+  → 整页跳微信授权（静默 snsapi_base）
+  → 回跳 <订单页>?code=xxx&state=yyy
+  → POST /member/social-user/bind {type:31, code, state}   →  openid
+  → POST /pay/order/submit { id: payOrderId, channelCode: 'wx_pub', channelExtras: { openid } }
+  → 响应 displayMode = 'app'，displayContent = JSAPI 参数 JSON
+  → WeixinJSBridge.invoke('getBrandWCPayRequest', …)       →  用户完成付款
+  → 支付模块回调 pay_app.order_notify_url → /app-api/trade/order/update-paid
+  → 交易订单 → 待发货(10)（前端 `GET /trade/order/get-detail?sync=true` 确认）
+```
+
+**`displayContent` 的字段映射**（V2/V3 两个 API 版本字段名一致）：
+
+| 后端 `displayContent` 字段 | 传给 `WeixinJSBridge` |
+|---|---|
+| `packageValue` | **`package`**（改名，传错手机上弹「参数错误」） |
+| `appId` / `timeStamp` / `nonceStr` / `signType` / `paySign` | 同名照传 |
+
+> `timeStamp` 的 `S` 大写是**后端返回**的字段名；JSSDK 侧的入参叫小写 `timestamp`。
+> 本实现用 `WeixinJSBridge`，它收的就是 `timeStamp`。
+
+**四条必须遵守的约束**：
+
+- **不引 `weixin-js-sdk`**：`jweixin.chooseWXPay` 要先 `jweixin.config()` 拿到 JSSDK
+  签名（`POST /member/auth/create-weixin-jsapi-signature`）并配公众号「JS 安全域名」；
+  `WeixinJSBridge` 是微信浏览器自带的，不需要签名。**`create-weixin-jsapi-signature`
+  本期不调用**（将来要做定位/分享等 JS-SDK 能力时再评估）。
+- **回跳 URL 上的 `code`/`state` 必须在读到后立刻从地址栏抹掉**：这条 URL 事实上可
+  重放 —— `SocialUserServiceImpl.authSocialUser` 会先命中自己库里已存的
+  `(type, code, state)`，绕过 justauth 的 state 校验。刷新一次就会再绑一次。
+- **`bind` 有副作用，必须知情**：它第一步就解绑「该 openid 原先绑的会员」。
+  同一台手机的同一个微信号本来就是同一个 openid，而 yudao 的模型是
+  「1 openid → 1 会员」，所以会「抢绑定」。**判定为可接受**：订单归属按 memberId
+  不按 openid，不会丢单丢钱；被抢的一方下次支付会自动重新授权。也正因如此，
+  前端**只把 openid 放内存、不落 localStorage**。
+- **收银台返回 `ok` 不等于已付款**：`err_msg=getBrandWCPayRequest:ok` 只说明用户在
+  微信那侧走完了，交易订单仍要等后端回调 —— 前端照 `sync=true` 重新拉详情（FR-039）。
+
+**环境过滤**：`wx_pub` 只在微信内渲染、`wx_native`（扫码）只在微信外渲染。
+这是**运行环境事实**，不是业务规则 —— 可用性仍完全由
+`/pay/channel/get-enable-code-list` 决定，前端只在后端给的启用集合内部做减法。
+
+**真机验收（无法自动化）**：`WeixinJSBridge` 的实际唤起、微信授权往返、
+「下单账号与支付账号不一致」这类只有微信能给的错误，都要在微信里手工走一笔。
 
 ---
 
@@ -269,4 +380,5 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 | `/trade/delivery/pick-up-store/*` | 自提不在本期（FR-027a） |
 | `/trade/brokerage-*` | 分销不在本期 |
 | `/pay/wallet/*`、`/pay/wallet-recharge/*` | 余额与充值不在本期 |
-| `/member/auth/social-login` 等社交登录 | 无微信授权 |
+| `/member/auth/social-login` | 本期的微信授权只用来**换取 openid**，不用于登录/建号 —— 一律走 `/member/social-user/bind`（见 §6.1）。用 `social-login` 会把当前手机号账号的登录态换成微信账号，语义不对 |
+| `/member/auth/create-weixin-jsapi-signature`、`/member/social-user/wxa-qrcode`、`get-subscribe-template-list` | 属于 JSSDK / 小程序路径，本期不调用（§6.1 说明为何用 `WeixinJSBridge` 绕开 JSSDK 签名） |

@@ -206,6 +206,13 @@ wx:
 yudao:
   captcha:
     enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
+  # 2026-10-09 加：把短信验证码固定成 9999，**只为本地开发与 e2e**。
+  # e2e 的 helpers 里 DEV_SMS_CODE = '9999'，拿不到这个值整条登录用例就跑不通。
+  # ⚠️ 别把这行当成"基础配置"——线上必须靠 application-my.yaml 覆盖成随机区间，
+  #    因为线上的 profile 列表里**也含 local**（jar 内 spring.profiles.active = local,my）。
+  sms-code:
+    begin-code: 9999
+    end-code: 9999
   security:
     mock-enable: true
   pay:

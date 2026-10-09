@@ -356,8 +356,14 @@ yudao:
     expire-times: 10m
     send-frequency: 1m
     send-maximum-quantity-per-day: 10
-    begin-code: 9999 # 这里配置 9999 的原因是，测试方便。
-    end-code: 9999 # 这里配置 9999 的原因是，测试方便。
+    # ⚠️ 2026-10-09：这里原本是 `9999 / 9999`（上游为了测试方便），但它是**基础**配置、
+    #    不属于任何 profile，于是**所有环境**的验证码都恒为 9999 ——
+    #    任何人拿任意手机号提交 9999 就能登进别人账号。
+    #    现改为随机区间（4 位）。**本地开发要靠 application-local.yaml 里那份覆盖回 9999**
+    #    （e2e 的 DEV_SMS_CODE 就是 9999）；线上则由服务器上的 application-my.yaml 显式
+    #    覆盖成随机区间 —— 因为线上跑的 profile 里含 local（见该文件的说明）。
+    begin-code: 1000
+    end-code: 9999
   trade:
     order:
       pay-expire-time: 2h # 支付的过期时间

@@ -1,5 +1,5 @@
 import { get, post } from '@/config/http'
-import type { PayOrder, PayOrderSubmitResp } from '@/types'
+import type { PayOrder, PayOrderSubmitResp, PaySubmitReq } from '@/types'
 
 /**
  * 支付接口（`/app-api/pay/order/**`、`/app-api/pay/channel/**`）。
@@ -20,15 +20,24 @@ import type { PayOrder, PayOrderSubmitResp } from '@/types'
  * （当时的规格约束 SC-010 是「本期不接第三方商户号」，已随接入支付宝/微信一并去掉）。
  * 渠道码的可用性来自 {@link listEnabledChannelCodes}，界面只负责让用户选。
  *
+ * `channelExtras` 目前只有**微信公众号 JSAPI（`wx_pub`）**需要，传 `{ openid }` ——
+ * 后端 `WxPubPayClient` 拿不到 openid 会直接拒。其余渠道不传，
+ * 且**不传时不能把 `channelExtras: undefined` 塞进 body**。
+ *
  * ⚠️ 支付**不是**提交即成功：真实渠道要跳收银台、模拟通道也要等后端**异步回调**
  * `/app-api/trade/order/update-paid` 才把交易订单推进到「待发货」。所以提交成功后
  * 必须重新拉取订单详情来确认状态，**不得由前端把订单标记为已支付**（FR-039）。
  */
-export function submitPay(payOrderId: number, channelCode: string): Promise<PayOrderSubmitResp> {
-  return post<PayOrderSubmitResp>('/pay/order/submit', {
-    id: payOrderId,
-    channelCode,
-  })
+export function submitPay(
+  payOrderId: number,
+  channelCode: string,
+  channelExtras?: Record<string, string>,
+): Promise<PayOrderSubmitResp> {
+  const body: PaySubmitReq = { id: payOrderId, channelCode }
+  if (channelExtras) {
+    body.channelExtras = channelExtras
+  }
+  return post<PayOrderSubmitResp>('/pay/order/submit', body)
 }
 
 /**

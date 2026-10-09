@@ -81,4 +81,22 @@ test.describe('US5 支付闭环', () => {
     await expect(page.locator('.order-card')).toHaveCount(1)
     await expect(page.locator('.order-card').first().locator('.ml-pill')).toHaveText('待发货')
   })
+
+  test('桌面浏览器不给「微信支付（公众号）」入口（wx_pub 只能在微信内跑）', async ({ page }) => {
+    const mobile = testMobile()
+    await page.goto('/')
+    await smsLogin(page, mobile)
+    await createAddress(page)
+
+    await page.goto('/mall')
+    await page.locator('.p-card .p-title').first().click()
+    await page.locator('.btn-buy').click()
+    await page.locator('#submitOrder').click()
+    await expect(page).toHaveURL(/\/order\/\d+/)
+
+    // 桌面 chromium 的 UA 不含 MicroMessenger —— 即便后台启用了 wx_pub，
+    // 也不该给出这个入口：它要会员的 openid，且只能在微信内置浏览器里唤起收银台。
+    // 这条护栏同时钉住了「渠道选择器不再是无条件照搬后端列表」。
+    await expect(page.locator('[data-channel="wx_pub"]')).toHaveCount(0)
+  })
 })

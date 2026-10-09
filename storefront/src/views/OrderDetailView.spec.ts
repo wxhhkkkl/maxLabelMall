@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { OrderStatus, type OrderDetail } from '@/types'
+import { clearWxPayPending, markWxPayPending, readWxPayPending } from '@/utils/weixin'
 
 const getOrderDetail = vi.fn()
 const cancelOrder = vi.fn()
@@ -34,6 +35,24 @@ vi.mock('@/api/cart', () => ({
 vi.mock('@/api/member', () => ({
   getMemberUser: vi.fn().mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888' }),
   logout: vi.fn(),
+}))
+
+const getSocialUser = vi.fn()
+const bindSocialUser = vi.fn()
+const getSocialAuthRedirectUrl = vi.fn()
+vi.mock('@/api/social', () => ({
+  SOCIAL_TYPE_WECHAT_MP: 31,
+  getSocialUser: (...a: unknown[]) => getSocialUser(...a),
+  bindSocialUser: (...a: unknown[]) => bindSocialUser(...a),
+  getSocialAuthRedirectUrl: (...a: unknown[]) => getSocialAuthRedirectUrl(...a),
+}))
+
+// 只把「整页跳转」换掉（jsdom 里赋值 location.href 会报 not implemented），
+// 其余走真实实现 —— 这样「到底有没有真的去唤起收银台」才是被真实验证过的。
+const redirectTo = vi.fn()
+vi.mock('@/utils/weixin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/weixin')>()),
+  redirectTo: (...a: unknown[]) => redirectTo(...a),
 }))
 
 const OrderDetailView = (await import('./OrderDetailView.vue')).default
@@ -125,6 +144,12 @@ beforeEach(async () => {
   // 默认：只开了支付宝（线上 162 就是这状态，微信等商户号）
   listEnabledChannelCodes.mockReset()
   listEnabledChannelCodes.mockResolvedValue(['alipay_pc'])
+  getSocialUser.mockReset()
+  getSocialUser.mockResolvedValue(null)
+  bindSocialUser.mockReset()
+  getSocialAuthRedirectUrl.mockReset()
+  redirectTo.mockReset()
+  clearWxPayPending()
   await router.push('/order/1')
   await router.isReady()
 })
@@ -405,5 +430,223 @@ describe('OrderDetailView —— 错误态（FR-045）', () => {
     await flushPromises()
     expect(w.find('.empty-state').exists()).toBe(true)
     expect(w.text()).toContain('重新加载')
+  })
+})
+
+/**
+ * 微信公众号 JSAPI 支付（渠道码 `wx_pub`）。
+ *
+ * ⚠️ 这一组**刻意断言「请求体」与「收银台入参」**，不只断言界面文案 ——
+ * 本项目吃过「造假登录态、只断言 UI 不断言请求体」的亏：那样写出来的绿灯
+ * 证明不了链路接通。
+ */
+describe('OrderDetailView —— 微信公众号 JSAPI 支付（wx_pub）', () => {
+  const UA_WECHAT =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 MicroMessenger/8.0.44 NetType/WIFI'
+
+  /** JSAPI 下单结果 —— 字段名照后端 `WxPubPayClient` 返回的样子写 */
+  const JSAPI_DISPLAY = JSON.stringify({
+    appId: 'wx1234567890',
+    timeStamp: '1730000000',
+    nonceStr: 'nonce-abc',
+    packageValue: 'prepay_id=abc',
+    signType: 'MD5',
+    paySign: 'SIGN-xyz',
+  })
+
+  let uaSpy: { mockRestore: () => void } | null = null
+
+  function setUa(ua: string) {
+    uaSpy?.mockRestore()
+    uaSpy = vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(ua)
+  }
+
+  /** 装上假的微信内置 bridge，返回 `invoke` 以便断言入参 */
+  function installBridge(errMsg = 'getBrandWCPayRequest:ok') {
+    const invoke = vi.fn(
+      (_api: string, _params: Record<string, string>, cb: (r: { err_msg: string }) => void) =>
+        cb({ err_msg: errMsg }),
+    )
+    ;(globalThis as { WeixinJSBridge?: unknown }).WeixinJSBridge = { invoke }
+    return invoke
+  }
+
+  /** 链路上有好几段串行的 await，一次 flush 不够 */
+  async function settle() {
+    for (let i = 0; i < 4; i++) await flushPromises()
+  }
+
+  afterEach(() => {
+    uaSpy?.mockRestore()
+    uaSpy = null
+    delete (globalThis as { WeixinJSBridge?: unknown }).WeixinJSBridge
+  })
+
+  it('微信外不渲染 wx_pub —— 后端就算启用了也不给这个入口', async () => {
+    listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_pub'])
+    const w = await mountDetail()
+    expect(w.find('[data-channel="wx_pub"]').exists()).toBe(false)
+  })
+
+  it('微信内渲染 wx_pub，且文案与扫码渠道区分开', async () => {
+    setUa(UA_WECHAT)
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    const w = await mountDetail()
+    const btn = w.find('[data-channel="wx_pub"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('微信支付（公众号）')
+    expect(btn.classes()).not.toContain('is-disabled')
+  })
+
+  it('**提交支付时真的带上了 openid**，唤起收银台用的也是后端给的参数', async () => {
+    setUa(UA_WECHAT)
+    const invoke = installBridge()
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    getSocialUser.mockResolvedValue({ openid: 'o-1' })
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await settle()
+
+    // ① 请求体：没有 openid 后端一定拒（WxPubPayClient 直接抛错）
+    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_pub', { openid: 'o-1' })
+    // ② 收银台：真要唤起，且 packageValue 必须改名成 package
+    expect(invoke).toHaveBeenCalledTimes(1)
+    const [api, params] = invoke.mock.calls[0]
+    expect(api).toBe('getBrandWCPayRequest')
+    expect(params).toEqual({
+      appId: 'wx1234567890',
+      timeStamp: '1730000000',
+      nonceStr: 'nonce-abc',
+      package: 'prepay_id=abc',
+      signType: 'MD5',
+      paySign: 'SIGN-xyz',
+    })
+  })
+
+  it('**收银台走完之后仍以后端状态为准**（FR-039），不自行标记已付款', async () => {
+    setUa(UA_WECHAT)
+    installBridge('getBrandWCPayRequest:ok')
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    getSocialUser.mockResolvedValue({ openid: 'o-1' })
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await settle()
+
+    // 重新拉了一次详情，且带 sync=true（让后端顺便同步渠道状态）
+    expect(getOrderDetail).toHaveBeenCalledWith(1, true)
+    // 后端仍说待支付 → 页面就得是待支付（这里 mock 没推进状态）
+    expect(w.get('.ml-pill').text()).toBe('待支付')
+  })
+
+  it('收银台取消 → 明确提示，订单仍「待支付」且入口还在', async () => {
+    setUa(UA_WECHAT)
+    installBridge('getBrandWCPayRequest:cancel')
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    getSocialUser.mockResolvedValue({ openid: 'o-1' })
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await settle()
+
+    expect(w.text()).toContain('支付已取消')
+    expect(w.get('.ml-pill').text()).toBe('待支付')
+    expect(w.find('#payOrder').exists()).toBe(true)
+  })
+
+  it('没有 openid 时**不发支付请求**，先整页跳授权，并记下在付哪一笔', async () => {
+    setUa(UA_WECHAT)
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    getSocialUser.mockResolvedValue(null)
+    getSocialAuthRedirectUrl.mockResolvedValue('https://open.weixin.qq.com/connect/oauth2/authorize?...')
+    const w = await mountDetail()
+
+    await w.get('#payOrder').trigger('click')
+    await settle()
+
+    // 回跳地址是当前订单页，且**不带 query**（免得把 ?login=1 之类带进回调）
+    expect(getSocialAuthRedirectUrl).toHaveBeenCalledWith('http://localhost:3000/order/1')
+    expect(redirectTo).toHaveBeenCalledWith('https://open.weixin.qq.com/connect/oauth2/authorize?...')
+    // 授权往返之间要知道回来接着付哪一笔
+    expect(readWxPayPending()).toBe(8899)
+    // 没有 openid 就提交，必然被后端拒 —— 不该发这一枪
+    expect(submitPay).not.toHaveBeenCalled()
+  })
+
+  it('授权回跳后自动换 openid 并**接着把这一笔付掉**', async () => {
+    setUa(UA_WECHAT)
+    const invoke = installBridge()
+    // 两个渠道都开着，且支付宝排在前面 —— 用来验证续跑时会切回微信渠道
+    listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_pub'])
+    bindSocialUser.mockResolvedValue('o-9')
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
+    markWxPayPending(8899)
+
+    await router.push('/order/1?code=C-1&state=S-1')
+    await mountDetail()
+    await settle()
+
+    expect(bindSocialUser).toHaveBeenCalledWith('C-1', 'S-1')
+    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_pub', { openid: 'o-9' })
+    expect(invoke).toHaveBeenCalledTimes(1)
+    // 凭据不该留在地址栏上：这条 URL 事实上可重放（后端会先命中自己库里存的 code+state）
+    expect(router.currentRoute.value.query.code).toBeUndefined()
+    expect(router.currentRoute.value.query.state).toBeUndefined()
+    // 续跑是「读后即删」，不会因为再刷新一次而重复发单
+    expect(readWxPayPending()).toBeNull()
+  })
+
+  it('续跑只发生一次 —— 刷新页面不会再自动提交一次', async () => {
+    setUa(UA_WECHAT)
+    installBridge()
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    bindSocialUser.mockResolvedValue('o-9')
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
+    markWxPayPending(8899)
+
+    await router.push('/order/1?code=C-1&state=S-1')
+    await mountDetail()
+    await settle()
+    expect(submitPay).toHaveBeenCalledTimes(1)
+
+    // 用户手动刷新（同一 URL，但续跑标记已消费；这里重挂一次组件模拟）
+    await mountDetail()
+    await settle()
+    expect(submitPay).toHaveBeenCalledTimes(1)
+  })
+
+  it('授权换 openid 失败时，把后端文案摊开来说，且不偷偷续跑', async () => {
+    setUa(UA_WECHAT)
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    bindSocialUser.mockRejectedValue({ message: '社交授权失败，原因是：invalid code' })
+    markWxPayPending(8899)
+
+    await router.push('/order/1?code=C-bad&state=S-1')
+    const w = await mountDetail()
+    await settle()
+
+    expect(w.text()).toContain('社交授权失败')
+    expect(submitPay).not.toHaveBeenCalled()
+    expect(readWxPayPending()).toBeNull()
+  })
+
+  it('微信外误点到 wx_pub 时兜底提示，不发出注定失败的支付请求', async () => {
+    // 渠道选择器已经按环境过滤，这里直接构造出「选中了 wx_pub」的状态来验兜底
+    setUa(UA_WECHAT)
+    listEnabledChannelCodes.mockResolvedValue(['wx_pub'])
+    const w = await mountDetail()
+    // 切回非微信环境后再点
+    uaSpy?.mockRestore()
+    uaSpy = vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Chrome/126')
+
+    await w.get('#payOrder').trigger('click')
+    await settle()
+
+    expect(submitPay).not.toHaveBeenCalled()
+    expect(w.text()).toContain('请在微信中打开')
   })
 })

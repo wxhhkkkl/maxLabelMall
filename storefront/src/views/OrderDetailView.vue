@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { cancelOrder, getOrderDetail } from '@/api/order'
 import { getPayOrder, listEnabledChannelCodes, submitPay } from '@/api/pay'
+import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/social'
 import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
@@ -15,6 +17,15 @@ import { formatYuan, reconcile } from '@/utils/money'
 import { orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
 import { formatDateTime } from '@/utils/time'
+import {
+  clearWxPayPending,
+  invokeWxPay,
+  isWechatBrowser,
+  markWxPayPending,
+  parseWxJsapiParams,
+  readWxPayPending,
+  redirectTo,
+} from '@/utils/weixin'
 
 /**
  * 订单详情 —— 按 design-new-pages.md §3.4 的版式实现（无设计稿）。
@@ -32,10 +43,17 @@ import { formatDateTime } from '@/utils/time'
  *
  * 4. 五种状态**共用同一版式**，只有状态区与操作区不同（§3.4）。
  *
- * 5. **支付用模拟通道**（SC-010），提交后状态由后端异步回调推进 —— 见 `onPay`。
+ * 5. **支付渠道由后端下发**（FR-038，替代已删除的 SC-010），用户选哪个就提交哪个。
+ *    微信公众号 JSAPI（`wx_pub`）比别的渠道多两步：先拿到该会员的 openid
+ *    （没有就整页跳授权、回跳后接着付），再用后端给的 `displayContent` 唤起微信
+ *    收银台 —— 详见 `payByWechatJsapi`。**收银台说「ok」也不代表已付款**：状态
+ *    始终等后端回调推进（这就是约束 1）。
  */
 
 const props = defineProps<{ id: number | string }>()
+
+const route = useRoute()
+const router = useRouter()
 
 const order = ref<OrderDetail | null>(null)
 const loading = ref(true)
@@ -43,6 +61,19 @@ const error = ref(false)
 const message = ref('')
 const cancelOpen = ref(false)
 const paying = ref(false)
+
+/**
+ * 微信公众号的 JSAPI 渠道码。这里**只用来分派「怎么把收银台唤起来」**，
+ * 不代表前端判断渠道可用性 —— 用不用得上仍由后端的启用列表说了算（FR-038）。
+ */
+const WX_PUB_CHANNEL = 'wx_pub'
+
+/**
+ * 付款要用的公众号 openid。**只放内存不落盘**：
+ * 一是后端 `/member/social-user/get` 已经能查到绑定关系（下次付款自动取到，不必重复授权），
+ * 二是这个 openid 的绑定可能被同一手机的另一个账号「抢走」，落盘会留下陈旧值。
+ */
+const wxOpenid = ref('')
 
 /**
  * 可选支付渠道。**可用性来自后端**（`/pay/channel/get-enable-code-list`），
@@ -119,10 +150,89 @@ async function load(sync = false) {
 }
 
 /**
- * 立即支付（模拟通道，SC-010）。
+ * 取付款要用的 openid：先看内存，再问后端（会员可能早就绑过公众号了，
+ * 那样第二次付款就不用再走一次整页授权）。
+ */
+async function resolveWxOpenid(): Promise<string> {
+  if (wxOpenid.value) return wxOpenid.value
+  try {
+    wxOpenid.value = (await getSocialUser())?.openid ?? ''
+  } catch {
+    // 查不到就当没绑过，去走一次授权 —— 比在这里把支付卡死要好
+    wxOpenid.value = ''
+  }
+  return wxOpenid.value
+}
+
+/**
+ * 微信公众号 JSAPI 支付。
  *
- * ⚠️ **提交成功后不把订单标成已支付**：模拟通道提交即成功，但交易订单要等后端
- * 回调 `/app-api/trade/order/update-paid` 才推进。所以这里重新拉一次详情
+ * 没有 openid **不发支付请求**：后端 `WxPubPayClient` 拿不到 openid 直接拒。
+ * 这时先记下「正在付哪一笔」，再整页跳微信授权；回跳后由
+ * {@link handleWechatCallback} 接着把这一笔付掉。
+ */
+async function payByWechatJsapi(payOrderId: number) {
+  // 渠道选择器已按环境过滤过 wx_pub，这里是兜底（UA 判断也可能失灵）
+  if (!isWechatBrowser()) {
+    message.value = '请在微信中打开本页后再使用微信支付'
+    return
+  }
+  const openid = await resolveWxOpenid()
+  if (!openid) {
+    markWxPayPending(payOrderId)
+    // 回跳地址**不带 query**：带上会把 ?login=1、上一次的 code 之类一起塞进授权回调
+    const redirectUri = `${window.location.origin}${route.path}`
+    redirectTo(await getSocialAuthRedirectUrl(redirectUri))
+    return
+  }
+
+  const resp = await submitPay(payOrderId, WX_PUB_CHANNEL, { openid })
+  const outcome = await invokeWxPay(parseWxJsapiParams(resp.displayContent))
+  if (outcome === 'cancel') {
+    message.value = '支付已取消'
+  }
+  await load(true)
+}
+
+/**
+ * 处理微信授权回跳（URL 上带 `?code=&state=`）。
+ *
+ * ⚠️ 读到之后**立刻**把这两个参数从地址栏抹掉。这条 URL 事实上是可重放的
+ * （后端 `SocialUserServiceImpl.authSocialUser` 会先命中自己库里已存的
+ * `(type, code, state)`，绕过 justauth 的 state 校验），刷新一次就会再绑一次 ——
+ * 而绑定会把这个 openid 从它原先绑的会员身上解绑。
+ */
+async function handleWechatCallback() {
+  const code = typeof route.query.code === 'string' ? route.query.code : ''
+  const state = typeof route.query.state === 'string' ? route.query.state : ''
+  if (!code || !state) return
+
+  const pending = readWxPayPending()
+  // 先消费掉标记、再清地址栏，最后才去绑 —— 中途失败都不会留下会重复触发的残留
+  clearWxPayPending()
+  await router.replace({ path: route.path })
+
+  try {
+    wxOpenid.value = await bindSocialUser(code, state)
+  } catch (e) {
+    // 例如公众号还没配好（后端报「社交授权失败，原因是…」）
+    message.value = (e as { message?: string })?.message || '微信授权失败，请重试'
+    return
+  }
+
+  // 授权前正在付的那一笔，接着付。标记是「读后即删」，且再校验一次订单仍是待支付，
+  // 所以这个自动提交**最多发生一次**。
+  if (pending && pending === order.value?.payOrderId && isUnpaid.value) {
+    selectedChannel.value = WX_PUB_CHANNEL
+    await onPay()
+  }
+}
+
+/**
+ * 立即支付。
+ *
+ * ⚠️ **提交成功后不把订单标成已支付**：交易订单要等后端回调
+ * `/app-api/trade/order/update-paid` 才推进。所以这里重新拉一次详情
  * （`sync=true` 顺便让后端同步一次渠道状态），**页面显示的状态始终是后端给的**
  * —— 后端说还是待支付，就还是待支付（FR-039）。
  */
@@ -135,8 +245,12 @@ async function onPay() {
   message.value = ''
   paying.value = true
   try {
-    await submitPay(payOrderId, selectedChannel.value)
-    await load(true)
+    if (selectedChannel.value === WX_PUB_CHANNEL) {
+      await payByWechatJsapi(payOrderId)
+    } else {
+      await submitPay(payOrderId, selectedChannel.value)
+      await load(true)
+    }
   } catch (e) {
     // 支付放弃/中断/失败：订单仍是「待支付」，入口留着让用户再发起（FR-038）
     message.value = (e as { message?: string })?.message || '支付失败，请稍后重试'
@@ -165,6 +279,9 @@ onMounted(async () => {
   // 按契约走另一条路：不给支付入口、提示「本单无需支付」，并同步一次状态，
   // 确认后端到底把它算成什么（不臆断它会自动完成）。
   if (needsNoPay.value) await load(true)
+  // 微信授权回跳的那一次：用 code 换 openid，并接着把刚才那笔付掉。
+  // 放在 `load()` 之后 —— 续跑前要先知道订单还是不是待支付。
+  await handleWechatCallback()
 })
 </script>
 

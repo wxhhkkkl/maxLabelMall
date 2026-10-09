@@ -50,3 +50,45 @@ describe('buildChannelOptions —— 渠道编码映射为展示项', () => {
     expect('MOCK_CHANNEL_CODE' in pay).toBe(false)
   })
 })
+
+/**
+ * 环境过滤：`wx_pub`（公众号 JSAPI）只能在微信内置浏览器里跑，`wx_native`（扫码）
+ * 只适合微信外。**不匹配的环境整条不渲染** —— 注意不能渲染成 `comingSoon`
+ * （那是「后台没启用」的语义，而这里是「后台启用了、但当前浏览器执行不了」，
+ * 两者对用户的含义完全不同）。
+ *
+ * 可用性仍是后端说了算：这里只在后端返回的启用集合内部做**减法**。
+ */
+describe('buildChannelOptions —— 按运行环境过滤', () => {
+  it('微信外不渲染 wx_pub（后端启用了也不行）', () => {
+    const opts = buildChannelOptions(['alipay_pc', 'wx_pub'], false)
+    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_native'])
+    expect(opts.find((o) => o.code === 'wx_pub')).toBeUndefined()
+  })
+
+  it('微信内渲染 wx_pub，且不给扫码渠道留占位', () => {
+    const opts = buildChannelOptions(['alipay_pc', 'wx_pub'], true)
+    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_pub'])
+    expect(opts.find((o) => o.code === 'wx_native')).toBeUndefined()
+  })
+
+  it('微信内 wx_pub 启用时可选，文案与扫码渠道区分开', () => {
+    const opts = buildChannelOptions(['wx_pub'], true)
+    expect(opts.find((o) => o.code === 'wx_pub')).toEqual({
+      code: 'wx_pub',
+      label: '微信支付（公众号）',
+      enabled: true,
+      comingSoon: false,
+    })
+  })
+
+  it('微信内后端没启用 wx_pub 时，才轮到「即将上线」占位', () => {
+    const opts = buildChannelOptions([], true)
+    expect(opts.find((o) => o.code === 'wx_pub')).toMatchObject({ enabled: false, comingSoon: true })
+  })
+
+  it('未知编码不受环境过滤影响 —— 后端新配的渠道照样显示', () => {
+    const opts = buildChannelOptions(['wx_lite'], true)
+    expect(opts.map((o) => o.code)).toContain('wx_lite')
+  })
+})

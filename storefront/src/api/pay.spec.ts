@@ -28,6 +28,8 @@ beforeEach(() => {
  *    那个常量已删除 —— 渠道码是参数，不再有默认值。
  * 3. **可用渠道必须问后端**（`/pay/channel/get-enable-code-list`），前端不得自己判断
  *    哪个渠道可用。
+ * 4. **公众号 JSAPI（`wx_pub`）必须带 `channelExtras.openid`**，且没传时**不能**把
+ *    `channelExtras: undefined` 塞进 body —— 其余渠道不需要这个键。
  */
 describe('提交支付', () => {
   it('body 是 { id: 支付单号, channelCode: 调用方给的渠道码 }', async () => {
@@ -47,6 +49,27 @@ describe('提交支付', () => {
       id: 8899,
       channelCode: undefined,
     })
+  })
+
+  it('传了 channelExtras 时放进 body —— 公众号 JSAPI 靠它带 openid（缺了后端必拒）', async () => {
+    post.mockResolvedValue(true)
+    await submitPay(8899, 'wx_pub', { openid: 'o-1' })
+    expect(post).toHaveBeenCalledWith('/pay/order/submit', {
+      id: 8899,
+      channelCode: 'wx_pub',
+      channelExtras: { openid: 'o-1' },
+    })
+  })
+
+  it('没传 channelExtras 时 body **不含该键** —— 不给支付宝之类的渠道发一个 undefined', async () => {
+    post.mockResolvedValue(true)
+    await submitPay(8899, 'alipay_pc')
+    expect(post).toHaveBeenCalledWith('/pay/order/submit', {
+      id: 8899,
+      channelCode: 'alipay_pc',
+    })
+    // `toHaveBeenCalledWith` 对 `{a:1,b:undefined}` 是宽容的，所以单独钉一次键集
+    expect(Object.keys(post.mock.calls[0][1] as object)).toEqual(['id', 'channelCode'])
   })
 })
 

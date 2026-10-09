@@ -41,6 +41,7 @@ const ALL_PATHS = [
   '/product/1',
   '/software',
   '/solutions',
+  '/solutions/warehouse',
   '/support',
   '/cart',
   '/checkout',
@@ -62,7 +63,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 23 条路径（6 设计稿 + 11 功能页 + 6 信息页）', () => {
+  it('声明了 24 条路径（原有 23 条 + 行业详情）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -73,7 +74,7 @@ describe('路由表', () => {
     }
     walk((realRouter as unknown as { options: { routes: never[] } }).options.routes)
     // 23 条叶子路由。注意首页那条 path 为 ''，解析后就是 '/'，不要额外过滤掉它。
-    expect(paths).toHaveLength(23)
+    expect(paths).toHaveLength(24)
     expect(paths).toContain('/')
   })
 

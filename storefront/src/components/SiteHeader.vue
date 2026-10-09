@@ -94,7 +94,7 @@ onMounted(() => {
 })
 
 function isActive(name: string): boolean {
-  return route.name === name
+  return route.name === name || (name === 'solutions' && route.name === 'solution-detail')
 }
 </script>
 

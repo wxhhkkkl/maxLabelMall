@@ -9,7 +9,7 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { getAccessToken } from '@/utils/auth'
 
 /**
- * 路由表 —— 共 23 条。
+ * 路由表 —— 共 24 条（原有 23 条 + 行业详情）。
  *   6 条来自设计稿（须忠实还原，FR-046）
  *   11 条功能页（无设计稿，版式见 design-new-pages.md）
  *    6 条信息页（无设计稿，承接全站 36 处营销/公司入口，FR-053）
@@ -36,7 +36,8 @@ const router = createRouter({
           props: true,
         },
         { path: 'software', name: 'software', component: () => import('@/views/SoftwareView.vue') },
-        { path: 'solutions', name: 'solutions', component: () => import('@/views/SolutionsView.vue') },
+        { path: 'solutions', alias: '/solution', name: 'solutions', component: () => import('@/views/SolutionsView.vue') },
+        { path: 'solutions/:industry', alias: '/solution/:industry', name: 'solution-detail', component: () => import('@/views/IndustrySolutionView.vue') },
         { path: 'support', name: 'support', component: () => import('@/views/SupportView.vue') },
 
         // ── 功能页（11 条路由 / 10 个视图） ────────────────────────

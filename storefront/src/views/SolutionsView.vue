@@ -1,70 +1,214 @@
 <script setup lang="ts">
-import PendingText from '@/components/base/PendingText.vue'
-import { RENDERED } from '@/data/placeholders'
+import { computed, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
+import SolutionCta from '@/components/solutions/SolutionCta.vue'
+import SolutionLabel from '@/components/solutions/SolutionLabel.vue'
+import SolutionStepArtwork from '@/components/solutions/SolutionStepArtwork.vue'
+import { industrySolutions, solutionGroups, solutionMethod, industryArtwork } from '@/data/industrySolutions'
 
-/**
- * 行业方案页 —— 按设计稿 `www/solutions.html` 还原。
- *
- * ⚠️ 设计稿里的**客户案例与成效数字**（如「某头部电商仓储：日均 12,000 单」）
- * 属未经确认的业务声明，经 `PendingText` 渲染（FR-056）。
- */
+const query = ref('')
+const selectedGroup = ref<(typeof solutionGroups)[number]>('全部行业')
+const industriesSection = ref<HTMLElement | null>(null)
+const filteredIndustries = computed(() => {
+  const keyword = query.value.trim().toLocaleLowerCase()
+  return industrySolutions.filter((industry) =>
+    (selectedGroup.value === '全部行业' || industry.group === selectedGroup.value)
+    && (!keyword || [industry.name, industry.summary, ...industry.tags].join(' ').toLocaleLowerCase().includes(keyword)),
+  )
+})
+const featuredSamples = [industrySolutions[0]!.samples[0]!, industrySolutions[2]!.samples[0]!, industrySolutions[4]!.samples[1]!]
+function resetFilters() {
+  query.value = ''
+  selectedGroup.value = '全部行业'
+}
+function exploreIndustries() {
+  industriesSection.value?.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    block: 'start',
+  })
+}
 </script>
 
 <template>
-  <section class="sol-hero">
-    <h1>十大行业标签解决方案</h1>
-    <p class="sw-hero-sub">为每一个行业打磨专属的标签打印与管理方案</p>
-  </section>
+  <div class="solutions-page">
+    <section class="solution-hero solution-banner solution-overview-banner">
+      <img
+        class="solution-banner-photo"
+        src="/assets/solutions/00-overview-v2.webp"
+        alt="标签打印机、包装箱、服装吊牌与食品标签的应用场景"
+        fetchpriority="high"
+      >
+      <div class="solution-container solution-hero-layout">
+        <div class="solution-hero-copy">
+          <span class="solution-eyebrow">行业标签解决方案</span>
+          <h1>让标签，成为<br>业务的连接点</h1>
+          <p>从商品识别到作业流转，<br class="solution-desktop-break">为不同场景设计清晰、实用的标签方案。</p>
+          <div class="solution-actions">
+            <button
+              class="btn-primary"
+              type="button"
+              @click="exploreIndustries"
+            >
+              找到我的行业 <span aria-hidden="true">↓</span>
+            </button>
+            <RouterLink
+              class="solution-secondary-link"
+              to="/contact"
+            >
+              咨询定制方案 <span aria-hidden="true">↗</span>
+            </RouterLink>
+          </div>
+        </div>
+        <div class="solution-banner-tags">
+          <div class="solution-media-caption">
+            <span>商品身份</span><span>批次信息</span><span>流转记录</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  <section class="industry">
-    <div class="sol-grid">
-      <div class="sol-card">
-        <div class="sol-icon c1">仓</div>
-        <h3>仓储物流</h3>
-        <p>标签协同 + 自动箱单 + 称重测体，出入库效率显著提升</p>
+    <section
+      id="industries"
+      ref="industriesSection"
+      class="solution-section solution-container"
+      aria-labelledby="industry-heading"
+    >
+      <div class="solution-section-heading">
+        <span class="solution-eyebrow">从您的行业出发</span>
+        <h2 id="industry-heading">
+          找到适合您的标签方案
+        </h2>
+        <p>不同的作业场景，同样清晰的信息连接。</p>
       </div>
-      <div class="sol-card">
-        <div class="sol-icon c2">产</div>
-        <h3>生产制造</h3>
-        <p>上下游生产链标签协同，批次追溯不出错、不遗漏</p>
+      <div class="solution-filters">
+        <div
+          class="solution-filter-groups"
+          aria-label="行业分类"
+        >
+          <button
+            v-for="group in solutionGroups"
+            :key="group"
+            type="button"
+            :class="{ 'is-selected': selectedGroup === group }"
+            :aria-pressed="selectedGroup === group"
+            @click="selectedGroup = group"
+          >
+            {{ group }}
+          </button>
+        </div>
+        <label class="solution-search">
+          <span class="solution-sr-only">搜索行业或标签场景</span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          ><circle
+            cx="10.5"
+            cy="10.5"
+            r="6.5"
+          /><path d="m16 16 4.5 4.5" /></svg>
+          <input
+            v-model="query"
+            type="search"
+            placeholder="搜索行业或标签场景"
+          >
+        </label>
       </div>
-      <div class="sol-card">
-        <div class="sol-icon c3">服</div>
-        <h3>服装行业</h3>
-        <p>吊牌水洗标快速替换，扫码即可批量改写标签内容</p>
-      </div>
-      <div class="sol-card">
-        <div class="sol-icon c1">医</div>
-        <h3>医药 UDI</h3>
-        <p>满足 UDI 对标签内容、条码质量与数据留存的要求</p>
-      </div>
-      <div class="sol-card">
-        <div class="sol-icon c2">食</div>
-        <h3>食品饮料</h3>
-        <p>配料表、效期与批次标签批量生成，合规又高效</p>
-      </div>
-      <div class="sol-card">
-        <div class="sol-icon c3">商</div>
-        <h3>零售门店</h3>
-        <p>价签、促销标与货架标签快速更换，改价不再手写</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 客户案例：成效数字是未确认声明（FR-056） -->
-  <section class="trust">
-    <h2 class="section-title" style="text-align: center">客户案例</h2>
-    <div class="quote">
-      <p class="quote-text">
-        <PendingText :value="RENDERED.inheritedClaims.testimonial.text" />
+      <p
+        class="solution-result-count"
+        role="status"
+      >
+        共 {{ filteredIndustries.length }} 个行业方案
       </p>
-      <p class="quote-author">—— <PendingText :value="RENDERED.inheritedClaims.testimonial.author" /></p>
-    </div>
-  </section>
+      <div
+        v-if="filteredIndustries.length"
+        class="solution-industry-grid"
+        :class="{ 'has-all-industries': filteredIndustries.length === 10 }"
+      >
+        <RouterLink
+          v-for="industry in filteredIndustries"
+          :key="industry.id"
+          :to="`/solutions/${industry.id}`"
+          class="solution-industry-card"
+        >
+          <div class="solution-card-photo">
+            <img
+              :src="industry.image"
+              :alt="industry.name + '标签应用场景'"
+              width="449"
+              height="295"
+              loading="lazy"
+              decoding="async"
+            >
+          </div>
+          <div class="solution-card-content">
+            <span class="solution-card-category">{{ industry.group }}</span>
+            <h3>{{ industry.name }}</h3>
+            <p>{{ industry.summary }}</p>
+            <div class="solution-card-tags">
+              <span
+                v-for="tag in industry.tags.slice(0, 2)"
+                :key="tag"
+              >{{ tag }}</span>
+            </div>
+            <span class="solution-card-link">查看方案 <span aria-hidden="true">→</span></span>
+          </div>
+        </RouterLink>
+      </div>
+      <EmptyState
+        v-else
+        title="暂未找到匹配的行业方案"
+        desc="试试行业名称或标签类型，例如「库位」「吊牌」。"
+        action-text="查看全部行业"
+        @action="resetFilters"
+      />
+    </section>
 
-  <section class="final-cta">
-    <h2 class="cta-title">需要为您的行业定制标签方案？</h2>
-    <p class="cta-sub">批量采购与行业定制，可走企业采购通道</p>
-    <RouterLink class="cta-btn" to="/enterprise">联系我们</RouterLink>
-  </section>
+    <section class="solution-method-section">
+      <div class="solution-container solution-section">
+        <div class="solution-section-heading">
+          <span class="solution-eyebrow">从需求到现场</span>
+          <h2>同一套方法，连接不同的行业</h2>
+          <p>先理解流程，再决定标签应该如何表达。</p>
+        </div>
+        <ol class="solution-method-grid solution-illustrated-steps">
+          <li
+            v-for="([title, description], index) in solutionMethod"
+            :key="title"
+          >
+            <SolutionStepArtwork :kind="['document', 'tag', 'printer', 'check'][index]" />
+            <span class="solution-step-number">{{ String(index + 1).padStart(2, '0') }}</span>
+            <h3>{{ title }}</h3><p>{{ description }}</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section
+      class="solution-container solution-section solution-showcase"
+      aria-labelledby="sample-heading"
+    >
+      <div class="solution-section-heading">
+        <span class="solution-eyebrow">让信息看得见</span>
+        <h2 id="sample-heading">
+          从一张标签，<br>看见完整方案
+        </h2>
+        <p>识别商品，突出关键变量，<br>连接每一次后续作业。</p>
+        <RouterLink
+          class="solution-text-link"
+          to="/solutions/warehouse"
+        >
+          看看标签如何落地 <span aria-hidden="true">→</span>
+        </RouterLink>
+      </div>
+      <div class="solution-sample-grid">
+        <SolutionLabel
+          v-for="(sample, index) in featuredSamples"
+          :key="sample.name"
+          :sample="sample"
+          :image="industryArtwork(industrySolutions[[0, 2, 4][index]!]!, 'label', index === 2 ? 1 : 0)"
+        />
+      </div>
+    </section>
+    <SolutionCta image="/assets/solutions/00-overview.webp" />
+  </div>
 </template>

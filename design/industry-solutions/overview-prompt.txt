@@ -1,0 +1,20 @@
+Use case: ui-mockup. Create ONE high fidelity full-length Chinese desktop website INDUSTRY SOLUTIONS OVERVIEW page design mockup for 赋签 MaxLabel, replacing /solutions. Output a tall polished page, approximately 1440x2400 pixels, all sections visible. Consistent with a label printing ecommerce corporate website: brand blue #2E7CD6, deep navy #0C2148 headings, white, pale blue #F3F8FF background, rounded 14px white cards, understated borders, generous spacing, Chinese sans serif. Sophisticated editorial layout, no purple, no dark theme, no invented customer logos or metrics. Use restrained realistic industry photography/3D asset scenes. NOT a detail page for one industry: this is an overview with EXACTLY TEN distinct industry entry cards.
+HEADER: white navigation bar blue rounded square M mark, exact brand "赋签 MaxLabel"; 首页 商城 标签软件 行业方案 服务支持 with 行业方案 active blue; right 进入商城.
+HERO: pale blue expansive split layout. Small eyebrow "行业标签解决方案". Large exact headline on left: "让标签，成为业务的连接点". Supporting copy "从商品识别到作业流转，为不同场景设计清晰、实用的标签方案。" Blue primary button "找到我的行业" and understated secondary "咨询定制方案". Right a curated photoreal composition: desktop label printer, shipping box with barcode, food container label and garment hangtag, connected by thin subtle blue lines to floating small white chips "商品身份" "批次信息" "流转记录". Clean professional, no giant dashboard.
+MAIN SELECTOR SECTION: heading "找到适合您行业的标签方案", subheading "从真实作业出发，让每一张标签发挥作用". A compact search field placeholder "搜索行业或标签场景"; filter pills 全部行业 active blue, 仓储与生产, 门店与消费, 专业标识.
+EXACT TEN CARDS, a five-column by two-row grid on desktop. Each equal card has top 16:10 industry scene photograph, small pale-blue category chip, bold heading, short one-line task descriptor, two tiny outline label-use tags, blue 查看方案 → at bottom. Cards in this exact order:
+1 仓储物流 — 收货、库位、装箱有序衔接 — 库位标签 / 出库箱标; scene blue warehouse bins.
+2 生产制造 — 批次身份贯穿生产工序 — 批次标签 / 工序卡; scene modern assembly.
+3 服装行业 — 款色码统一，补标更轻松 — 商品吊牌 / 水洗标; scene pale blue sweaters.
+4 医药与医疗器械 — 关键字段清晰、可核对 — 产品标识 / 批号效期; scene sterile packages.
+5 食品饮料 — 配方与日期分层管理 — 配料标签 / 效期标签; scene juice bottles.
+6 零售门店 — 价签更新与货架同步 — 货架价签 / 促销标签; scene supermarket.
+7 跨境电商 — 多渠道模板与箱单配对 — 商品标签 / 物流箱标; scene shipping cartons.
+8 烘焙行业 — 看得见的出炉时间与鲜度 — 产品信息 / 陈列价签; scene croissants kraft bag.
+9 餐饮供应链 — 来源、分装、周转更清楚 — 食材标签 / 周转箱标; scene kitchen food tubs.
+10 电子半导体 — 料盘、批次、序列有关联 — 料盘标签 / 序列标签; scene chip reels.
+NEXT SECTION light blue: heading "同一套方法，连接不同的行业". Four horizontally connected numbered steps with minimal icons: 01 梳理场景 (明确谁在何时使用标签); 02 设计标签 (组织字段与信息层级); 03 匹配打印 (选择设备、尺寸与材料); 04 验证流程 (核对样张与现场操作). No unsupported claims of existing integrations.
+NEXT SECTION: heading "从一张标签，看见完整方案". Spacious horizontal composition with left small annotation list "清楚识别商品" "突出关键变量" "连接后续作业", right three tangible realistic WHITE demo label examples laid neatly side by side: "库位标签", "商品吊牌", "批次效期标", each realistic black barcode and concise Chinese example data and caption "示意标签". Keep quiet and less visually dense than industry grid.
+FINAL CTA full width navy to blue gradient, headline "没找到完全匹配的场景？", body "告诉我们您的业务流程，一起打磨适合现场的标签方案。", white button "咨询行业方案".
+FOOTER white with consistent brand, small standard links 商城 标签软件 行业方案 服务支持.
+All Chinese visibly readable, typography precise, coherent alignment, visual hierarchy. Original composition and copy, no DLabel logos, no copied competitor imagery. No fake testimonials, business statistics or compliance badges. This must look like a mature website overview, not a poster or a collage of ten pages.

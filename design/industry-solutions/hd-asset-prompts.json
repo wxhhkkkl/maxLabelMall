@@ -1,0 +1,25 @@
+{
+  "tool": "built-in image_gen",
+  "assets": [
+    {
+      "id": "overview",
+      "prompt": "Use case: product-mockup. Generate a standalone high-resolution 2400x1350 landscape hero photograph asset for a Chinese business label-printing website. No UI, no page screenshot. Premium crisp commercial product photography on a pale cool blue-white seamless tabletop, subtle real shadows, restrained professional palette navy and blue. Right two thirds: a compact realistic desktop thermal label printer, one kraft shipping carton with a simple white barcode label, a folded navy cotton shirt with a hanging paper tag, a clear food container with a minimal white product label. Labels show clean black bars and minimal neutral small type, no logos or made-up brand names. Deliberate harmonious composition with objects fully in frame and strong depth, not a collage, not floating cards. Left third mostly empty pale blue-white background for HTML heading, no text or interface anywhere. Sharp textures, sharp object edges, focused subjects, soft natural studio light, no blur of main products, no watermarks."
+    },
+    {
+      "id": "bakery-hero",
+      "prompt": "Use case: photorealistic-natural. Standalone 2400x1350 landscape hero photograph for bakery label solutions website. Real artisan bakery countertop, beautiful golden butter croissants on a wooden tray, one neatly packaged croissant in a clear kraft window pouch with a small white product information label, one sliced milk toast loaf in a clear food-safe bag with a white time label, subtle bakery background with no chalkboards or writing. Bread and packaging sharply focused, realistic crisp laminated pastry, warm natural daylight with restrained cream and pale blue neutral colors. Put products in right two-thirds, leave left third a clean pale softly lit wall/table negative space for webpage text. Label text restrained and simple, no dense unreadable paragraphs, no claims or logos, no website layout, no embedded headings, no watermark. Packaging appropriate for food. All products fit the frame."
+    },
+    {
+      "id": "bakery-product",
+      "prompt": "Use case: product-mockup. Standalone 1600x1200 landscape sharp commercial photo for a bakery product-information label example. Close-up of one golden butter croissant packaged in a kraft paper pouch with a clear food-safe window on an artisan bakery counter. Main subject is a generous flat matte white rectangular label attached to the kraft upper part of pouch, clearly fully visible, exactly this minimal Chinese text in clean dark type: \"法式牛角可颂\" then \"净含量 80 g\" then \"含小麦、牛奶、鸡蛋\". One small illustrative barcode at bottom, no other text. Beautiful pastry visible through window, warm cream background, crisp packaging texture, premium editorial photography, soft daylight, full label entirely in frame, no UI or captions outside package, no logos, no watermark."
+    },
+    {
+      "id": "bakery-time",
+      "prompt": "Use case: product-mockup. Standalone 1600x1200 landscape sharply focused photo for bakery production-time labeling. A neatly packed golden sliced milk toast loaf in a transparent food-safe bag resting on light wooden bakery counter. A large flat white rectangular label attached on the front and entirely visible, crisp restrained modern black Chinese type with exactly these three lines: \"奶香吐司\" \"出炉时间 08:35\" \"批次 BK-1009-A\". One small illustrative barcode bottom. Natural warm cream background, soft light, all focus on bread bag and label, coherent premium product photography, no blur on label, no logos, no web page, no outer captions, no watermark."
+    },
+    {
+      "id": "bakery-price",
+      "prompt": "Use case: product-mockup. Standalone 1600x1200 landscape crisp commercial photograph for bakery display price label. One clean transparent acrylic countertop sign holder with a flat white printed price card in the foreground, card facing camera slight natural perspective, entirely in frame. Exact sparse black Chinese lettering: \"牛角可颂\" large, \"¥12.00 / 个\" largest, \"含小麦、牛奶、鸡蛋\" small but readable. No barcode. A tray of golden croissants behind the sign establishes matching bakery retail scene, pale wood counter, cream backdrop, soft daylight, realistic acrylic edges, premium restrained typography, no logo, no decorative illustrations, no UI, no extra outside captions or watermark."
+    }
+  ]
+}

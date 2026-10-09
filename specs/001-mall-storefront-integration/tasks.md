@@ -1087,10 +1087,23 @@ US4 需等 US1 与 US2 的接口稳定后再开工。
 → 所有环境验证码都是 9999，**任何人提交 9999 即可登录任意手机号**。
 修法：基础配置改成随机区间，把 `9999` 挪进 `application-local.yaml`（保住本地 e2e）。
 
-**附带发现**：三个 C 端短信模板（`user-sms-login` / `user-update-password` /
-`user-reset-password`）**仍绑在渠道 4 = `DEBUG_DING_TALK`（调试·钉钉）**上；2026-10-07 新建的
-阿里云渠道是 id=8，只有一条新模板挂在它上面，**没有任何场景在用** —— 即便把 9999 改成随机码，
-真机也收不到短信，除非模板一并改绑。
+**附带发现（2026-10-09 发版后订正）**：C 端**根本发不出短信**，而且原因与被删的模板有关 ——
+调用 `POST /app-api/member/auth/send-sms-code` 直接返回 `1002013002 短信模板不存在`。
+
+查库（`system_sms_template`，**注意要带 `deleted` 条件**）：
+
+- **2026-10-07 15:55–15:56**（updater=1）：`user-sms-login` / `user-update-password` /
+  `user-reset-password` / `admin-sms-login` / `bpm_*` 等 **15 条模板被批量软删除**（`deleted=1`）。
+- **2026-10-09 10:05**（updater=249）：新建 1 条，编码是**中文「短信验证码」**，绑阿里云渠道 8
+  —— 全表**唯一存活**，但它的 code 对不上任何场景。
+
+yudao 按 `SmsSceneEnum` 里**写死的 templateCode** 查模板（登录 `user-sms-login`、改密
+`user-update-password`、忘记密码 `user-reset-password`），这些行全是删除态 → **任何场景都报
+「短信模板不存在」**。因此「短信已经配置好了」是误会：渠道建好了，但**场景模板断了**，
+与渠道绑定、与 `9999` 都无关。修法见 memory/sms-templates-unbound。
+
+> ⚠️ 本段此前写成「三个模板仍绑在渠道 4 `DEBUG_DING_TALK` 上」—— 那是因为 SQL 没带
+> `deleted` 条件、把软删除的行当成了在用。**软删除的行直查还在，应用查不到。**
 
 **真机验收 —— 显式声明「不验证」的部分**（宪法原则 V）：滑块在真机上的拖拽手感与容差、
 真实短信到达、以及生产开启验证码后的完整发码链路，**无法自动化**。本地 e2e 走的是

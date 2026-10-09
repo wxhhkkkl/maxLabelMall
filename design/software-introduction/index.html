@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MaxLabel 软件介绍页 · 设计预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #F0F4FB; color: #16233F; font-family: 'Microsoft YaHei', sans-serif; }
+    header { position: sticky; top: 0; z-index: 1; padding: 14px 24px; background: #FFFFFF; border-bottom: 1px solid #E3E9F4; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h1 { font-size: 16px; margin: 0; }
+    header p { color: #5B6C8F; font-size: 12px; margin: 6px 0 0; }
+    button { cursor: pointer; border: 1px solid #E3E9F4; border-radius: 8px; background: #F5F8FF; color: #2E7CD6; padding: 9px 14px; font: inherit; font-size: 12px; }
+    main { padding: 28px 16px 60px; }
+    img { display: block; width: min(100%, 1440px); height: auto; margin: auto; background: #FFFFFF; box-shadow: 0 16px 50px rgba(12,33,72,.08); }
+    body.actual main { overflow-x: auto; }
+    body.actual img { width: auto; max-width: none; }
+    @media (max-width: 600px) { header { padding: 12px 16px; } h1 { font-size: 14px; } main { padding: 16px 8px; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>MaxLabel 软件介绍页 · 第三版</h1><p>涂料数据绑定 · 涂料、服装、仓储三个应用示例</p></div><button type="button" id="zoom">查看原图</button></header>
+  <main><img src="software-introduction-v3.png" alt="MaxLabel 软件介绍页设计：朦胧软件预览显示敬请期待，涂料生产数据生成三种产品标签，最后展示涂料产品标、服装吊牌、仓储库位标"></main>
+  <script>document.querySelector('#zoom').addEventListener('click', function () { document.body.classList.toggle('actual'); this.textContent = document.body.classList.contains('actual') ? '适应窗口' : '查看原图'; });</script>
+</body>
+</html>

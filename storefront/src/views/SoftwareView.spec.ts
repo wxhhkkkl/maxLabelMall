@@ -1,42 +1,25 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
-
 import SoftwareView from './SoftwareView.vue'
 
-const router = createRouter({
-  history: createMemoryHistory(),
-  routes: [
-    { path: '/', component: { template: '<div/>' } },
-    { path: '/templates', component: { template: '<div/>' } },
-    { path: '/support', component: { template: '<div/>' } },
-    { path: '/account', component: { template: '<div/>' } },
-  ],
-})
-
-function mountView() {
-  return mount(SoftwareView, { global: { plugins: [router] } })
-}
-
-describe('SoftwareView —— 版本价格区暂时下线', () => {
-  /**
-   * 三档价格（¥0 / ¥199/年 / ¥899/年）与能力声明（「200 次打印/月」「无限次打印」）
-   * 都是**对外的报价与承诺**，业务方尚未确认。按所有者要求先把价格区换成一句
-   * 「马上上线，敬请期待」—— 与其展示了再改，不如等软件真正上线。
-   */
-  it('不再渲染三档价格卡', () => {
-    const w = mountView()
-    expect(w.find('.price-cards').exists()).toBe(false)
-    expect(w.findAll('.plan-card')).toHaveLength(0)
+describe('软件介绍页的开发中展示', () => {
+  it('突出主题并展示开发中状态，不提供未发布软件的试用与报价', () => {
+    const view = mount(SoftwareView)
+    expect(view.get('h1').text()).toBe('让标签设计极致简单')
+    expect(view.get('.preview-announcement').text()).toContain('敬请期待')
+    expect(view.get('.preview-announcement').text()).toContain('MaxLabel · 开发中')
+    expect(view.findAll('.plan-card, .price-cards, a[href*="download"]')).toHaveLength(0)
+    expect(view.text()).not.toMatch(/30 天|全平台|2,000|立即免费试用/)
   })
-
-  it('原位置改为「马上上线，敬请期待」', () => {
-    expect(mountView().text()).toContain('马上上线，敬请期待')
-  })
-
-  it('页面其余部分保留（hero 与「软件能做什么」不动）', () => {
-    const w = mountView()
-    expect(w.find('.sw-hero').exists()).toBe(true)
-    expect(w.text()).toContain('软件能做什么')
+  it('三份涂料数据与生成标签中的产品、色号和批次一致', () => {
+    const view = mount(SoftwareView)
+    const labels = view.findAll('.data-labels .coating-label')
+    const rows = view.findAll('tbody tr')
+    expect(rows).toHaveLength(3)
+    expect(labels).toHaveLength(3)
+    rows.forEach((row, index) => {
+      row.findAll('td').forEach((cell) => expect(labels[index]!.text()).toContain(cell.text()))
+    })
+    expect(view.findAll('.application-example img')).toHaveLength(3)
   })
 })

@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,6 +35,7 @@ const router = createRouter({
     { path: '/mall', component: { template: '<div/>' } },
     { path: '/software', component: { template: '<div/>' } },
     { path: '/solutions', component: { template: '<div/>' } },
+    { path: '/solutions/:industry', component: { template: '<div/>' } },
     { path: '/product/:id', component: { template: '<div/>' } },
     { path: '/templates', component: { template: '<div/>' } },
   ],
@@ -152,43 +150,26 @@ describe('HomeView —— 商品区用真实商品填充', () => {
   })
 })
 
-describe('HomeView —— 轮播用设计稿的结构', () => {
-  it('Hero 是 3 张幻灯片（与设计稿一致），并生成 3 个圆点', async () => {
+describe('HomeView —— 新版首页 Banner 与行业入口', () => {
+  it('首屏使用新主题与明确的商城、行业方案入口', async () => {
     const w = await mountHome()
-    expect(w.findAll('.hero .car-slide')).toHaveLength(3)
-    expect(w.findAll('.hero .car-dot')).toHaveLength(3)
+    expect(w.get('h1').text()).toBe('设计、打印与耗材一站解决')
+    expect(w.get('.home-banner-primary').attributes('href')).toBe('/mall')
+    expect(w.get('.home-banner-secondary').attributes('href')).toBe('/software')
+    expect(w.get('.home-banner-image').attributes('alt')).toBeTruthy()
   })
 
-  it('第一张是讲「标签耗材」的那张（商城导流放在首屏第一眼）', async () => {
+  it('三个实物行业入口分别指向对应行业详情', async () => {
     const w = await mountHome()
-    const first = w.findAll('.hero .car-slide')[0]!
-    expect(first.text()).toContain('标签耗材设备')
-    expect(first.text()).toContain('一站购齐更省心')
+    expect(w.findAll('.home-industry-card').map((card) => card.attributes('href'))).toEqual([
+      '/solutions/manufacturing', '/solutions/apparel', '/solutions/warehouse',
+    ])
+    expect(w.findAll('.home-industry-card img')).toHaveLength(3)
+    expect(w.get('.home-industry-all').attributes('href')).toBe('/solutions')
   })
 })
 
-describe('HomeView —— 首屏配图与小图标', () => {
-  /**
-   * 三张 Hero 配图由业务方 2026-10-08 提供，放在 `public/assets/`。
-   * 顺序与幻灯片内容**一一对应**（商城耗材 / 打印机 / 软件界面），
-   * 这里把文件名和顺序一起钉住 —— 换图或调顺序时这条会红。
-   */
-  it('三张幻灯片的配图是真实图片，且与各自的内容对应', async () => {
-    const w = await mountHome()
-    const visuals = w.findAll('.hero .hero-visual')
-    expect(visuals).toHaveLength(3)
-    expect(visuals.map((v) => v.attributes('src'))).toEqual([
-      '/assets/hero-mall.png',
-      '/assets/hero-printer.png',
-      '/assets/hero-software.png',
-    ])
-    // 占位块（div）换成了 img，且每张都有非空 alt
-    for (const v of visuals) {
-      expect(v.element.tagName).toBe('IMG')
-      expect(v.attributes('alt')?.trim()).toBeTruthy()
-    }
-  })
-
+describe('HomeView —— 保留原有功能与服务图标', () => {
   /**
    * 软件功能卡与服务支持卡的图标。设计稿（已删除，可回溯 git `9df135c3`）里
    * `.f-card` 与 `.s-card` 各有内联 SVG；实现时漏掉了，页面上只剩标题与正文。
@@ -207,52 +188,6 @@ describe('HomeView —— 首屏配图与小图标', () => {
     const cards = w.findAll('.s-card')
     expect(cards).toHaveLength(4)
     for (const c of cards) expect(c.find('svg').exists()).toBe(true)
-  })
-})
-
-describe('HomeView —— Hero 右侧小标签（设计稿三张都有）', () => {
-  /**
-   * 设计稿里三张幻灯片**都**带右侧玻璃小标签，实现时只做了第 2 张（打印机那张），
-   * 另外两张漏了 —— 2026-10-08 补齐。顺序与幻灯片一致：耗材 / 打印机 / 软件。
-   */
-  it('三张幻灯片各带 2 个小标签', async () => {
-    const w = await mountHome()
-    const slides = w.findAll('.hero .car-slide')
-    expect(slides).toHaveLength(3)
-    for (const [i, s] of slides.entries()) {
-      expect(s.findAll('.glass-chip'), `第 ${i + 1} 张幻灯片`).toHaveLength(2)
-    }
-  })
-
-  /**
-   * 设计稿的标签里有一个**报价**（¥12.9 /卷 起）和两个数字/效果承诺。
-   * 按 FR-056 一律走占位符，业务方确认前不得当作事实展示。
-   */
-  it('报价 / 数字 / 效果承诺类标签文案带 data-content-pending', async () => {
-    const w = await mountHome()
-    const flagged = w.findAll('.hero .glass-chip [data-content-pending]').map((e) => e.text())
-    expect(flagged).toContain('¥12.9 /卷 起')
-    expect(flagged).toContain('2,000+ 持续更新')
-    expect(flagged).toContain('效率提升 10 倍')
-  })
-
-  /**
-   * 门禁③ 的视图层：标签文案必须全部来自 `placeholders.ts`，
-   * 视图里不得再出现任何一句（第 2 张那两句原本是硬编码的）。
-   *
-   * ⚠️ 这里**只查标签专属的字符串**，没有把 HomeView 整个纳入门禁③ ——
-   * 这个视图里本来就散布着大量设计稿文案字面量（幻灯片标题/副标题、功能卡、行业卡…），
-   * 那是更大的一笔账，不在本次改动范围内。像「Excel 批量打印」这种**同时**出现在
-   * 第 3 张副标题和功能卡里的，就用它自己的断言去管，不算标签泄漏。
-   */
-  it('标签文案没有硬编码在视图里（门禁③）', () => {
-    // ⚠️ 不能用 `import.meta.url` + fileURLToPath —— jsdom 环境下它不是 file: 协议，
-    //    会抛 "The URL must be of scheme file"。照 design-consistency.spec.ts 的做法用 cwd。
-    const src = readFileSync(join(process.cwd(), 'src', 'views', 'HomeView.vue'), 'utf8')
-    for (const t of ['赋签 M3 Pro', 'MaxLabel 云标签', '双模高速 · 300dpi', '多端同步 · 批量打印',
-      '三防热敏纸', '蜡基碳带', '110mm×300m', '海量模板库', '¥12.9', '2,000+ 持续更新', '效率提升 10 倍']) {
-      expect(src, `视图里不该出现「${t}」`).not.toContain(t)
-    }
   })
 })
 

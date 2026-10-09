@@ -3,7 +3,8 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { listCategories } from '@/api/category'
 import { pageProducts, SORT_FIELD } from '@/api/product'
-import BaseCarousel from '@/components/BaseCarousel.vue'
+import HomeHero from '@/components/home/HomeHero.vue'
+import HomeIndustry from '@/components/home/HomeIndustry.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ProductCard from '@/components/ProductCard.vue'
@@ -13,7 +14,7 @@ import type { Category, ProductSpu } from '@/types'
 import { deriveBadges } from '@/utils/badge'
 
 /**
- * 首页 —— 按设计稿 `www/index.html` 还原，沿用其 class 名。
+ * 首页 —— Banner 与行业区采用新版设计，其余区域沿用现有布局。
  *
  * 商品区取**后台真实商品**：按销量降序，取几个由视口宽度决定 —— 超宽屏 6、其余 4
  * （FR-008，2026-10-07 修订）。销量全为 0 时后端会退化为默认排序，商品区仍有
@@ -30,8 +31,6 @@ const badges = ref<ReturnType<typeof deriveBadges>>({ hot: [], fresh: [] })
 const categories = ref<Category[]>([])
 const loading = ref(true)
 const error = ref(false)
-
-const HERO_COUNT = 3
 
 /**
  * 商品区取几个 —— **由视口宽度决定**（2026-10-07 所有者决策）：超宽屏 6 个、其余 4 个。
@@ -110,106 +109,47 @@ onBeforeUnmount(() => {
 
 /** 信任背书区的数字（全部来自占位符，业务方确认前不当作事实） */
 const trustStats = RENDERED.inheritedClaims.stats
-/** Hero 右侧小标签 —— 三张幻灯片各一组，索引与幻灯片顺序一一对应 */
-const heroChips = RENDERED.heroChips
 const partnerNames = RENDERED.inheritedClaims.partnerNames
 const testimonial = RENDERED.inheritedClaims.testimonial
 </script>
 
 <template>
-  <!-- Hero 首屏轮播（3 张，与设计稿一致）。
-       顺序按所有者要求调整：「标签耗材」那张（原第 2 张）提到第一张 —— 首屏第一眼
-       先看到商城导流。第 1、3 张的相对次序不变。 -->
-  <BaseCarousel class="hero" :count="HERO_COUNT">
-    <div class="car-slide hero-slide">
-      <div class="hero-left">
-        <div class="hero-badge">商城大促 · 耗材囤货季</div>
-        <h1 class="hero-title">标签耗材设备
-一站购齐更省心</h1>
-        <p class="hero-sub">热敏纸 / 铜版纸 / PET / 碳带 / 打印机 现货速发</p>
-        <div class="hero-cta">
-          <RouterLink class="btn-cyan" to="/mall">立即选购</RouterLink>
-          <RouterLink class="btn-ghost-white" to="/product/1">看看明星单品</RouterLink>
-        </div>
-      </div>
-      <div class="hero-right">
-        <img class="hero-visual" src="/assets/hero-mall.png" alt="赋签商城在售的标签打印机、热敏纸卷与碳带" />
-        <div class="hero-chips">
-          <div v-for="c in heroChips[0] ?? []" :key="c.title" class="glass-chip">
-            <PendingText tag="b" :value="c.title" />
-            <PendingText tag="span" :value="c.sub" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="car-slide hero-slide">
-      <div class="hero-left">
-        <div class="hero-badge">全新 MaxLabel 3.0 · 云标签时代</div>
-        <h1 class="hero-title">让每一枚标签
-都精准呈现</h1>
-        <p class="hero-sub">标签软件 · 打印机 · 标签耗材一站式商城，
-编辑、打印、管理从未如此简单</p>
-        <div class="hero-cta">
-          <RouterLink class="btn-cyan" to="/mall">进入商城选购</RouterLink>
-          <RouterLink class="btn-ghost-white" to="/software">免费使用标签软件</RouterLink>
-        </div>
-        <p class="trust-line">
-          已服务 <PendingText :value="trustStats[0]?.value ?? ''" /> 企业用户 ·
-          兼容 <PendingText :value="trustStats[2]?.value ?? ''" /> 打印机型号
-        </p>
-      </div>
-      <div class="hero-right">
-        <img class="hero-visual" src="/assets/hero-printer.png" alt="赋签标签打印机正在打印条码标签" />
-        <div class="hero-chips">
-          <div v-for="c in heroChips[1] ?? []" :key="c.title" class="glass-chip">
-            <PendingText tag="b" :value="c.title" />
-            <PendingText tag="span" :value="c.sub" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="car-slide hero-slide">
-      <div class="hero-left">
-        <div class="hero-badge">MaxLabel 3.0 · 免费下载</div>
-        <h1 class="hero-title">3 分钟上手
-标签设计如此简单</h1>
-        <p class="hero-sub">行业模板一键套用，Excel 批量打印，
-Windows / macOS / iOS / Android 全平台云同步</p>
-        <div class="hero-cta">
-          <RouterLink class="btn-cyan" to="/software">免费下载软件</RouterLink>
-          <RouterLink class="btn-ghost-white" to="/templates">浏览模板中心</RouterLink>
-        </div>
-      </div>
-      <div class="hero-right">
-        <img class="hero-visual" src="/assets/hero-software.png" alt="MaxLabel 标签编辑软件的编辑器界面" />
-        <div class="hero-chips">
-          <div v-for="c in heroChips[2] ?? []" :key="c.title" class="glass-chip">
-            <PendingText tag="b" :value="c.title" />
-            <PendingText tag="span" :value="c.sub" />
-          </div>
-        </div>
-      </div>
-    </div>
-  </BaseCarousel>
+  <HomeHero />
 
   <!-- 商城商品区：真实商品 -->
   <section class="mall">
     <div class="section-head">
       <div>
-        <h2 class="section-title">赋签商城 · 一站式购齐</h2>
-        <p class="section-desc">标签耗材 · 智能打印机 · 软件服务，一个商城全部搞定</p>
+        <h2 class="section-title">
+          赋签商城 · 一站式购齐
+        </h2>
+        <p class="section-desc">
+          标签耗材 · 智能打印机 · 软件服务，一个商城全部搞定
+        </p>
       </div>
       <div class="tabs">
-        <RouterLink class="tab active" to="/mall">全部</RouterLink>
-        <RouterLink v-for="c in categories.slice(0, 3)" :key="c.id" class="tab" :to="`/mall?categoryId=${c.id}`">
+        <RouterLink
+          class="tab active"
+          to="/mall"
+        >
+          全部
+        </RouterLink>
+        <RouterLink
+          v-for="c in categories.slice(0, 3)"
+          :key="c.id"
+          class="tab"
+          :to="`/mall?categoryId=${c.id}`"
+        >
           {{ c.name }}
         </RouterLink>
       </div>
     </div>
 
-    <LoadingState v-if="loading" variant="grid" :count="4" />
+    <LoadingState
+      v-if="loading"
+      variant="grid"
+      :count="4"
+    />
 
     <EmptyState
       v-else-if="error"
@@ -220,8 +160,16 @@ Windows / macOS / iOS / Android 全平台云同步</p>
       @action="loadAll"
     />
 
-    <div v-else-if="products.length" class="product-grid">
-      <ProductCard v-for="p in products" :key="p.id" :spu="p" :badge="badgeOf(p.id)" />
+    <div
+      v-else-if="products.length"
+      class="product-grid"
+    >
+      <ProductCard
+        v-for="p in products"
+        :key="p.id"
+        :spu="p"
+        :badge="badgeOf(p.id)"
+      />
     </div>
 
     <EmptyState
@@ -236,27 +184,121 @@ Windows / macOS / iOS / Android 全平台云同步</p>
   <!-- 软件功能特性（静态内容，还原设计稿） -->
   <section class="features">
     <div>
-      <h2 class="section-title" style="text-align: center">MaxLabel 标签编辑软件</h2>
-      <p class="section-desc">编辑变得如此简单 —— 软件免费下载，专业版按需订阅</p>
+      <h2
+        class="section-title"
+        style="text-align: center"
+      >
+        MaxLabel 标签编辑软件
+      </h2>
+      <p class="section-desc">
+        编辑变得如此简单 —— 软件免费下载，专业版按需订阅
+      </p>
     </div>
     <div class="f-grid">
       <div class="f-card">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="14" y="3" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="3" y="14" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /><rect x="14" y="14" width="7" height="7" rx="1" stroke="#6FC8FF" stroke-width="2" /></svg>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><rect
+          x="3"
+          y="3"
+          width="7"
+          height="7"
+          rx="1"
+          stroke="#6FC8FF"
+          stroke-width="2"
+        /><rect
+          x="14"
+          y="3"
+          width="7"
+          height="7"
+          rx="1"
+          stroke="#6FC8FF"
+          stroke-width="2"
+        /><rect
+          x="3"
+          y="14"
+          width="7"
+          height="7"
+          rx="1"
+          stroke="#6FC8FF"
+          stroke-width="2"
+        /><rect
+          x="14"
+          y="14"
+          width="7"
+          height="7"
+          rx="1"
+          stroke="#6FC8FF"
+          stroke-width="2"
+        /></svg>
         <h3>海量模板 · 一键套用</h3>
         <p>覆盖零售、物流、服装、烘焙等行业的精品模板，选好即改，改完即打。</p>
       </div>
       <div class="f-card">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9V3h12v6" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="3" y="9" width="18" height="8" rx="2" stroke="#6FC8FF" stroke-width="2" /><path d="M7 14h10v7H7z" stroke="#6FC8FF" stroke-width="2" stroke-linejoin="round" /></svg>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M6 9V3h12v6"
+          stroke="#6FC8FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /><rect
+          x="3"
+          y="9"
+          width="18"
+          height="8"
+          rx="2"
+          stroke="#6FC8FF"
+          stroke-width="2"
+        /><path
+          d="M7 14h10v7H7z"
+          stroke="#6FC8FF"
+          stroke-width="2"
+          stroke-linejoin="round"
+        /></svg>
         <h3>Excel 批量打印</h3>
         <p>导入 Excel / TXT 数据源，自动生成流水号与可变内容，批量打印效率大幅提升。</p>
       </div>
       <div class="f-card">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4 1.7A4 4 0 0 0 7 19h10.5z" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4 1.7A4 4 0 0 0 7 19h10.5z"
+          stroke="#6FC8FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /></svg>
         <h3>多端云同步</h3>
         <p>Windows / iOS / Android / Web 四端实时同步，换设备、重装系统标签数据永不丢失。</p>
       </div>
       <div class="f-card">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v4" stroke="#6FC8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v4"
+          stroke="#6FC8FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /></svg>
         <h3>主流打印机兼容</h3>
         <p>兼容市面主流桌面与便携打印机，支持 TSPL / CPCL / ESC-POS 标准指令集。</p>
       </div>
@@ -266,58 +308,44 @@ Windows / macOS / iOS / Android 全平台云同步</p>
   <!-- 三步使用流程（静态） -->
   <section class="steps">
     <div>
-      <h2 class="section-title" style="text-align: center">三步完成标签打印</h2>
-      <p class="section-desc">从模板到成稿，全程不超过 5 分钟</p>
+      <h2
+        class="section-title"
+        style="text-align: center"
+      >
+        三步完成标签打印
+      </h2>
+      <p class="section-desc">
+        从模板到成稿，全程不超过 5 分钟
+      </p>
     </div>
     <div class="steps-row">
       <div class="step-card">
-        <div class="step-num">1</div>
+        <div class="step-num">
+          1
+        </div>
         <h3>选择模板</h3>
         <p>从模板库中挑选，或从空白画布开始创作</p>
       </div>
       <span class="step-arrow">→</span>
       <div class="step-card">
-        <div class="step-num">2</div>
+        <div class="step-num">
+          2
+        </div>
         <h3>拖拽编辑</h3>
         <p>文字、条码、二维码、表格自由排版，所见即所得</p>
       </div>
       <span class="step-arrow">→</span>
       <div class="step-card">
-        <div class="step-num">3</div>
+        <div class="step-num">
+          3
+        </div>
         <h3>连接打印</h3>
         <p>一键连接打印机，即点即打</p>
       </div>
     </div>
   </section>
 
-  <!-- 行业解决方案（静态） -->
-  <section class="industry">
-    <div>
-      <h2 class="section-title" style="text-align: center">行业标签方案</h2>
-      <p class="section-desc">为每一个行业打磨专属的标签打印与管理方案</p>
-    </div>
-    <div class="i-grid">
-      <div class="i-card">
-        <div class="i-icon c1">仓</div>
-        <h3>仓储物流</h3>
-        <p>标签协同 + 自动箱单 + 称重测体，出入库效率显著提升</p>
-        <RouterLink class="i-link" to="/solutions">查看方案 →</RouterLink>
-      </div>
-      <div class="i-card">
-        <div class="i-icon c2">产</div>
-        <h3>生产制造</h3>
-        <p>上下游生产链标签协同，批次追溯不出错、不遗漏</p>
-        <RouterLink class="i-link" to="/solutions">查看方案 →</RouterLink>
-      </div>
-      <div class="i-card">
-        <div class="i-icon c3">服</div>
-        <h3>服装行业</h3>
-        <p>吊牌水洗标快速替换，扫码即可批量改写标签内容</p>
-        <RouterLink class="i-link" to="/solutions">查看方案 →</RouterLink>
-      </div>
-    </div>
-    <RouterLink class="more-link" to="/solutions">查看全部行业方案 →</RouterLink>
-  </section>
+  <HomeIndustry />
 
   <!--
     信任背书 —— 这里的数字、公司名与客户证言**全部是未确认的业务声明**，
@@ -326,47 +354,138 @@ Windows / macOS / iOS / Android 全平台云同步</p>
   -->
   <section class="trust">
     <div class="stats-row">
-      <div v-for="s in trustStats" :key="s.label" class="stat">
-        <div class="stat-num"><PendingText :value="s.value" /></div>
-        <div class="stat-label"><PendingText :value="s.label" /></div>
+      <div
+        v-for="s in trustStats"
+        :key="s.label"
+        class="stat"
+      >
+        <div class="stat-num">
+          <PendingText :value="s.value" />
+        </div>
+        <div class="stat-label">
+          <PendingText :value="s.label" />
+        </div>
       </div>
     </div>
 
     <div class="quote">
-      <p class="quote-text"><PendingText :value="testimonial.text" /></p>
-      <p class="quote-author">—— <PendingText :value="testimonial.author" /></p>
+      <p class="quote-text">
+        <PendingText :value="testimonial.text" />
+      </p>
+      <p class="quote-author">
+        —— <PendingText :value="testimonial.author" />
+      </p>
     </div>
 
-    <p class="partner-label">他们都在使用赋签</p>
+    <p class="partner-label">
+      他们都在使用赋签
+    </p>
     <div class="logo-row">
-      <PendingText v-for="n in partnerNames" :key="n" tag="span" :value="n" />
+      <PendingText
+        v-for="n in partnerNames"
+        :key="n"
+        tag="span"
+        :value="n"
+      />
     </div>
   </section>
 
   <!-- 服务支持（静态） -->
   <section class="support-home">
     <div>
-      <h2 class="section-title" style="text-align: center">全程护航的售后服务</h2>
-      <p class="section-desc">购买只是开始，赋签为每一次打印保驾护航</p>
+      <h2
+        class="section-title"
+        style="text-align: center"
+      >
+        全程护航的售后服务
+      </h2>
+      <p class="section-desc">
+        购买只是开始，赋签为每一次打印保驾护航
+      </p>
     </div>
     <div class="s-grid">
       <div class="s-card">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M4 13v3a3 3 0 0 0 3 3h1v-6H7a3 3 0 0 0-3 3z" fill="#1B66FF" /></svg>
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M4 13a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2"
+          stroke="#1B66FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /><path
+          d="M4 13v3a3 3 0 0 0 3 3h1v-6H7a3 3 0 0 0-3 3z"
+          fill="#1B66FF"
+        /></svg>
         <h3>7×12 在线客服</h3>
         <p>工作日 9:00-21:00 随时响应打印问题</p>
       </div>
       <div class="s-card">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M12 3v12m0 0l-4-4m4 4l4-4"
+          stroke="#1B66FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /><path
+          d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+          stroke="#1B66FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /></svg>
         <h3>驱动与手册下载</h3>
         <p>全型号驱动 · 快速指南，持续更新一键获取</p>
       </div>
       <div class="s-card">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="#1B66FF" stroke-width="2" /><path d="M10 8.5l6 3.5-6 3.5v-7z" fill="#1B66FF" /></svg>
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><circle
+          cx="12"
+          cy="12"
+          r="9"
+          stroke="#1B66FF"
+          stroke-width="2"
+        /><path
+          d="M10 8.5l6 3.5-6 3.5v-7z"
+          fill="#1B66FF"
+        /></svg>
         <h3>视频教程学院</h3>
         <p>从入门到进阶，手把手教你玩转标签</p>
       </div>
       <div class="s-card">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z" stroke="#1B66FF" stroke-width="2" stroke-linejoin="round" /><path d="M9 12l2 2 4-4" stroke="#1B66FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        ><path
+          d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"
+          stroke="#1B66FF"
+          stroke-width="2"
+          stroke-linejoin="round"
+        /><path
+          d="M9 12l2 2 4-4"
+          stroke="#1B66FF"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        /></svg>
         <h3>整机一年质保</h3>
         <p>打印机整机质保一年，耗材支持无理由退换</p>
       </div>
@@ -375,8 +494,17 @@ Windows / macOS / iOS / Android 全平台云同步</p>
 
   <!-- 底部 CTA -->
   <section class="final-cta">
-    <h2 class="cta-title">开启高效标签打印之旅</h2>
-    <p class="cta-sub">免费注册 · 商城下单更便捷</p>
-    <RouterLink class="cta-btn" to="/software">立即免费试用</RouterLink>
+    <h2 class="cta-title">
+      开启高效标签打印之旅
+    </h2>
+    <p class="cta-sub">
+      免费注册 · 商城下单更便捷
+    </p>
+    <RouterLink
+      class="cta-btn"
+      to="/software"
+    >
+      立即免费试用
+    </RouterLink>
   </section>
 </template>

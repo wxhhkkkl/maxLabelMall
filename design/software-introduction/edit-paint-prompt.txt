@@ -1,0 +1,12 @@
+Edit the attached COMPLETE MaxLabel software introduction webpage mockup. It is the edit target. Make ONE localized change only: replace the CROISSANT product photo and floating croissant label within the LEFT visual of the middle pale-blue rounded feature section titled "设计体验" / "把想法，放到标签上" (the block below the three small feature summaries and above the spreadsheet-to-label block).
+
+Replace that left visual with a premium, photorealistic WATER-BASED INDUSTRIAL COATINGS MANUFACTURER label-design application scene. Show a clean white 20 kg metal or plastic paint pail with a blue lid/blue restrained accent on a tidy light industrial production counter, slightly out of focus in background. Keep the blurred desktop label-editor preview in the background to indicate software still in development. In foreground, show a sharply focused matte-white rectangular batch/product label, tasteful navy/black typography, simple barcode, exact sparse Chinese text:
+"水性工业涂料"
+"型号  WX-210"
+"色号  RAL 7035"
+"批次  TL-001"
+"净含量  20 kg"
+Barcode with small example code "TL-001".
+No croissant photograph, bread illustration or food references remain in THIS LEFT FEATURE VISUAL. The paint pail must feel realistic and specific to coatings production, clean manufacturing context, not house decoration, not a painter or colorful paint splash. Keep the small "界面预览 · 开发中" badge. Crisp product label, softly blurred unfinished software behind. Existing pale blue/navy/white color harmony, realistic restrained lighting. Ensure the new label fully fits within this image block and looks like a real production label.
+
+Preserve EVERYTHING ELSE as closely as possible: same canvas size and full-page structure, identical header, giant hero heading "让标签设计 / 极致简单", original intentionally blurred hero software preview and crisp "敬请期待" overlay, feature summary row, the RIGHT text and blue accents in the target feature section, the spreadsheet/bread-label section BELOW, the three bottom label photographs, final teaser and navy footer, all spacing and typography. Do not redesign or regenerate other sections, do not change the content of the lower spreadsheet or lower photo gallery. Local replacement of the one middle left visual only. No new claims, logos, certification symbols or warnings.

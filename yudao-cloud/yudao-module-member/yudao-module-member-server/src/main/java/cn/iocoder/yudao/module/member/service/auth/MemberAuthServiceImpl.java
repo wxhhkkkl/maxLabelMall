@@ -10,6 +10,8 @@ import cn.iocoder.yudao.module.member.controller.app.auth.vo.*;
 import cn.iocoder.yudao.module.member.convert.auth.AuthConvert;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
+import cn.iocoder.yudao.module.system.api.captcha.CaptchaApi;
+import cn.iocoder.yudao.module.system.api.captcha.dto.CaptchaVerificationReqDTO;
 import cn.iocoder.yudao.module.system.api.logger.LoginLogApi;
 import cn.iocoder.yudao.module.system.api.logger.dto.LoginLogCreateReqDTO;
 import cn.iocoder.yudao.framework.common.biz.system.oauth2.OAuth2TokenCommonApi;
@@ -51,6 +53,8 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     private MemberUserService userService;
     @Resource
     private SmsCodeApi smsCodeApi;
+    @Resource
+    private CaptchaApi captchaApi;
     @Resource
     private LoginLogApi loginLogApi;
     @Resource
@@ -228,6 +232,15 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
     @Override
     public void sendSmsCode(Long userId, AppAuthSmsSendReqVO reqVO) {
+        // 图形验证码闸门：**发短信之前**先过。短信是真金白银，这个闸门就是用来挡
+        // 「脚本刷短信」的，所以必须卡在这一步，而不是提交登录时再校验。
+        // 开关关闭时 CaptchaApi 自己返回 true（放行），本模块不必知道开关的存在 ——
+        // 判定只在一处，不会出现「前端弹了滑块、后端没校验」这类错配。
+        CaptchaVerificationReqDTO captchaReqDTO = new CaptchaVerificationReqDTO();
+        captchaReqDTO.setCaptchaVerification(reqVO.getCaptchaVerification());
+        if (!Boolean.TRUE.equals(captchaApi.verification(captchaReqDTO).getCheckedData())) {
+            throw exception(AUTH_SMS_CAPTCHA_ERROR);
+        }
         // 情况 1：如果是修改手机场景，需要校验新手机号是否已经注册，说明不能使用该手机了
         if (Objects.equals(reqVO.getScene(), SmsSceneEnum.MEMBER_UPDATE_MOBILE.getScene())) {
             MemberUserDO user = userService.getUserByMobile(reqVO.getMobile());

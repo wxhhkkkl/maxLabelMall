@@ -21,6 +21,7 @@ public interface ErrorCodeConstants {
     ErrorCode AUTH_LOGIN_USER_DISABLED = new ErrorCode(1_004_003_001, "登录失败，账号被禁用");
     ErrorCode AUTH_SOCIAL_USER_NOT_FOUND = new ErrorCode(1_004_003_005, "登录失败，解析不到三方登录信息");
     ErrorCode AUTH_MOBILE_USED = new ErrorCode(1_004_003_007, "手机号已经被使用");
+    ErrorCode AUTH_SMS_CAPTCHA_ERROR = new ErrorCode(1_004_003_008, "图形验证码校验未通过，请重新验证");
 
     // ========== 用户收件地址 1-004-004-000 ==========
     ErrorCode ADDRESS_NOT_EXISTS = new ErrorCode(1_004_004_000, "用户收件地址不存在");

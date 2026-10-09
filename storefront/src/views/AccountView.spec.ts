@@ -11,8 +11,21 @@ vi.mock('@/api/member', () => ({
   sendSmsCode: (...a: unknown[]) => sendSmsCode(...a),
   getMemberUser: (...a: unknown[]) => getMemberUser(...a),
   logout: vi.fn().mockResolvedValue(true),
+  resetPassword: vi.fn(),
   SMS_SCENE_MEMBER_LOGIN: 1,
   SMS_SCENE_UPDATE_PASSWORD: 3,
+  SMS_SCENE_RESET_PASSWORD: 4,
+}))
+
+// 图形验证码：默认关闭（与本地开发一致）→ 既有断言一字不变
+const isCaptchaEnabled = vi.fn()
+const getCaptcha = vi.fn()
+const checkCaptcha = vi.fn()
+vi.mock('@/api/captcha', () => ({
+  CAPTCHA_TYPE_SLIDE: 'blockPuzzle',
+  isCaptchaEnabled: (...a: unknown[]) => isCaptchaEnabled(...a),
+  getCaptcha: (...a: unknown[]) => getCaptcha(...a),
+  checkCaptcha: (...a: unknown[]) => checkCaptcha(...a),
 }))
 
 import AccountView from './AccountView.vue'
@@ -48,6 +61,17 @@ beforeEach(async () => {
   getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888' })
   const { setTokens } = await import('@/utils/auth')
   setTokens('at-1', 'rt-1')
+  isCaptchaEnabled.mockReset()
+  isCaptchaEnabled.mockResolvedValue(false)
+  getCaptcha.mockReset()
+  getCaptcha.mockResolvedValue({
+    originalImageBase64: 'BG',
+    jigsawImageBase64: 'PIECE',
+    token: 'tk-1',
+    secretKey: 'Iir1lkUSLYB43kaG',
+  })
+  checkCaptcha.mockReset()
+  checkCaptcha.mockResolvedValue({ success: true, msg: null })
   await router.push('/account')
 })
 
@@ -124,5 +148,52 @@ describe('AccountView —— 设置密码（FR-011）', () => {
 
     const w = await mountView()
     expect(w.get('#getPasswordCodeBtn').attributes('disabled')).toBeDefined()
+  })
+})
+
+/**
+ * 改密发码前的图形验证码闸门（与登录弹层同一口径：开关由服务端给）。
+ */
+describe('AccountView —— 改密发码前先过滑块', () => {
+  it('开关关闭时直接发码，不弹滑块（既有行为不变）', async () => {
+    const w = await mountView()
+    await w.get('#getPasswordCodeBtn').trigger('click')
+    await flushPromises()
+    expect(w.find('#captchaSlider').exists()).toBe(false)
+    expect(sendSmsCode).toHaveBeenCalledWith('13800008888', 3)
+  })
+
+  it('开关开启时先弹滑块，且**此时不发短信**', async () => {
+    isCaptchaEnabled.mockResolvedValue(true)
+    const w = await mountView()
+    await w.get('#getPasswordCodeBtn').trigger('click')
+    await flushPromises()
+    expect(w.find('#captchaSlider').exists()).toBe(true)
+    expect(sendSmsCode).not.toHaveBeenCalled()
+  })
+
+  it('**滑块通过后才发码，并把凭据带上**', async () => {
+    isCaptchaEnabled.mockResolvedValue(true)
+    const w = await mountView()
+    await w.get('#getPasswordCodeBtn').trigger('click')
+    await flushPromises()
+
+    w.findComponent({ name: 'CaptchaSlider' }).vm.$emit('success', 'the-verification')
+    await flushPromises()
+
+    expect(sendSmsCode).toHaveBeenCalledWith('13800008888', 3, 'the-verification')
+    expect(w.find('#captchaSlider').exists()).toBe(false)
+  })
+
+  it('关掉滑块不发音 —— 不能绕过闸门拿到短信', async () => {
+    isCaptchaEnabled.mockResolvedValue(true)
+    const w = await mountView()
+    await w.get('#getPasswordCodeBtn').trigger('click')
+    await flushPromises()
+
+    w.findComponent({ name: 'CaptchaSlider' }).vm.$emit('close')
+    await flushPromises()
+
+    expect(sendSmsCode).not.toHaveBeenCalled()
   })
 })

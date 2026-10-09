@@ -21,4 +21,15 @@ public class AppAuthSmsSendReqVO {
     @InEnum(SmsSceneEnum.class)
     private Integer scene;
 
+    /**
+     * 滑块验证码通过后拿到的凭据。
+     *
+     * ⚠️ **刻意不加 `@NotEmpty`**：验证码开关（`yudao.captcha.enable`）关闭时前端不传，
+     * 这时应当照常发码。开关的判定统一在 `CaptchaApi#verification` 里做一处 ——
+     * 由它返回 false 时本接口才拒绝，这样不会出现「前端弹了滑块、后端没校验」或
+     * 「后端要校验、前端没传」的错配。
+     */
+    @Schema(description = "图形验证码凭据，验证码开启时必传", example = "Xl5mX3nQ...")
+    private String captchaVerification;
+
 }

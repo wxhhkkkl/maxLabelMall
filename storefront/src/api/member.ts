@@ -22,6 +22,9 @@ export const SMS_SCENE_MEMBER_LOGIN = 1
 /** 短信场景：3 = 修改密码（后端 SmsSceneEnum.MEMBER_UPDATE_PASSWORD） */
 export const SMS_SCENE_UPDATE_PASSWORD = 3
 
+/** 短信场景：4 = 忘记密码（后端 SmsSceneEnum.MEMBER_RESET_PASSWORD） */
+export const SMS_SCENE_RESET_PASSWORD = 4
+
 /**
  * ⚠️ **令牌落盘是本模块的责任，不是调用方的。**
  *
@@ -48,9 +51,26 @@ export async function smsLogin(mobile: string, code: string): Promise<AuthLoginR
   return persistLogin(await post<AuthLoginResp>('/member/auth/sms-login', { mobile, code }))
 }
 
-/** 发送验证码 */
-export function sendSmsCode(mobile: string, scene = SMS_SCENE_MEMBER_LOGIN): Promise<boolean> {
-  return post<boolean>('/member/auth/send-sms-code', { mobile, scene })
+/**
+ * 发送验证码。
+ *
+ * `captchaVerification` 是**滑块通过后**拿到的凭据（见 `@/api/captcha`）。
+ * 服务端在 `MemberAuthServiceImpl.sendSmsCode` 的第一步就校验它 —— 短信是真金白银，
+ * 这道闸门就是为了挡脚本刷短信。
+ *
+ * ⚠️ **没传时不能把 `captchaVerification: undefined` 放进 body**：验证码开关关闭时
+ * （本地开发 / e2e）前端根本不传它，body 必须与从前一字不差。
+ */
+export function sendSmsCode(
+  mobile: string,
+  scene = SMS_SCENE_MEMBER_LOGIN,
+  captchaVerification?: string,
+): Promise<boolean> {
+  const body: { mobile: string; scene: number; captchaVerification?: string } = { mobile, scene }
+  if (captchaVerification) {
+    body.captchaVerification = captchaVerification
+  }
+  return post<boolean>('/member/auth/send-sms-code', body)
 }
 
 /** 登出（后端会作废当前令牌） */
@@ -76,4 +96,19 @@ export function getMemberUser(): Promise<MemberUser> {
  */
 export function updatePassword(password: string, code: string): Promise<boolean> {
   return put<boolean>('/member/user/update-password', { password, code })
+}
+
+/**
+ * 忘记密码（**未登录**可用，后端 `@PermitAll`）。
+ *
+ * 与 {@link updatePassword} 是两个接口，别混：
+ *   · 这个传 `mobile`（用户自己填），走 scene 4；
+ *   · 改密那个从登录态取手机号，走 scene 3。
+ *
+ * 后端的错误是**可区分**的：「手机号未注册用户」与「验证码不正确」文案不同，
+ * 调用方直接透出即可（不像密码登录那样必须收敛文案 —— 这里本来就要用户
+ * 确认手机号是不是自己注册过的那个）。
+ */
+export function resetPassword(mobile: string, code: string, password: string): Promise<boolean> {
+  return put<boolean>('/member/user/reset-password', { password, code, mobile })
 }

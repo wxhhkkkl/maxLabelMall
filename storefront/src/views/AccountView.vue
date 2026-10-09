@@ -2,8 +2,10 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { isCaptchaEnabled } from '@/api/captcha'
 import { sendSmsCode, SMS_SCENE_UPDATE_PASSWORD, updatePassword } from '@/api/member'
 import AccountSidebar from '@/components/AccountSidebar.vue'
+import CaptchaSlider from '@/components/CaptchaSlider.vue'
 import MlField from '@/components/base/MlField.vue'
 import { useUserStore } from '@/store/user'
 
@@ -30,6 +32,8 @@ const codeError = ref('')
 const ok = ref('')
 const submitting = ref(false)
 const countdown = ref(0)
+/** 滑块弹层开关（发短信前的那道闸门） */
+const captchaOpen = ref(false)
 
 const MIN_LEN = 6
 
@@ -62,17 +66,42 @@ watch(
   },
 )
 
+/**
+ * 点「获取验证码」。
+ *
+ * 与登录弹层同一道闸门：发短信前先过图形验证码（开关由**服务端**给，
+ * 关着时直接发，不弹滑块）。
+ */
 async function onGetCode() {
   if (!canGetCode.value) return
   codeError.value = ''
+  if (await isCaptchaEnabled()) {
+    captchaOpen.value = true
+    return
+  }
+  await doSendCode()
+}
+
+/** 真正发短信。没凭据时**不传第三个参数**（与 `@/api/member` 的 body 处理一致） */
+async function doSendCode(captchaVerification?: string) {
   try {
-    await sendSmsCode(mobile.value, SMS_SCENE_UPDATE_PASSWORD)
+    if (captchaVerification) {
+      await sendSmsCode(mobile.value, SMS_SCENE_UPDATE_PASSWORD, captchaVerification)
+    } else {
+      await sendSmsCode(mobile.value, SMS_SCENE_UPDATE_PASSWORD)
+    }
     startCountdown()
   } catch (e) {
     // 频率限制要告知还需等待多久，而不是笼统报错（FR-010b 的同一条口径）
     const raw = (e as { message?: string })?.message || '验证码发送失败，请稍后重试'
     codeError.value = /频繁|频率|过于/.test(raw) ? raw : `验证码发送失败：${raw}`
   }
+}
+
+/** 滑块通过 → 关上弹层，带上凭据继续发码 */
+async function onCaptchaPassed(verification: string) {
+  captchaOpen.value = false
+  await doSendCode(verification)
 }
 
 async function onSetPassword() {
@@ -215,6 +244,9 @@ async function onLogout() {
         <button class="btn-cart" type="button" @click="onLogout">退出登录</button>
       </div>
     </div>
+
+    <!-- 发短信前的图形验证码闸门（开关由服务端决定，关着时不会被打开） -->
+    <CaptchaSlider :open="captchaOpen" @close="captchaOpen = false" @success="onCaptchaPassed" />
   </div>
 </template>
 

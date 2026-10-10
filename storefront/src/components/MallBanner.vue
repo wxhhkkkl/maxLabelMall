@@ -55,23 +55,35 @@ defineProps<{ banners: Banner[] }>()
 </template>
 
 <style scoped>
-/* 横幅高度固定，图片按容器裁切 —— 图挂了或尺寸不对也不会把商品列表挤下去 */
-.mbn-item {
-  display: block;
-}
-.mbn-link {
-  display: block;
-}
-.mbn-img {
-  display: block;
-  width: 100%;
-  height: 220px;
-  object-fit: cover;
+/*
+  横幅图片的尺寸：**高度由图片自己的比例决定**（height: auto）。
+
+  ⚠️ 不要给横幅图片钉死高度。第一版是「height: 220px + object-fit: cover」，
+  而 `cover` 的含义是"等比放大到填满容器、溢出的裁掉"，后果两条：
+    · 窄屏时左右被切 → **图片最左边的文字看不到**；
+    · 源图比容器小时被放大 → **模糊**（运营传了张小图就特别明显）。
+  `width: 100%; height: auto` 则既不裁、也不为了填满而拉伸。
+
+  代价说清楚：多张横幅且**比例不一致**时，容器高度取最高的那张，矮的那张下方会留白。
+  这是刻意的取舍 —— 留白只是不好看，裁掉/糊掉是**内容丢失**。
+  想让它整齐，运营按统一比例传图即可（建议宽度 ≥ 1200px、约 5:1）。
+*/
+
+/* 容器高度跟着图片走。design.css 给 .mall-banner 定死了 220px ——
+   那是为**文字型**横幅写的（里面没有图片可裁），图片型必须放开 */
+.mall-banner {
+  height: auto;
 }
 
-@media (max-width: 768px) {
-  .mbn-img {
-    height: 150px;
-  }
+.mbn-item,
+.mbn-link,
+.mbn-img {
+  display: block;
+}
+
+.mbn-img {
+  width: 100%;
+  /* 关键：不要写死像素值，见上方注释 */
+  height: auto;
 }
 </style>

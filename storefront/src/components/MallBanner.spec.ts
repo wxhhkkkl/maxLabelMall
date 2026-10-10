@@ -77,3 +77,31 @@ describe('MallBanner —— 跳转（FR-083）', () => {
     expect(w.findAll('.mbn-link')).toHaveLength(1)
   })
 })
+
+/**
+ * 横幅图片的尺寸契约（缺陷修复，2026-10-10）。
+ *
+ * ⚠️ **绝对不要给横幅图片钉死高度**。第一版写的是 `height: 220px; object-fit: cover`
+ * —— `cover` 的意思是"等比放大到填满容器、溢出的裁掉"，于是：
+ *   · 窄屏时左右被切掉 → **图片最左边的文字看不到**；
+ *   · 源图比容器小时被放大 → **模糊**（运营传了张 logo 就特别明显）。
+ *
+ * 正确做法是 `width: 100%; height: auto`：高度由**图片自己的比例**决定，
+ * 既不会裁、也不会为了填满而拉伸。
+ *
+ * jsdom 没有排版引擎，测不了"到底裁没裁"；所以这里钉的是**样式契约**本身 ——
+ * 与 `styles/design-consistency.spec.ts` 读样式文本做断言是同一套做法。
+ */
+describe('MallBanner —— 图片尺寸不得写死', () => {
+  it('`.mbn-img` 的 height 必须是 auto，不能是固定像素', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const src = readFileSync(join(process.cwd(), 'src', 'components', 'MallBanner.vue'), 'utf8')
+    const style = src.slice(src.indexOf('<style'))
+
+    // `height: 220px` / `height: 150px` 都会命中；`height: auto` 不会
+    expect(style).not.toMatch(/\.mbn-img[^}]*height:\s*\d+px/)
+    // 反面断言：确实声明了 height: auto（防止把整条规则删掉也算"通过"）
+    expect(style).toMatch(/\.mbn-img[^}]*height:\s*auto/)
+  })
+})

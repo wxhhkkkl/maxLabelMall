@@ -70,28 +70,27 @@ onMounted(load)
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
-    <RouterLink to="/">首页</RouterLink> / <span>我的券</span>
-  </div>
-
-  <div class="ml-page-head">
-    <h1 class="ml-page-title">我的券</h1>
-    <p class="ml-page-sub">
-      结算时可选用未使用的券。
-      <RouterLink class="mc-center" to="/coupon">去领券中心 ›</RouterLink>
-    </p>
+    <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> / <span>我的券</span>
   </div>
 
   <div class="account-wrap">
     <AccountSidebar />
     <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
-    <div class="account-main">
-      <div class="cat-pills">
+    <div class="account-main account-section-main">
+      <div class="account-page-heading">
+        <div><h1>我的券</h1><p>查看优惠券与使用记录，结算时按需选用。</p></div>
+        <RouterLink class="account-heading-link" to="/coupon">去领券中心 <span aria-hidden="true">→</span></RouterLink>
+      </div>
+      <div class="account-content-card account-coupon-content">
+      <div class="cat-pills account-tabs" aria-label="优惠券状态">
         <button
           v-for="t in TABS"
           :key="t.status"
           class="tab"
           :class="{ active: active === t.status }"
+          :aria-pressed="active === t.status"
           type="button"
           @click="onPick(t.status)"
         >
@@ -118,8 +117,8 @@ onMounted(load)
         @action="$router.push('/coupon')"
       />
 
-      <div v-else class="grid-3 mc-grid">
-        <div v-for="c in coupons" :key="c.id" class="mc-card">
+      <div v-else class="grid-3 mc-grid account-coupon-grid">
+        <div v-for="c in coupons" :key="c.id" class="mc-card" :class="{ 'is-inactive': c.status !== 1 }">
           <div class="mc-amount">
             <span class="mc-num">{{ couponAmountText(c) }}</span>
             <span class="mc-thresh">{{ couponThresholdText(c) }}</span>
@@ -135,73 +134,10 @@ onMounted(load)
           <span v-else class="mc-status">{{ STATUS_TEXT[c.status] }}</span>
         </div>
       </div>
+      </div>
     </div>
+  </div>
   </div>
 </template>
 
-<style scoped>
-.mc-grid {
-  align-items: start;
-}
-.mc-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-  border: 1px solid var(--ml-border);
-  border-radius: var(--ml-radius-card);
-  padding: 18px;
-}
-.mc-amount {
-  background: #eaf1ff;
-  border-radius: var(--ml-radius-field);
-  padding: 14px 16px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.mc-num {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2e7cd6;
-  font-variant-numeric: tabular-nums;
-}
-.mc-thresh {
-  font-size: 13px;
-  color: #2e7cd6;
-}
-.mc-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ml-text);
-}
-.mc-valid {
-  font-size: 13px;
-  color: var(--ml-text-sub);
-  margin-top: 6px;
-}
-.mc-use {
-  align-self: flex-start;
-}
-.mc-status {
-  align-self: flex-start;
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: #f0f4fb;
-  color: var(--ml-text-ph);
-  font-size: 14px;
-}
-.mc-center {
-  color: var(--ml-primary);
-}
-@media (max-width: 1100px) {
-  .mc-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 768px) {
-  .mc-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
+<!-- Coupon cards use the shared account styles in store.css. -->

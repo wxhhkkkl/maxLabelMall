@@ -77,18 +77,21 @@ onMounted(load)
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
-    <RouterLink to="/">首页</RouterLink><span>/ 收货地址</span>
-  </div>
-
-  <div class="ml-page-head">
-    <h1 class="ml-page-title">收货地址</h1>
+    <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> / <span>收货地址</span>
   </div>
 
   <div class="account-wrap">
     <AccountSidebar />
     <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
-    <div class="account-main">
+    <div class="account-main account-section-main">
+      <div class="account-page-heading">
+        <div><h1>收货地址</h1><p>管理常用地址，让每次下单更省心。</p></div>
+        <button id="addAddress" class="account-primary-button" type="button" @click="openCreate">新增地址</button>
+      </div>
+      <div class="account-content-card">
+      <div class="account-section-heading"><h2>地址管理</h2><span v-if="!loading && !error">共 {{ list.length }} 个地址</span></div>
       <LoadingState v-if="loading" :count="2" />
 
       <EmptyState
@@ -102,7 +105,7 @@ onMounted(load)
 
       <template v-else>
         <div v-if="list.length" class="addr-list">
-          <div v-for="a in list" :key="a.id" class="ml-card addr-card">
+          <div v-for="a in list" :key="a.id" class="ml-card addr-card" :class="{ 'is-default': a.defaultStatus }">
             <div class="addr-head">
               <span class="addr-name">{{ a.name }}</span>
               <span class="addr-mobile">{{ a.mobile }}</span>
@@ -128,16 +131,8 @@ onMounted(load)
           @action="openCreate"
         />
 
-        <button
-          v-if="list.length"
-          id="addAddress"
-          class="btn-cyan addr-add"
-          type="button"
-          @click="openCreate"
-        >
-          新增地址
-        </button>
       </template>
+      </div>
 
       <!-- 新增 / 编辑弹层（共用组件；结算页也用同一个） -->
       <AddressFormDialog
@@ -148,19 +143,25 @@ onMounted(load)
       />
     </div>
   </div>
+  </div>
 </template>
 
 <style scoped>
 .addr-list {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+  margin-top: 24px;
 }
+.addr-list .addr-card { margin: 0; padding: 24px; border-radius: 12px; }
+.addr-card.is-default { border-color: #B4C0D8; background: #F5F8FF; }
 .addr-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
+.addr-head .ml-pill { margin-left: auto; background: #EAF1FF; color: var(--ml-primary); }
 .addr-name {
   font-size: 16px;
   font-weight: 600;
@@ -173,17 +174,26 @@ onMounted(load)
 .addr-detail {
   font-size: 14px;
   color: var(--ml-text-sub);
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
+.addr-name { overflow-wrap: anywhere; }
 .addr-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .addr-actions .btn-cart {
-  padding: 4px 12px;
+  padding: 8px 16px;
   font-size: 13px;
+  width: auto;
 }
-.addr-add {
-  margin-top: 16px;
+@media (max-width: 480px) {
+  .addr-list .addr-card { padding: 20px 16px; }
+  .addr-mobile { font-size: 13px; }
+  .addr-detail { font-size: 13px; }
+  .addr-actions { gap: 8px; }
+  .addr-actions .btn-cart { padding: 8px 12px; font-size: 12px; }
 }
 </style>

@@ -13,6 +13,7 @@ vi.mock('@/api/member', () => ({
 }))
 
 import PointsRecordView from './PointsRecordView.vue'
+import { getMemberUser } from '@/api/member'
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -62,6 +63,19 @@ beforeEach(async () => {
  * ⚠️ `point` 是**变动值**（正负即增减），不是余额 —— 界面上要能一眼看出是加还是减。
  */
 describe('PointsRecordView —— 列表渲染', () => {
+  it('概览读取会员余额与等级，不把当前页的积分变动当作余额', async () => {
+    vi.mocked(getMemberUser).mockResolvedValueOnce({
+      id: 1, nickname: '张三', mobile: '13800008888', point: 350, experience: 600,
+      level: { id: 2, name: '黄金会员', level: 2 },
+    })
+    const w = await mountView()
+    const overview = w.get('.pt-overview').text()
+    expect(overview).toContain('350')
+    expect(overview).toContain('600')
+    expect(overview).toContain('黄金会员')
+    expect(w.get('.pt-delta').text()).toBe('+10')
+  })
+
   it('展示 时间 / 事由 / 变动值', async () => {
     const w = await mountView()
     expect(w.text()).toContain('2026-10-09 17:30')

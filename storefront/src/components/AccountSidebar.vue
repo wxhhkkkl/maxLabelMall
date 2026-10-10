@@ -66,6 +66,7 @@ function isActive(to: string): boolean {
         :key="item.to"
         class="s-item"
         :class="{ active: isActive(item.to) }"
+        :aria-current="isActive(item.to) ? 'page' : undefined"
         :to="item.to"
       >
         {{ item.label }}

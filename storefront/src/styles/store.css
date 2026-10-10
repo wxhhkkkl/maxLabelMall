@@ -617,8 +617,9 @@
    ============================================================================ */
 .account-wrap {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: 24px;
+  align-items: start;
   /* 与 `.ml-wrap` 取同一个宽度，免得这几个页面宽度不一致 */
   max-width: 1240px;
   margin: 0 auto;
@@ -632,16 +633,37 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  position: static;
+  gap: 0;
+  padding: 24px 16px;
+  position: sticky;
+  top: 100px;
 }
 /* 菜单项给足点击区域（设计稿的 `.s-item` 是给商城分类用的，内边距偏小） */
 .account-sidebar .s-item {
-  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  line-height: 1.5;
+  margin-top: 4px;
+  transition: background .15s, color .15s;
+}
+.account-sidebar .s-item:hover {
+  background: #F5F8FF;
+}
+.account-sidebar .s-item.active {
+  background: #EAF1FF;
+}
+.account-sidebar .s-item:focus-visible {
+  outline: 2px solid var(--ml-primary);
+  outline-offset: 2px;
 }
 /* 2026-10-09：侧栏按主题分三组（FR-011e），组标题是胶囊式小字 */
 .account-sidebar .s-group + .s-group {
-  margin-top: 14px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ml-border);
 }
 .account-sidebar .s-group-title {
   padding: 0 12px 6px;
@@ -655,7 +677,90 @@
 @media (max-width: 768px) {
   .account-wrap {
     grid-template-columns: 1fr;
+    gap: 20px;
+    padding-inline: 16px;
   }
+  .account-sidebar {
+    position: static;
+    padding: 16px;
+  }
+  .account-sidebar .s-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .account-sidebar .s-group + .s-group {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .account-sidebar .s-group-title {
+    flex: 0 0 64px;
+    padding: 0;
+    font-size: 11px;
+  }
+  .account-sidebar .s-item {
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 10px;
+  }
+}
+
+/* Account detail pages share the same shell and content rhythm. */
+.account-section-page { background: #F5F8FF; min-height: 70vh; }
+.account-section-page > .crumbs { max-width: 1240px; margin: 0 auto; padding-inline: 24px; flex-wrap: wrap; height: auto; min-height: 52px; gap: 8px; }
+.account-section-main { display: grid; gap: 20px; }
+.account-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 2px 0 4px; }
+.account-page-heading h1 { color: #0C2148; font-size: 26px; line-height: 1.4; letter-spacing: -.02em; }
+.account-page-heading p { color: var(--ml-text-sub); font-size: 13px; line-height: 1.7; margin-top: 8px; }
+.account-heading-link { font-size: 13px; color: var(--ml-primary); white-space: nowrap; }
+.account-heading-link span { margin-left: 8px; }
+.account-primary-button { border: 0; border-radius: 8px; padding: 11px 20px; background: var(--ml-primary); color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.account-primary-button:hover { opacity: .9; }
+.account-primary-button:focus-visible, .account-tabs .tab:focus-visible { outline: 2px solid var(--ml-primary); outline-offset: 3px; }
+.account-section-main > .account-content-card, .account-section-main > .ml-card { margin: 0; }
+.account-order-list { display: grid; gap: 20px; }
+.account-tabs.cat-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 20px; margin: 0 0 24px; border-bottom: 1px solid var(--ml-border); }
+.account-tabs .tab { display: inline-flex; justify-content: center; align-items: center; border: 0; background: #F5F8FF; color: var(--ml-text-sub); border-radius: 8px; padding: 10px 16px; font-family: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.account-tabs .tab.active { color: var(--ml-primary); background: #EAF1FF; font-weight: 600; }
+.account-tabs .tab:hover { color: var(--ml-primary); }
+.account-coupon-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 24px; align-items: stretch; }
+.account-coupon-content :is(.mc-card, .cc-card) { display: flex; flex-direction: column; gap: 20px; min-width: 0; background: #FFFFFF; border: 1px solid var(--ml-border); border-radius: 12px; padding: 24px; }
+.account-coupon-content :is(.mc-amount, .cc-amount) { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; background: #F5F8FF; padding: 20px; border-radius: 10px; }
+.account-coupon-content :is(.mc-num, .cc-num) { color: var(--ml-primary); font-size: 30px; line-height: 1.3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.account-coupon-content :is(.mc-thresh, .cc-thresh) { font-size: 12px; line-height: 1.7; color: var(--ml-primary); }
+.account-coupon-content :is(.mc-name, .cc-name) { font-size: 15px; font-weight: 600; line-height: 1.7; color: var(--ml-text); overflow-wrap: anywhere; }
+.account-coupon-content :is(.mc-info, .cc-info) { flex: 1; }
+.account-coupon-content :is(.mc-valid, .cc-valid, .cc-desc) { margin-top: 8px; color: var(--ml-text-sub); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.account-coupon-content :is(.mc-use, .cc-take) { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: 8px; background: var(--ml-primary); color: #FFFFFF; font-family: inherit; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.account-coupon-content :is(.mc-status, .cc-taken) { align-self: flex-start; color: var(--ml-text-sub); background: #F0F4FB; padding: 10px 20px; border-radius: 8px; font-size: 13px; }
+.account-coupon-content .is-inactive .mc-num, .account-coupon-content .is-inactive .mc-thresh { color: var(--ml-text-sub); }
+.account-coupon-content .cc-take:disabled { opacity: .5; cursor: wait; }
+.account-coupon-content .mc-use { box-shadow: none; }
+.account-content-card { min-width: 0; border: 1px solid var(--ml-border); background: #FFFFFF; border-radius: 14px; padding: 28px 32px; }
+.account-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--ml-border); }
+.account-section-heading h2 { font-size: 16px; font-weight: 600; color: var(--ml-text); }
+.account-section-heading > span { font-size: 12px; color: var(--ml-text-sub); }
+.account-content-card > .empty-state { min-height: 320px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 48px 20px; }
+.account-content-card > .empty-state .es-desc { max-width: 380px; line-height: 1.8; margin: 0; }
+.account-content-card > .empty-state .es-reset { margin-top: 10px; }
+@media (max-width: 768px) {
+  .account-section-page > .crumbs { padding-inline: 16px; }
+  .account-section-main { gap: 16px; }
+  .account-content-card { padding: 24px; }
+  .account-page-heading h1 { font-size: 23px; }
+  .account-coupon-grid { grid-template-columns: 1fr; gap: 16px; }
+}
+@media (max-width: 480px) {
+  .account-content-card { padding: 22px 20px; }
+  .account-page-heading { align-items: flex-start; gap: 12px; }
+  .account-page-heading p { font-size: 12px; }
+  .account-heading-link { padding-top: 7px; font-size: 12px; }
+  .account-content-card > .empty-state { min-height: 280px; padding: 36px 4px; }
+  .account-tabs.cat-pills { gap: 6px; padding-bottom: 16px; margin-bottom: 20px; }
+  .account-tabs .tab { font-size: 12px; padding: 9px 12px; }
+  .account-primary-button { padding: 10px 14px; font-size: 12px; }
+  .account-coupon-content :is(.mc-card, .cc-card) { padding: 20px; }
 }
 
 /* Industry solutions: shared visual system for the overview and ten details. */

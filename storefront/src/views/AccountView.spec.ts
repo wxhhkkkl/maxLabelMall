@@ -113,10 +113,33 @@ describe('AccountView —— 侧栏入口（T113 / T125）', () => {
   })
 })
 
+async function mountPasswordView() {
+  const w = await mountView()
+  await w.get('#changePassword').trigger('click')
+  await flushPromises()
+  return w
+}
+
+describe('AccountView —— 密码弹窗入口', () => {
+  it('默认不展示表单，入口紧邻编辑资料，关闭后清空输入', async () => {
+    const w = await mountView()
+    expect(w.find('#newPassword').exists()).toBe(false)
+    expect(w.get('.acct-profile-actions').find('#editProfile').exists()).toBe(true)
+    await w.get('#changePassword').trigger('click')
+    await w.get('#newPassword').setValue('Temporary123')
+    await w.get('#setPasswordCode').setValue('123456')
+    await w.get('.ml-modal-close').trigger('click')
+    expect(w.find('#newPassword').exists()).toBe(false)
+    await w.get('#changePassword').trigger('click')
+    expect((w.get('#newPassword').element as HTMLInputElement).value).toBe('')
+    expect((w.get('#setPasswordCode').element as HTMLInputElement).value).toBe('')
+  })
+})
+
 describe('AccountView —— 设置密码（FR-011）', () => {
   it('提交时把**密码与手机验证码一起**送出', async () => {
     updatePassword.mockResolvedValue(true)
-    const w = await mountView()
+    const w = await mountPasswordView()
 
     await w.get('#newPassword').setValue('Maxlabel123')
     await w.get('#newPassword2').setValue('Maxlabel123')
@@ -130,7 +153,7 @@ describe('AccountView —— 设置密码（FR-011）', () => {
 
   it('「获取验证码」用**改密场景 3**发码，且发到当前登录用户的手机号', async () => {
     sendSmsCode.mockResolvedValue(true)
-    const w = await mountView()
+    const w = await mountPasswordView()
 
     await w.get('#getPasswordCodeBtn').trigger('click')
     await flushPromises()
@@ -142,7 +165,7 @@ describe('AccountView —— 设置密码（FR-011）', () => {
   })
 
   it('未填验证码时**不发请求**，并给出提示', async () => {
-    const w = await mountView()
+    const w = await mountPasswordView()
 
     await w.get('#newPassword').setValue('Maxlabel123')
     await w.get('#newPassword2').setValue('Maxlabel123')
@@ -158,7 +181,7 @@ describe('AccountView —— 设置密码（FR-011）', () => {
     getMemberUser.mockReset()
     getMemberUser.mockReturnValue(new Promise(() => {}))
 
-    const w = await mountView()
+    const w = await mountPasswordView()
     expect(w.get('#getPasswordCodeBtn').attributes('disabled')).toBeDefined()
   })
 })
@@ -168,7 +191,7 @@ describe('AccountView —— 设置密码（FR-011）', () => {
  */
 describe('AccountView —— 改密发码前先过滑块', () => {
   it('开关关闭时直接发码，不弹滑块（既有行为不变）', async () => {
-    const w = await mountView()
+    const w = await mountPasswordView()
     await w.get('#getPasswordCodeBtn').trigger('click')
     await flushPromises()
     expect(w.find('#captchaSlider').exists()).toBe(false)
@@ -177,7 +200,7 @@ describe('AccountView —— 改密发码前先过滑块', () => {
 
   it('开关开启时先弹滑块，且**此时不发短信**', async () => {
     isCaptchaEnabled.mockResolvedValue(true)
-    const w = await mountView()
+    const w = await mountPasswordView()
     await w.get('#getPasswordCodeBtn').trigger('click')
     await flushPromises()
     expect(w.find('#captchaSlider').exists()).toBe(true)
@@ -186,7 +209,7 @@ describe('AccountView —— 改密发码前先过滑块', () => {
 
   it('**滑块通过后才发码，并把凭据带上**', async () => {
     isCaptchaEnabled.mockResolvedValue(true)
-    const w = await mountView()
+    const w = await mountPasswordView()
     await w.get('#getPasswordCodeBtn').trigger('click')
     await flushPromises()
 
@@ -199,7 +222,7 @@ describe('AccountView —— 改密发码前先过滑块', () => {
 
   it('关掉滑块不发音 —— 不能绕过闸门拿到短信', async () => {
     isCaptchaEnabled.mockResolvedValue(true)
-    const w = await mountView()
+    const w = await mountPasswordView()
     await w.get('#getPasswordCodeBtn').trigger('click')
     await flushPromises()
 

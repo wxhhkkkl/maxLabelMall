@@ -476,23 +476,25 @@ onMounted(async () => {
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
     <RouterLink to="/">首页</RouterLink> / <RouterLink to="/order">我的订单</RouterLink> /
     <span>订单详情</span>
   </div>
 
-  <div class="ml-page-head">
-    <h1 class="ml-page-title">订单详情</h1>
-  </div>
-
   <div class="account-wrap">
     <AccountSidebar />
     <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
-    <div class="account-main">
-      <LoadingState v-if="loading" :count="3" />
+    <div class="account-main account-section-main account-order-detail">
+      <div class="account-page-heading">
+        <div><h1>订单详情</h1><p>核对商品、收货信息与订单进度。</p></div>
+        <RouterLink to="/order" class="account-heading-link">返回订单列表 <span aria-hidden="true">→</span></RouterLink>
+      </div>
+      <LoadingState v-if="loading" class="account-content-card" :count="3" />
 
       <EmptyState
         v-else-if="error"
+        class="account-content-card"
         mode="error"
         title="订单加载失败"
         desc="网络或服务暂时不可用，请稍后重试"
@@ -573,6 +575,7 @@ onMounted(async () => {
         </div>
 
         <!-- 金额构成：促销优惠与优惠券抵扣分列两行，无积分行（FR-026g） -->
+        <div class="od-summary-grid">
         <div class="ml-card">
           <div class="ml-card-title">金额构成</div>
           <div class="ml-amount-card">
@@ -612,6 +615,7 @@ onMounted(async () => {
         </div>
 
         <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
+        </div>
         <div v-if="isUnpaid" class="od-actions">
           <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
                后台配好后不用改代码就会变成可选 -->
@@ -711,9 +715,16 @@ onMounted(async () => {
     @paid="onQrPaid"
     @expired="onQrExpired"
   />
+  </div>
 </template>
 
 <style scoped>
+.account-order-detail > .ml-card, .od-summary-grid > .ml-card { padding: 28px 32px; margin: 0; border-radius: 14px; min-width: 0; }
+.account-order-detail .ml-card-title { margin-bottom: 20px; font-size: 16px; }
+.od-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.account-order-detail .od-status { background: linear-gradient(110deg, #FFFFFF, #F0F4FB); }
+.od-status .ml-hint { margin-top: 14px; line-height: 1.8; }
+.account-order-detail > .empty-state { min-height: 320px; }
 .od-msg {
   color: var(--ml-orange);
   font-size: 13px;
@@ -723,6 +734,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .od-status-text {
   font-size: 22px;
@@ -739,25 +751,29 @@ onMounted(async () => {
   gap: 10px;
   align-items: center;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 .od-text {
   font-size: 14px;
   color: var(--ml-text-sub);
+  margin-top: 10px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 .od-item {
   display: grid;
-  grid-template-columns: 56px 1fr auto auto;
-  gap: 12px;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  gap: 20px;
   align-items: center;
-  padding: 12px 0;
+  padding: 20px 0;
   border-bottom: 1px solid var(--ml-border);
 }
 .od-item:last-child {
   border-bottom: 0;
 }
 .od-thumb {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--ml-radius-field);
   overflow: hidden;
   background: var(--ml-bg-card);
@@ -770,11 +786,18 @@ onMounted(async () => {
 .od-name {
   font-size: 14px;
   color: var(--ml-text);
+  font-weight: 600;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
+.od-info { min-width: 0; }
+.od-thumb .ph { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ml-text-ph); font-size: 12px; }
 .od-spec {
   font-size: 12px;
   color: var(--ml-text-ph);
   margin-top: 4px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 /* 售后入口/状态 —— 放在 .od-info 里（外层是 4 列 grid，不能加直接子元素） */
 .od-sale-actions {
@@ -782,6 +805,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
+  flex-wrap: wrap;
 }
 .od-aftersale {
   font-size: 12px;
@@ -812,20 +836,33 @@ onMounted(async () => {
   margin-top: 10px;
 }
 .dl-table .dl-row {
-  grid-template-columns: 1fr 2fr;
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  padding: 14px 16px;
+  gap: 16px;
 }
+.dl-val { overflow-wrap: anywhere; line-height: 1.8; font-size: 13px; }
+.dl-name { font-size: 12px; }
+.account-order-detail .dl-table { border-radius: 10px; }
 .od-actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 24px 32px;
+  background: #FFFFFF;
+  border: 1px solid var(--ml-border);
+  border-radius: 14px;
 }
+.od-actions > .btn-cart, .od-actions > .btn-buy { width: auto; font-size: 13px; padding: 10px 20px; }
+.od-actions > .btn-buy { border: 0; font-family: inherit; cursor: pointer; }
 /* 渠道选择在窄屏下另起一行，避免把两个按钮挤变形 */
 .pay-channels {
   display: flex;
   gap: 8px;
   margin-right: auto;
+  flex-wrap: wrap;
 }
 .pay-channel {
   display: inline-flex;
@@ -859,6 +896,8 @@ onMounted(async () => {
   color: var(--ml-text-sub);
 }
 @media (max-width: 768px) {
+  .od-summary-grid { grid-template-columns: 1fr; gap: 16px; }
+  .account-order-detail > .ml-card, .od-summary-grid > .ml-card { padding: 24px; }
   .pay-channels {
     width: 100%;
     margin-right: 0;
@@ -866,11 +905,18 @@ onMounted(async () => {
 }
 @media (max-width: 768px) {
   .od-item {
-    grid-template-columns: 56px 1fr;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 10px 14px;
   }
-  .od-price,
-  .od-count {
-    grid-column: 2;
-  }
+  .od-thumb { grid-row: 1 / 3; width: 56px; height: 56px; }
+  .od-info { grid-column: 2 / 4; }
+  .od-price { grid-column: 2; }
+  .od-count { grid-column: 3; }
+}
+@media (max-width: 480px) {
+  .account-order-detail > .ml-card, .od-summary-grid > .ml-card, .od-actions { padding: 22px 20px; }
+  .od-name, .od-text { font-size: 13px; }
+  .dl-table .dl-row { grid-template-columns: 64px minmax(0, 1fr); padding: 12px; gap: 10px; }
+  .pay-channel { font-size: 12px; padding: 8px 10px; }
 }
 </style>

@@ -23,6 +23,11 @@ __pycache__/
 yudao-cloud/sql/mysql/*.sql
 !yudao-cloud/sql/mysql/ruoyi-vue-pro.sql
 !yudao-cloud/sql/mysql/quartz.sql
+# ⚠️ 例外：**本项目自己写**的迁移脚本要入库。
+# 忽略规则是给"下载来的付费资产"用的，而迁移脚本是部署的一部分 ——
+# 不入库的话，别人（或换台机器）部署时会**静默漏掉这一步**，而漏掉的表现是
+# "运营在后台选不到某个选项"，很难倒推回这里。
+!yudao-cloud/sql/mysql/0*.sql
 
 # 旧商城导出数据：含 91 个客户手机号、收件人姓名与联系电话，属个人信息，禁止入库
 # （导入脚本 scripts/import_legacy_mall.py 以它作为输入，但它本身不进版本库）

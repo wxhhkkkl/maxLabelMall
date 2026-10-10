@@ -19,7 +19,17 @@ public enum BannerPositionEnum implements ArrayValuable<Integer> {
     SECKILL_POSITION(2, "秒杀活动页"),
     COMBINATION_POSITION(3, "砍价活动页"),
     DISCOUNT_POSITION(4, "限时折扣页"),
-    REWARD_POSITION(5, "满减送页");
+    REWARD_POSITION(5, "满减送页"),
+    /**
+     * 商城页（商品列表页顶部的横幅）。
+     *
+     * ⚠️ **本项目新增**（2026-10-10），上游没有这个位置。加它的原因是：
+     * 既没有哪个取值语义贴近"商品列表页"，而复用「首页」会让两处被迫共用同一批内容。
+     *
+     * ⚠️ 与数据库字典 `promotion_banner_position` 里的同名取值**必须成对存在** ——
+     * 只有字典没有它 → 管理端提交被 `@InEnum` 400 拒绝；只有它没有字典 → 运营在后台选不到。
+     */
+    MALL_POSITION(6, "商城页");
 
     public static final Integer[] ARRAYS = Arrays.stream(values()).map(BannerPositionEnum::getPosition).toArray(Integer[]::new);
 

@@ -4,14 +4,18 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/001-mall-storefront-integration/plan.md
+specs/002-product-detail-reviews-banner/plan.md
 
 Supporting artifacts for the active feature:
-- specs/001-mall-storefront-integration/spec.md — 功能规格（含 18 项已确认决策）
-- specs/001-mall-storefront-integration/research.md — 技术决策与被否决方案
-- specs/001-mall-storefront-integration/data-model.md — 实体映射、派生数据、状态流转
-- specs/001-mall-storefront-integration/contracts/app-api.md — 消费的 app-api 契约
-- specs/001-mall-storefront-integration/quickstart.md — 手工验证清单
+- specs/002-product-detail-reviews-banner/spec.md — 功能规格（含 4 项已确认决策）
+- specs/002-product-detail-reviews-banner/research.md — 技术决策与被否决方案
+- specs/002-product-detail-reviews-banner/data-model.md — 实体映射、派生数据、展示状态
+- specs/002-product-detail-reviews-banner/contracts/app-api.md — 消费的 app-api 契约（含"校验由谁承担"）
+- specs/002-product-detail-reviews-banner/quickstart.md — 手工验证清单与显式不验证项
+
+上一个特性（门面站与后台打通 —— 仍是本仓库的规格基线，编号 FR/SC/US 由它起算）：
+- specs/001-mall-storefront-integration/{spec,plan,data-model,research,quickstart,tasks}.md
+- specs/001-mall-storefront-integration/contracts/app-api.md
 <!-- SPECKIT END -->
 
 # CLAUDE.md

@@ -175,6 +175,12 @@ export const news: Array<{
 // /contact 联系我们
 // ============================================================================
 
+export const supportContact = {
+  name: '张经理',
+  phone: '010-88613986',
+  wechat: 'q345845052',
+};
+
 export const contact = {
   title: p('联系我们'),
   subtitle: p('售前咨询、售后支持与商务合作，请通过以下任一方式联系'),
@@ -530,6 +536,7 @@ export const inheritedClaims = {
  */
 export const RENDERED = {
   siteMeta,
+  supportContact,
   about,
   news,
   newsCategories,

@@ -9,9 +9,9 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { getAccessToken } from '@/utils/auth'
 
 /**
- * 路由表 —— 共 24 条（原有 23 条 + 行业详情）。
+ * 路由表 —— 共 28 条（含个人中心新增页、行业详情、支持文章及联系支持）。
  *   6 条来自设计稿（须忠实还原，FR-046）
- *   11 条功能页（无设计稿，版式见 design-new-pages.md）
+ *   13 条功能页（无设计稿，版式见 design-new-pages.md）
  *    6 条信息页（无设计稿，承接全站 36 处营销/公司入口，FR-053）
  *
  * 登录**不占路由**：由 LoginDialog 弹层承载。需登录时在当前路由加
@@ -39,6 +39,8 @@ const router = createRouter({
         { path: 'solutions', alias: '/solution', name: 'solutions', component: () => import('@/views/SolutionsView.vue') },
         { path: 'solutions/:industry', alias: '/solution/:industry', name: 'solution-detail', component: () => import('@/views/IndustrySolutionView.vue') },
         { path: 'support', name: 'support', component: () => import('@/views/SupportView.vue') },
+        { path: 'support/contact', name: 'support-contact', component: () => import('@/views/SupportContactView.vue') },
+        { path: 'support/:slug', name: 'support-article', component: () => import('@/views/SupportArticleView.vue') },
 
         // ── 功能页（11 条路由 / 10 个视图） ────────────────────────
         { path: 'cart', name: 'cart', meta: { requiresAuth: true }, component: () => import('@/views/CartView.vue') },
@@ -109,7 +111,13 @@ const router = createRouter({
       ],
     },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to) => {
+    if (to.path.startsWith('/support') && to.hash) {
+      const element = document.getElementById(to.hash.slice(1))
+      if (element) return { el: element, top: 100, behavior: 'smooth' }
+    }
+    return { top: 0 }
+  },
 })
 
 /**

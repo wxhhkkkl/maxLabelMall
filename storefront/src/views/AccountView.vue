@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { isCaptchaEnabled } from '@/api/captcha'
 import { sendSmsCode, SMS_SCENE_UPDATE_PASSWORD, updatePassword } from '@/api/member'
 import AccountSidebar from '@/components/AccountSidebar.vue'
+import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 import CaptchaSlider from '@/components/CaptchaSlider.vue'
 import MlField from '@/components/base/MlField.vue'
 import { useUserStore } from '@/store/user'
@@ -34,11 +35,31 @@ const submitting = ref(false)
 const countdown = ref(0)
 /** 滑块弹层开关（发短信前的那道闸门） */
 const captchaOpen = ref(false)
+/** 编辑资料弹层开关与保存成功提示 */
+const profileOpen = ref(false)
+const profileOk = ref('')
+
+/**
+ * 资料保存成功。
+ *
+ * ⚠️ **必须重新拉取会员信息**：顶栏的昵称/头像读的是 store 里的 `member`，
+ * 只改本地副本不会让顶栏变 —— 而 SC-022 要求「不刷新页面，顶栏与个人中心都显示新值」。
+ */
+async function onProfileSaved() {
+  profileOk.value = '资料已保存'
+  await userStore.loadMember()
+}
 
 const MIN_LEN = 6
 
 /** 发码要有手机号 —— 会员信息是异步来的，没回来之前不知道该发给谁 */
 const mobile = computed(() => userStore.member?.mobile ?? '')
+
+/**
+ * 会员等级名。**没有等级时显示「暂无等级」**（租户 162 现在就是零配置）——
+ * 如实呈现，不编造一个等级名（FR-011d）。
+ */
+const levelName = computed(() => userStore.member?.level?.name || '暂无等级')
 const canGetCode = computed(() => !!mobile.value && countdown.value === 0)
 
 let timer: ReturnType<typeof setInterval> | null = null
@@ -151,12 +172,28 @@ async function onLogout() {
     <div class="account-main">
       <div class="ml-card">
         <div class="ml-card-title">账号信息</div>
-        <p class="acct-name">
-          {{ userStore.displayName || '未登录' }}
-        </p>
-        <p v-if="!userStore.member?.nickname" class="ml-hint">
-          尚未设置昵称，当前展示脱敏手机号
-        </p>
+        <div class="acct-profile">
+          <img
+            v-if="userStore.member?.avatar"
+            class="acct-avatar"
+            :src="userStore.member.avatar"
+            :alt="userStore.displayName || '头像'"
+          />
+          <span v-else class="acct-avatar-ph">未设置</span>
+          <div class="acct-profile-info">
+            <p class="acct-name">
+              {{ userStore.displayName || '未登录' }}
+            </p>
+            <p class="acct-mobile">{{ userStore.member?.mobile }}</p>
+            <p v-if="!userStore.member?.nickname" class="ml-hint">
+              尚未设置昵称，当前展示脱敏手机号
+            </p>
+          </div>
+          <button id="editProfile" class="btn-cart" type="button" @click="profileOpen = true">
+            编辑资料
+          </button>
+        </div>
+        <p v-if="profileOk" class="acct-ok">{{ profileOk }}</p>
       </div>
 
       <!-- 快捷入口三卡（design-new-pages.md §3.5）—— 订单 / 地址 / 券 -->
@@ -173,6 +210,27 @@ async function onLogout() {
           <h3>我的券</h3>
           <p>未使用 / 已使用 / 已过期</p>
         </RouterLink>
+      </div>
+
+      <div class="ml-card">
+        <div class="ml-card-title">积分与等级</div>
+        <!-- 数据直接来自 /member/user/get，不需要额外请求 -->
+        <div class="acct-stats">
+          <div class="acct-stat">
+            <span class="k">积分</span>
+            <b>{{ userStore.member?.point ?? 0 }}</b>
+          </div>
+          <div class="acct-stat">
+            <span class="k">经验值</span>
+            <b>{{ userStore.member?.experience ?? 0 }}</b>
+          </div>
+          <div class="acct-stat">
+            <span class="k">会员等级</span>
+            <!-- ⚠️ 后台没配等级时如实显示「暂无等级」，不编造 -->
+            <b>{{ levelName }}</b>
+          </div>
+        </div>
+        <RouterLink class="acct-detail-link" to="/account/points">查看积分明细</RouterLink>
       </div>
 
       <div class="ml-card">
@@ -245,6 +303,14 @@ async function onLogout() {
       </div>
     </div>
 
+    <!-- 编辑资料（FR-011b）。保存成功后要重拉会员信息，顶栏才会跟着变 -->
+    <ProfileEditDialog
+      :open="profileOpen"
+      :member="userStore.member ?? null"
+      @close="profileOpen = false"
+      @saved="onProfileSaved"
+    />
+
     <!-- 发短信前的图形验证码闸门（开关由服务端决定，关着时不会被打开） -->
     <CaptchaSlider :open="captchaOpen" @close="captchaOpen = false" @success="onCaptchaPassed" />
   </div>
@@ -294,6 +360,58 @@ async function onLogout() {
   font-size: 14px;
 }
 .acct-links a {
+  color: var(--ml-primary);
+}
+/* 账号信息：头像 + 资料 + 「编辑资料」 */
+.acct-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.acct-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--ml-border);
+}
+.acct-avatar-ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px dashed var(--ml-border);
+  color: var(--ml-text-ph);
+  font-size: 12px;
+}
+.acct-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+.acct-mobile {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ml-text-sub);
+}
+/* 积分与等级 */
+.acct-stats {
+  display: flex;
+  gap: 28px;
+}
+.acct-stat .k {
+  display: block;
+  font-size: 12px;
+  color: var(--ml-text-ph);
+}
+.acct-stat b {
+  font-size: 18px;
+}
+.acct-detail-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
   color: var(--ml-primary);
 }
 @media (max-width: 768px) {

@@ -1,5 +1,5 @@
-import { del, post } from '@/config/http'
-import type { AfterSaleCreateReq } from '@/types'
+import { del, get, post } from '@/config/http'
+import type { AfterSaleCreateReq, AfterSaleListItem, PageResult } from '@/types'
 
 /**
  * 售后接口（`/app-api/trade/after-sale/**`）。
@@ -41,4 +41,17 @@ export function createAfterSale(req: AfterSaleCreateReq): Promise<number> {
  */
 export function cancelAfterSale(id: number): Promise<boolean> {
   return del<boolean>('/trade/after-sale/cancel', { id })
+}
+
+/**
+ * 「我的售后」列表（FR-011c）。
+ *
+ * ⚠️ 返回项里的 `status` 是**售后单的精确状态**（10/20/30/40/50/61/62/63）——
+ * 这正是列表页能**准确**判断"哪些还能撤销"的依据，比订单详情页只有订单项的
+ * 粗粒度状态强。判断函数用 `utils/afterSale` 的 `canCancelAfterSaleByStatus`。
+ */
+export function pageAfterSales(
+  params: { pageNo?: number; pageSize?: number } = {},
+): Promise<PageResult<AfterSaleListItem>> {
+  return get<PageResult<AfterSaleListItem>>('/trade/after-sale/page', params)
 }

@@ -34,7 +34,7 @@ function makeRouter() {
   return r
 }
 
-/** 设计稿 6 条 + 功能页 11 条 + 信息页 6 条 = 23 */
+/** 设计稿 6 条 + 功能页 13 条 + 信息页 6 条 = 25（另加行业详情 1 条 = 26） */
 const ALL_PATHS = [
   '/',
   '/mall',
@@ -49,6 +49,8 @@ const ALL_PATHS = [
   '/order/1',
   '/account',
   '/account/address',
+  '/account/after-sale',
+  '/account/points',
   '/coupon',
   '/coupon/mine',
   '/agreement/user',
@@ -63,7 +65,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 24 条路径（原有 23 条 + 行业详情）', () => {
+  it('声明了 26 条路径（设计稿 6 + 功能页 13 + 信息页 6 + 行业详情 1）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -73,8 +75,10 @@ describe('路由表', () => {
       }
     }
     walk((realRouter as unknown as { options: { routes: never[] } }).options.routes)
-    // 23 条叶子路由。注意首页那条 path 为 ''，解析后就是 '/'，不要额外过滤掉它。
-    expect(paths).toHaveLength(24)
+    // 叶子路由。注意首页那条 path 为 ''，解析后就是 '/'，不要额外过滤掉它。
+    // 2026-10-09：个人中心整理新增 /account/after-sale 与 /account/points（23 → 26，
+    // 其中 23 之后先由行业方案加了 1 条）。
+    expect(paths).toHaveLength(26)
     expect(paths).toContain('/')
   })
 

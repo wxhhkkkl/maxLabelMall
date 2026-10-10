@@ -33,7 +33,9 @@
 | 校验验证码 | `POST /member/auth/validate-sms-code` | 用于分步校验（可选） |
 | 刷新令牌 | `POST /member/auth/refresh-token` | query: `refreshToken` |
 | 登出 | `POST /member/auth/logout` | — |
-| 当前会员 | `GET /member/user/get` | 顶栏昵称/手机号 |
+| 当前会员 | `GET /member/user/get` | 顶栏昵称/手机号；**另返回** `email`/`sex`/`point`/`experience`/`level{id,name,level,icon}` —— 个人资料回填与积分等级展示都靠它，无需额外接口 |
+| **修改个人信息** | `PUT /member/user/update` | body 含 `nickname`、`avatar`（带 `@URL`）、`email`（`@Email`、≤50）、`sex`。⚠️ **四个字段都不是必填**（无 `@NotNull`），**只提交改动过的字段**即可；未提交的字段不会被清空（`NOT_NULL` 更新策略）。**清空要显式提交空串**（`@URL`/`@Email` 均放行空串） |
+| **积分明细** | `GET /member/point/record/page` | `pageNo`/`pageSize`；返回 `{id, title, description, point, createTime}` —— `point` 正负即增减。后端还支持 `addStatus`/`createTime` 筛选，本期**不用** |
 | 设置密码 | `PUT /member/user/update-password` | 登录后设置密码（FR-011）；body `password` + **scene 3** 的短信码 |
 | **忘记密码** | `PUT /member/user/reset-password` | **免登录**（`@PermitAll`）；body `mobile` + `password` + **scene 4** 的短信码 |
 
@@ -354,6 +356,7 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 | 用途 | 方法与路径 | 说明 |
 |---|---|---|
 | 申请退款 | `POST /app-api/trade/after-sale/create` | body `{orderItemId, way, refundPrice, applyReason, applyDescription?, applyPicUrls?}`；返回**售后单编号** |
+| **售后列表** | `GET /app-api/trade/after-sale/page` | `pageNo`/`pageSize`；返回项含 `no` 售后单号、**`status` 精确售后单状态**、`way`、`applyReason`、`refundPrice`、`createTime`、`auditReason` 与商品快照（`spuName`/`picUrl`/`properties`/`count`） |
 | 撤销申请 | `DELETE /app-api/trade/after-sale/cancel` | query `id` = **售后单编号**（订单项上的 `afterSaleId`）。后端只允许售后单处于「申请中 / 卖家同意 / 待卖家收货」时撤销；**撤销后订单项的售后状态回到未售后**，两个入口都会重现 |
 
 **请求体的四个必填字段**：
@@ -372,7 +375,12 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 **订单项的售后状态**（`AppTradeOrderItemRespVO.afterSaleStatus`，**订单项级**、不同商品互相独立）：
 `0` 未售后 / `10` 售后中（「退款处理中」）/ `20` 售后成功（「已退款」）。
 
-**本期的展示口径**：订单项上显示入口或状态标签，提交/撤销成功后都**重拉订单详情**以后端为准
+⚠️ **两个粒度别混**：上述订单项状态只有 3 个值，分不出售后单走到了哪一步；
+「我的售后」列表拿到的 `AppAfterSaleRespVO.status` 是**售后单的精确状态**（10/20/30/40/50/61/62/63）。
+因此**列表页能准确判断能否撤销，订单详情页不能** —— 后者只能在「售后中」时一律给撤销入口、
+不可撤销时由后端拒并透出文案。详见 [research.md](./research.md) R13 与 [data-model.md](./data-model.md) §1.10。
+
+**本期的展示口径**：订单项上显示入口或状态标签，提交/撤销成功后都**重拉**以后端为准
 （不做本地乐观更新，与支付后 `sync` 同一口径）。
 
 **「撤销申请」的入口判定**：订单项只暴露 `afterSaleStatus`（0/10/20），**看不出**售后单走到了
@@ -423,3 +431,26 @@ POST /pay/order/submit { id: payOrderId, channelCode: "mock" }
 | `/pay/wallet/*`、`/pay/wallet-recharge/*` | 余额与充值不在本期 |
 | `/member/auth/social-login` | 本期的微信授权只用来**换取 openid**，不用于登录/建号 —— 一律走 `/member/social-user/bind`（见 §6.1）。用 `social-login` 会把当前手机号账号的登录态换成微信账号，语义不对 |
 | `/member/auth/create-weixin-jsapi-signature`、`/member/social-user/wxa-qrcode`、`get-subscribe-template-list` | 属于 JSSDK / 小程序路径，本期不调用（§6.1 说明为何用 `WeixinJSBridge` 绕开 JSSDK 签名） |
+
+---
+
+## 9. 文件上传（头像）
+
+本期**唯一**用到的上传能力，服务于个人资料的头像（FR-011b）。
+
+| 用途 | 方法与路径 | 说明 |
+|---|---|---|
+| 上传文件 | `POST /app-api/infra/file/upload` | **`multipart/form-data`**，字段名 `file`（另有可选 `directory`）；返回 `CommonResult<String>`，**内容就是文件的访问 URL** |
+
+**三个要点**：
+
+- **返回的字符串直接写进 `avatar`** —— `PUT /member/user/update` 的 `avatar` 带 `@URL` 校验，
+  所以必须是可访问的 URL，不能传 base64 或本地路径。
+- **前端要自己拼 `FormData`**：项目的 `post()` 统一解包 `CommonResult` ✓ 可以复用，
+  但需显式带上 multipart 的 `Content-Type`（axios 传 `FormData` 时会自动补 boundary）。
+  `tenant-id` 等请求头由统一拦截器注入，无需手写。
+- **体积/格式上限由后台的文件上传配置决定，前端不自行设一个数字**：超限时**原样透出后端文案**，
+  而不是前端编一个"文件不能超过 X MB"（见 [research.md](./research.md) R11 与 data-model 的缺失项表）。
+
+> **存储位置与前台无关**：线上 master 配置指向阿里云 OSS（`infra_file_config`），前台拿到的就是
+> `img.yuwangchenfa.com` 下的 URL。以后要补「退款凭证图片」时，同一套上传控件可复用。

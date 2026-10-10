@@ -39,7 +39,12 @@ const PALETTE = new Set([
 /** §1.2：新增页面 MUST 沿用这三个断点，不得新增 */
 const BREAKPOINTS = new Set([1100, 768, 480])
 
-/** §5 点名的 17 条无设计稿路由，对应 16 个视图文件 */
+/**
+ * §5 点名的无设计稿路由，对应下面的视图文件。
+ *
+ * ⚠️ **新增无设计稿页面时 MUST 在此登记** —— 这是一份**显式清单**，不会被自动收录。
+ * 「我的售后」与「积分明细」于 2026-10-09 加入（个人中心整理，FR-011c / FR-011d）。
+ */
 const NEW_PAGE_VIEWS = [
   'CartView',
   'CheckoutView',
@@ -57,6 +62,8 @@ const NEW_PAGE_VIEWS = [
   'NewsView',
   'ContactView',
   'JobsView',
+  'AfterSaleListView',
+  'PointsRecordView',
 ]
 
 const VIEWS_DIR = join(process.cwd(), 'src', 'views')

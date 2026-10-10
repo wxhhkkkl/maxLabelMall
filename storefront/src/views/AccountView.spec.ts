@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const updatePassword = vi.fn()
+const updateProfile = vi.fn()
 const sendSmsCode = vi.fn()
 const getMemberUser = vi.fn()
 vi.mock('@/api/member', () => ({
   updatePassword: (...a: unknown[]) => updatePassword(...a),
+  updateProfile: (...a: unknown[]) => updateProfile(...a),
   sendSmsCode: (...a: unknown[]) => sendSmsCode(...a),
   getMemberUser: (...a: unknown[]) => getMemberUser(...a),
   logout: vi.fn().mockResolvedValue(true),
@@ -56,6 +58,8 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   window.localStorage.clear()
   updatePassword.mockReset()
+  updateProfile.mockReset()
+  updateProfile.mockResolvedValue(true)
   sendSmsCode.mockReset()
   getMemberUser.mockReset()
   getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888' })
@@ -94,10 +98,18 @@ describe('AccountView —— 侧栏入口（T113 / T125）', () => {
     })
   })
 
-  it('侧栏仍保留个人中心 / 收货地址 / 我的券', async () => {
+  it('侧栏保留全部入口（2026-10-09 起按主题分三组，新增「我的售后」「积分与等级」）', async () => {
     const w = await mountView()
     const labels = w.findAll('.sidebar .s-item').map((a) => a.text())
-    expect(labels).toEqual(['个人中心', '我的订单', '领券中心', '收货地址', '我的券'])
+    expect(labels).toEqual([
+      '个人中心',
+      '收货地址',
+      '我的订单',
+      '我的售后',
+      '我的券',
+      '领券中心',
+      '积分与等级',
+    ])
   })
 })
 
@@ -195,5 +207,124 @@ describe('AccountView —— 改密发码前先过滑块', () => {
     await flushPromises()
 
     expect(sendSmsCode).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * 个人资料（FR-011b / US8 场景 1-2）。
+ *
+ * ⚠️ 关键断言是**保存后重新拉取会员信息** —— 顶栏的昵称/头像读的是 store 里的 `member`，
+ * 只改本地副本不会让顶栏变（SC-022 要验的就是这个）。测试里用
+ * `getMemberUser` 的调用次数作为「刷新了登录态」的可观察代理。
+ */
+describe('AccountView —— 个人资料', () => {
+  const WITH_AVATAR = {
+    id: 1,
+    nickname: '张三',
+    mobile: '13800008888',
+    avatar: 'https://img.example.com/a.png',
+    email: 'a@example.com',
+    sex: 1,
+  }
+
+  it('展示昵称、头像与手机号', async () => {
+    getMemberUser.mockResolvedValue(WITH_AVATAR)
+    const w = await mountView()
+
+    expect(w.text()).toContain('张三')
+    expect(w.text()).toContain('13800008888')
+    expect(w.find('.acct-avatar').exists()).toBe(true)
+    expect(w.get('.acct-avatar').attributes('src')).toBe('https://img.example.com/a.png')
+  })
+
+  it('没有头像时显示占位而不是空白', async () => {
+    getMemberUser.mockResolvedValue({ ...WITH_AVATAR, avatar: '' })
+    const w = await mountView()
+
+    expect(w.find('.acct-avatar').exists()).toBe(false)
+    expect(w.find('.acct-avatar-ph').exists()).toBe(true)
+  })
+
+  it('有「编辑资料」入口，点开出现弹层', async () => {
+    getMemberUser.mockResolvedValue(WITH_AVATAR)
+    const w = await mountView()
+
+    expect(w.find('#editProfile').exists()).toBe(true)
+    await w.get('#editProfile').trigger('click')
+    await flushPromises()
+    expect(w.find('#profileSave').exists()).toBe(true)
+  })
+
+  it('**保存成功后重新拉取会员信息**（顶栏才会跟着变，SC-022）', async () => {
+    getMemberUser.mockResolvedValue(WITH_AVATAR)
+    updateProfile.mockResolvedValue(true)
+    const w = await mountView()
+    const before = getMemberUser.mock.calls.length
+
+    await w.get('#editProfile').trigger('click')
+    await flushPromises()
+    await w.get('#profileNickname').setValue('李四')
+    await w.get('#profileSave').trigger('click')
+    await flushPromises()
+
+    expect(updateProfile).toHaveBeenCalledWith({ nickname: '李四' })
+    expect(getMemberUser.mock.calls.length).toBeGreaterThan(before)
+    expect(w.text()).toContain('资料已保存')
+  })
+})
+
+/**
+ * 积分与会员等级展示（FR-011d）。
+ *
+ * ⚠️ **租户 162 现在等级零配置、积分全为 0** —— 所以「暂无等级」与 0 是**预期**表现。
+ * 页面必须如实呈现，**不得为好看编造等级名或数值**。
+ */
+describe('AccountView —— 积分与等级', () => {
+  it('展示积分与经验值（后端 user/get 已返回，无需额外请求）', async () => {
+    getMemberUser.mockResolvedValue({
+      id: 1,
+      nickname: '张三',
+      mobile: '13800008888',
+      point: 120,
+      experience: 340,
+    })
+    const w = await mountView()
+
+    expect(w.text()).toContain('积分')
+    expect(w.text()).toContain('120')
+    expect(w.text()).toContain('340')
+  })
+
+  it('有等级时显示等级名', async () => {
+    getMemberUser.mockResolvedValue({
+      id: 1,
+      nickname: '张三',
+      mobile: '13800008888',
+      point: 1,
+      experience: 2,
+      level: { id: 3, name: '黄金会员', level: 3 },
+    })
+    const w = await mountView()
+    expect(w.text()).toContain('黄金会员')
+  })
+
+  it('**没有等级时显示「暂无等级」，不编造**（这是租户 162 的现状）', async () => {
+    getMemberUser.mockResolvedValue({
+      id: 1,
+      nickname: '张三',
+      mobile: '13800008888',
+      point: 0,
+      experience: 0,
+      level: null,
+    })
+    const w = await mountView()
+    expect(w.text()).toContain('暂无等级')
+  })
+
+  it('积分明细入口可点，指向 /account/points', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888', point: 0 })
+    const w = await mountView()
+    const links = w.findAll('a').map((a) => a.attributes('href'))
+    expect(links).toContain('/account/points')
   })
 })

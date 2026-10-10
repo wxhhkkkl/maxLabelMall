@@ -7,7 +7,7 @@ shell commands, and other important information, read the current plan:
 specs/001-mall-storefront-integration/plan.md
 
 Supporting artifacts for the active feature:
-- specs/001-mall-storefront-integration/spec.md — 功能规格（含 12 项已确认决策）
+- specs/001-mall-storefront-integration/spec.md — 功能规格（含 18 项已确认决策）
 - specs/001-mall-storefront-integration/research.md — 技术决策与被否决方案
 - specs/001-mall-storefront-integration/data-model.md — 实体映射、派生数据、状态流转
 - specs/001-mall-storefront-integration/contracts/app-api.md — 消费的 app-api 契约

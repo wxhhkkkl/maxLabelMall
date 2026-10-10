@@ -71,6 +71,18 @@ const router = createRouter({
         },
         { path: 'account', name: 'account', meta: { requiresAuth: true }, component: () => import('@/views/AccountView.vue') },
         { path: 'account/address', name: 'address', meta: { requiresAuth: true }, component: () => import('@/views/AddressView.vue') },
+        {
+          path: 'account/after-sale',
+          name: 'after-sale',
+          meta: { requiresAuth: true },
+          component: () => import('@/views/AfterSaleListView.vue'),
+        },
+        {
+          path: 'account/points',
+          name: 'points',
+          meta: { requiresAuth: true },
+          component: () => import('@/views/PointsRecordView.vue'),
+        },
         { path: 'coupon', name: 'coupon-center', component: () => import('@/views/CouponCenterView.vue') },
         { path: 'coupon/mine', name: 'coupon-mine', meta: { requiresAuth: true }, component: () => import('@/views/MyCouponView.vue') },
         {

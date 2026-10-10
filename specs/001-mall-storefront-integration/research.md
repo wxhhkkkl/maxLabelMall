@@ -180,3 +180,59 @@ java -jar yudao-server/target/yudao-server.jar     # ⛔ 不要加 --spring.prof
 | `pointStatus` | 结算请求中标记 `@NotNull`，**必须传**；本期固定 `false`，明细不出现积分行 |
 | 券可用性 | 只由结算响应的 `coupons[].match` / `mismatchReason` 判定，前端不得自算 |
 | 领券中心 vs 我的券 | `coupon-template/*`（可领模板，`@PermitAll`）与 `coupon/*`（我的券，需登录）是两个接口族 |
+
+---
+
+## R11. 头像上传怎么接（前台此前没有任何上传能力）
+
+**Decision**: 用 yudao 现成的 `POST /app-api/infra/file/upload`（**multipart**，字段名 `file`），它**直接返回文件 URL 字符串**，把这个 URL 写进 `avatar` 即可。前台自写一个最小上传控件（原生 `<input type="file">` + 图片预览 + 上传中/失败提示），**不引 UI 组件库、不引上传库**。
+
+**Rationale**:
+- 该接口是 C 端专用的 `/app-api` 路径，符合宪法「C 端只走 app-api」；返回的正是 `PUT /member/user/update` 中 `avatar` 需要的值 —— 而那个字段带 `@URL` 校验，所以**必须是可访问的 URL**，不能是 base64 或本地路径。
+- 走它**不需要新建后端能力**（宪法原则 III）。文件存储器配置在 `infra_file_config`（线上 master 是阿里云 OSS，见 [[server-deploy]]），前台不必知道存到哪。
+- 这也顺带铺好了路：以后要补「退款凭证图片」时，同一套上传控件可复用（本期仍不做，见 spec 的 FR-041e 说明）。
+
+**Alternatives considered**:
+- **预签名直传（模式二，`presigned-url` + `create`）**：多两次请求、前端要处理 OSS 直传与回调登记，复杂度与收益不成比例（头像只有一张、体积小）。
+- **头像转 base64 直接塞进 `avatar`**：会被 `@URL` 校验拒掉，而且把二进制塞进业务表。
+- **不做头像、只改昵称**：所有者已明确要"四项都给改"，故不采用。
+
+---
+
+## R12. 「编辑资料」的形态，与个人中心的入口分组
+
+**Decision**:
+- **编辑资料做成弹层**（新建 `ProfileEditDialog.vue`），沿用 `AddressFormDialog.vue` 的既有范式：`MlModal` + `MlField` + 本地 `formError` + `watch(open)` 重置。
+- **入口分三组**（FR-011e）。归属如下：
+
+| 分组 | 入口 |
+|---|---|
+| **账户资料** | 个人中心（资料总览）· 收货地址 |
+| **我的交易** | 我的订单 · **我的售后/退款**（新） |
+| **我的权益** | 我的券 · 领券中心 · **积分与等级**（新） |
+
+**Rationale**:
+- 弹层而非独立页：本项目已有的弹层表单范式就是 `AddressFormDialog`（结算页与地址页共用），沿用比新造一致；且改资料是"轻动作"，弹层省掉"改完还要返回"的导航成本。**独立页会多一条路由，且回来要重新找入口。**
+- 分组解决的是"5 项平铺看不出结构"这个原始诉求（US8 的背景）。归属按**用户心智**而非后端模块：地址属于"账户资料"（和姓名手机号同类），售后属于"我的交易"（它是订单的延伸），积分/券属于"我的权益"。
+
+**Alternatives considered**:
+- **独立页面编辑资料**：多一条路由 + 返回成本，且与既有范式不一致。
+- **不分组、只调整顺序**：没解决"看不出结构"，等于没整理。
+- **把「售后」放进"账户资料"**：语义不对 —— 它是交易的一部分（其 `orderNo`/`orderItemId` 就来自订单）。
+
+---
+
+## R13. 两个新列表的取数与判定口径
+
+**Decision**:
+- **我的售后**走 `GET /app-api/trade/after-sale/page`。它的返回体（`AppAfterSaleRespVO`）字段很全：`no` 售后单号、`status` **精确的售后单状态**、`way` 售后方式、`applyReason`、`refundPrice`、`createTime`、`spuName`/`picUrl`/`properties`/`count` 商品快照、`auditReason`。**撤销入口就按这个精确 `status` 判断**（∈ `{10 申请中, 20 卖家同意, 30 待卖家收货}`）。
+- **积分明细**走 `GET /app-api/member/point/record/page`，展示 `createTime` 时间 / `title` 事由 / `point` 变动值（正负即增减）。**不加"增加/减少"筛选**。
+
+**Rationale**:
+- 列表 VO 自带**精确**的售后单状态 —— 所以"我的售后"页能**准确**判断哪些可撤销；这比订单详情页只能拿到订单项上那个粗粒度的「售后中」强得多（后者分不出"商家已收货待退款"这种不可撤销的状态，只能靠后端拒绝后透文案）。这是把撤销入口同时放进列表页的主要理由，也解释了为什么两个页面的判定精度不同。
+- 积分记录字段刚好覆盖"时间/事由/变动值"；后端虽支持 `addStatus` 筛选，但记录条数少时多一排筛选器只是噪音。
+
+**Alternatives considered**:
+- **在列表里对每条调 `after-sale/get` 查状态**：N+1 请求，而 `/page` 已经返回了状态。
+- **积分明细加增减筛选**：YAGNI（后端支持，需要时再加，前端加一排 pill 即可）。
+- **售后列表只读、不给撤销**：所有者已选"列表 + 可撤销"（澄清 Q2）。

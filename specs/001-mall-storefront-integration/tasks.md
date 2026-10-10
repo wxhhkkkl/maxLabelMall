@@ -1133,3 +1133,97 @@ yudao 按 `SmsSceneEnum` 里**写死的 templateCode** 查模板（登录 `user-
 
 **仍未验证**：验证码值是否已从 9999 变成随机区间 —— 需要一次真机发短信，
 之后查 `system_sms_code` 最新行的 `code` 即可确认（历史 377 行全是 9999）。
+
+---
+
+## 追加：个人中心整理（2026-10-09）—— US8
+
+**对应**：US8 / FR-011b–e / SC-022–024 / plan.md 的 Phase 11。
+**背景**：所有者要求「整理个人中心的排布、补个人信息管理、补一些入口」。现状是个人中心只有
+「账号信息（**只读**）+ 设置密码 + 协议/退出」，**改不了任何资料**，也**没有售后与积分入口**，
+侧栏 5 项平铺看不出分组。
+
+**只动前台**：后端 4 个接口（`user/update`、`infra/file/upload`、`after-sale/page`、`point/record/page`）
+与管理端售后台全部现成，**后端与管理端零改动**。**不新增任何 npm 依赖**（头像上传用原生
+`<input type="file">` + `FormData`）。
+
+**测试先行**：每条实现任务都有配对测试，先写测试、确认按正确理由失败、再实现。
+断言必须落在**请求体**上 —— 尤其「**只改昵称时 body 只有 `nickname`**」这条（FR-011b 的核心约束：
+不是"四项齐发"，见 spec 的订正条）。
+
+### ① 个人资料（FR-011b）
+
+- [x] T171 [P] [US8] 先写 `storefront/src/utils/profile.spec.ts`：昵称非空校验、邮箱格式与 ≤50 校验、性别映射（`0 未知 / 1 男 / 2 女`）
+- [x] T172 [US8] 实现 `storefront/src/utils/profile.ts`（依赖 T171 失败）
+- [x] T173 [P] [US8] 先写 `storefront/src/api/upload.spec.ts`：**multipart** 上传、请求体带 `FormData` 且字段名为 `file`、返回的是**文件 URL 字符串**
+- [x] T174 [US8] 实现 `storefront/src/api/upload.ts`（`POST /infra/file/upload`）
+- [x] T175 [P] [US8] 扩展 `storefront/src/api/member.spec.ts`：`updateProfile` **只发传进来的字段** —— 只改昵称时 body **精确为 `{nickname}`**（不含 avatar/email/sex）；显式传空串时该键保留（用于清空）
+- [x] T176 [US8] 在 `storefront/src/api/member.ts` 加 `updateProfile`（`PUT /member/user/update`）
+- [x] T177 [P] [US8] 扩展 `storefront/src/types/member.ts`：`MemberUser` 补 `email`/`sex`/`point`/`experience`/`level`（**原本缺这些字段**）
+- [x] T178 [P] [US8] 先写 `storefront/src/components/AvatarUploader.spec.ts`：选中文件→调上传→回填 URL；上传中禁止提交；失败给可重试提示且**不丢已填内容**
+- [x] T179 [US8] 实现 `storefront/src/components/AvatarUploader.vue`
+- [x] T180 [US8] 先写 `storefront/src/components/ProfileEditDialog.spec.ts`：**只发改动字段的请求体**（只改昵称 → body 只有 `nickname`；改了头像 → 多出 `avatar`）、**邮箱清空提交空串**（不是省略）、邮箱非法**不发请求**、**昵称空不发请求**、成功后 emit `saved`
+- [x] T181 [US8] 实现 `storefront/src/components/ProfileEditDialog.vue`（沿用 `AddressFormDialog` 的弹层范式）
+- [x] T182 [US8] `storefront/src/views/AccountView.vue` 接入：展示昵称/头像/手机号 + 「编辑资料」入口；保存后顶栏与页面**立即**反映（FR-042）；扩展 `AccountView.spec.ts`
+
+### ② 我的售后（FR-011c）
+
+- [x] T183 [P] [US8] 扩展 `storefront/src/utils/afterSale.spec.ts`：**列表侧**的可撤销判定 —— 精确售后单状态 ∈ `{10,20,30}` 才可撤销；`40/50/61/62/63` 不可
+- [x] T184 [US8] 在 `storefront/src/utils/afterSale.ts` 加 `canCancelAfterSaleItem(status)`（与订单详情侧那个"粗粒度"判定**分开两个函数**，别混用）
+- [x] T185 [P] [US8] 扩展 `storefront/src/api/afterSale.spec.ts`：`pageAfterSales` 的路径与分页参数
+- [x] T186 [US8] 在 `storefront/src/api/afterSale.ts` 加 `pageAfterSales`（`GET /trade/after-sale/page`）
+- [x] T187 [US8] 先写 `storefront/src/views/AfterSaleListView.spec.ts`：字段渲染（售后单号/商品/金额/时间/状态）、**只在可撤销时给按钮**、撤销后重拉、空状态、分页
+- [x] T188 [US8] 实现 `storefront/src/views/AfterSaleListView.vue` 并加路由 `/account/after-sale`
+
+### ③ 积分明细（FR-011d）
+
+- [x] T189 [P] [US8] 先写 `storefront/src/api/point.spec.ts`：`pagePointRecords` 的路径与分页参数
+- [x] T190 [US8] 实现 `storefront/src/api/point.ts`（`GET /member/point/record/page`）
+- [x] T191 [US8] 先写 `storefront/src/views/PointsRecordView.spec.ts`：时间/事由/变动值渲染（正负即增减）、分页、**空状态**
+- [x] T192 [US8] 实现 `storefront/src/views/PointsRecordView.vue` 并加路由 `/account/points`
+
+### ④ 侧栏分组与积分等级展示（FR-011e / FR-011d）
+
+- [x] T193 [US8] 扩展 `storefront/src/components/AccountSidebar.spec.ts`：**三组**（账户资料 / 我的交易 / 我的权益）、子页时侧栏仍在、两个新入口存在
+- [x] T194 [US8] 改 `storefront/src/components/AccountSidebar.vue` 为分组呈现（**只改结构，不重写骨架**），并补两个新入口
+- [x] T195 [US8] `storefront/src/views/AccountView.vue` 展示积分/经验/当前等级，**等级为 null 时显示「暂无等级」不编造**；扩展其 spec
+
+### ⑤ 收尾
+
+- [x] T196 [US8] 全量门禁：`pnpm test` / `pnpm ts:check` / `pnpm lint` 全绿；若新增页面被 `storefront/src/styles/design-consistency.spec.ts` 覆盖到，同步补断言
+- [ ] T197 [US8] 按 `specs/001-mall-storefront-integration/quickstart.md` §8.2 的 13 条清单人工执行并记录结果（含"不刷新顶栏即变""列表撤销后订单详情入口重现"）
+  → **2026-10-09：未执行（实机待验）**。本会话无实机环境 —— 本机后端（:48080）未运行、仓库内无 `yudao-server.jar`，
+  起后端还需先开 `scripts/_dbtunnel.py` 隧道；且 §8.2 的第 6/7/8 条还依赖一笔**已支付订单 + 后台退款**的存在。
+  **已完成的替代动作（不等于替代本任务）**：
+  · **T196 门禁实测全绿** —— `pnpm test` 838 例 / 62 文件、`pnpm ts:check` 退出 0、`pnpm lint` 0 error、`pnpm build` 成功；
+  · **13 条清单逐条做了静态核对**（实现与测试的映射），全部落在真实代码上：`AccountView`、`ProfileEditDialog`、
+    `AfterSaleListView`、`PointsRecordView`、`AccountSidebar` 三组、路由 `/account/after-sale` 与 `/account/points`、
+    每个子页各自渲染侧栏（故"进子页不丢菜单"成立）；
+  · **顺带查出并订正 quickstart §8.2 第 5 条** —— 原文写"body 同时含四项"，与 FR-011b、「只提交改动过的字段」的
+    实现（`utils/profile.ts#buildProfileUpdate`）及 spec/data-model/plan 的订正条**相矛盾**，已改为"只含改动过的字段"。
+  **本任务保持未勾选** —— 上述静态核对**不能替代**实机人工验证。
+
+### 依赖与并行
+
+```
+T171 ─→ T172 ─┐
+T173 ─→ T174 ─┼─→ T178 ─→ T179 ─→ T180 ─→ T181 ─→ T182 ─→ T195 ─→ T196 ─→ T197
+T175 ─→ T176 ─┤                                                  ↑
+T177 ─────────┘                                                  │
+T183 ─→ T184 ─→ T185 ─→ T186 ─→ T187 ─→ T188 ─────────────────────┤
+T189 ─→ T190 ─→ T191 ─→ T192 ─────────────────────────────────────┤
+T193 ─→ T194 ─────────────────────────────────────────────────────┘
+```
+
+- **三组互相独立**：①②③④ 之间没有依赖，可并行（不同文件）。
+- **同一配对内不得并行**：测试与其实现是「先红后绿」，标了 `[P]` 的只有"写测试"那一半。
+- ① 最重（8 条），且 T182/T195 都改 `AccountView.vue` → **这两条不要并行**。
+
+### 本组**不做**的（显式声明，别当成漏项）
+
+1. **e2e 不新增**：走通需要一笔已支付订单 + 后台操作，现有 e2e 只能造待支付单 —— 与售后退款同一原因。
+   US8 的验收全部落在单元/组件层 + quickstart §8.2 的人工清单。
+2. **凭证图片上传**：仍不做（本次只补了头像上传这一处能力，控件以后可复用）。
+3. **等级列表页 / 升级进度**：不做 —— 租户 162 无等级配置，做了只是空架子（澄清 Q1）。
+4. **售后详情页**：不做（澄清 Q2）。
+5. **积分明细的增减筛选**：不做（后端支持 `addStatus`，但记录少时是噪音，见 research R13）。

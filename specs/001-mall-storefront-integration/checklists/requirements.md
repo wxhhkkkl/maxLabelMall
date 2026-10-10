@@ -76,3 +76,44 @@ Checklist now fully passes. No blocking items. Ready for `/speckit-plan`.
 | 「Checklist 13 项全通过 / Ready for /speckit-plan」 | 已过时。当前的合规判定以 `.specify/memory/constitution.md` 与 [plan.md](../plan.md) 的 Constitution Check 为准 |
 
 **本清单在当前阶段的用途**：仅作为规格早期质量的留痕。规格的可信度判定请以 [spec.md](../spec.md)（含 12 条澄清记录）、[plan.md](../plan.md)（Constitution Check + Complexity Tracking）与 [tasks.md](../tasks.md)（依赖表 + 配对表）为准。
+
+---
+
+**Iteration 3** — 2026-10-09（个人中心整理；规格并入本特性而非新建 `002-*`）
+
+所有者要求：整理个人中心的功能排布、补上个人信息管理、补一些入口。
+
+**本轮改了 spec 的哪些地方**
+
+- 新增 **US8「个人中心：个人信息管理与入口补全」**（6 条验收场景，P2）
+- 新增 **FR-011b**（个人信息管理：昵称/头像/邮箱/性别，四项一次提交；邮箱前端校验；头像需先上传取 URL；保存后顶栏与个人中心立即反映）
+- 新增 **FR-011c**（我的售后：入口 + 列表 + 状态以后端为准 + 空状态）
+- 新增 **FR-011d**（积分/经验/等级展示 + 明细入口；无数据如实呈现"暂无"）
+- 新增 **FR-011e**（入口按主题分组：账户资料 / 我的交易 / 我的权益；子页共用侧栏）
+- 新增 4 条 **Edge Cases**（资料为空、头像上传失败、邮箱边界、积分与等级无数据）
+- 新增 3 条 **Success Criteria**（SC-022/023/024）
+- 新增 3 条 **Assumptions**（头像需上传能力、个人信息**按需提交**、积分与等级只做展示）
+- **移出「本期不做」**：「会员等级与积分体系」（本次只做展示与明细，不做等级规则/积分发放）
+- 新增一个 **Clarifications** 小节记录本轮三项决策与数据事实
+
+**逐项校验**
+
+| 检查项 | 结果 | 说明 |
+|---|---|---|
+| No implementation details | ✅ | 正文只写「要什么」；接口路径与后端字段只在**假设与澄清记录**里出现（用来界定可行性边界），需求句本身不绑定实现 |
+| Requirements are testable | ✅ | FR-011b/c/d/e 均可直接观测：保存后顶栏是否变、列表状态是否与订单详情一致、无数据是否为空状态 |
+| Success criteria measurable | ✅ | SC-022「不刷新即生效、非法邮箱不发请求」；SC-023「状态一致率 100%」；SC-024「分组呈现 + 子页不丢菜单」 |
+| Technology-agnostic SC | ✅ | 三条 SC 都不含框架/数据库/接口名 |
+| Edge cases identified | ✅ | 资料为空、上传失败、邮箱格式/长度、积分与等级零数据 |
+| Scope clearly bounded | ✅ | 明确「只做展示，不做等级规则与积分发放」；凭证图片上传仍不做 |
+| Assumptions identified | ✅ | 头像必须走上传（`avatar` 有 `@URL` 校验）、个人信息**按需提交**、积分/等级只读 |
+| No NEEDS CLARIFICATION | ✅ | 三处关键分叉（放哪 / 做到哪一步 / 补哪些入口）已在澄清阶段由所有者拍板 |
+
+**本轮记录的两处事实，planning 时不要当成缺陷**
+
+1. **租户 162 的积分与等级没有任何数据**（`member_level` 零配置、`member_point_record` 零记录、93 个会员积分全为 0）→ FR-011d 上线后**必然是空状态**，直到运营配等级、有积分产生。
+2. **前台此前没有任何上传能力**（凭证图片就是因为这个没做）→ 头像要新增一处上传（`/app-api/infra/file/upload` + 自写控件，不引 UI 组件库）。
+
+**顺带订正**：Assumptions 里「支付渠道：本期只用模拟支付通道」一条**已过期**（生产已接支付宝并跑通），已就地划掉并注明，避免同一文档自相矛盾。
+
+**计数**：本轮后 FR **92** 条、SC **22** 条、US **8** 个。无遗留 `[NEEDS CLARIFICATION]`。**Ready for `/speckit-plan`。**

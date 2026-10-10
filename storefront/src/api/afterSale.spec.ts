@@ -2,18 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const post = vi.fn()
 const del = vi.fn()
+const get = vi.fn()
 vi.mock('@/config/http', () => ({
-  get: vi.fn(),
+  get: (...a: unknown[]) => get(...a),
   post: (...a: unknown[]) => post(...a),
   put: vi.fn(),
   del: (...a: unknown[]) => del(...a),
 }))
 
-const { cancelAfterSale, createAfterSale } = await import('./afterSale')
+const { cancelAfterSale, createAfterSale, pageAfterSales } = await import('./afterSale')
 
 beforeEach(() => {
   post.mockReset()
   del.mockReset()
+  get.mockReset()
 })
 
 /**
@@ -109,5 +111,25 @@ describe('撤销售后申请', () => {
   it('失败要向上抛 —— 状态不允许撤销时（如商家已收货待退款）后端会拒，文案要能透给用户', async () => {
     del.mockRejectedValue({ message: '售后单状态不允许取消' })
     await expect(cancelAfterSale(2048)).rejects.toMatchObject({ message: '售后单状态不允许取消' })
+  })
+})
+
+/**
+ * 「我的售后」列表。
+ *
+ * ⚠️ 它返回的是**售后单的精确状态**（10/20/30/40/50/61/62/63），
+ * 这是列表页能**准确**判断能否撤销的前提（见 utils/afterSale 的说明）。
+ */
+describe('售后列表', () => {
+  it('按分页参数查，走 GET /trade/after-sale/page', async () => {
+    get.mockResolvedValue({ list: [], total: 0 })
+    await pageAfterSales({ pageNo: 1, pageSize: 10 })
+    expect(get).toHaveBeenCalledWith('/trade/after-sale/page', { pageNo: 1, pageSize: 10 })
+  })
+
+  it('不传参数时也能查（后端有默认值）', async () => {
+    get.mockResolvedValue({ list: [], total: 0 })
+    await pageAfterSales()
+    expect(get).toHaveBeenCalledWith('/trade/after-sale/page', {})
   })
 })

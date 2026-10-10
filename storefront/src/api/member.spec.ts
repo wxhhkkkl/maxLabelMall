@@ -16,6 +16,7 @@ const {
   logout,
   updatePassword,
   resetPassword,
+  updateProfile,
   sendSmsCode,
   SMS_SCENE_MEMBER_LOGIN,
   SMS_SCENE_UPDATE_PASSWORD,
@@ -157,6 +158,46 @@ describe('忘记密码（重置密码）', () => {
     put.mockRejectedValue({ message: '手机号未注册用户' })
     await expect(resetPassword('13800000000', '0000', 'x')).rejects.toMatchObject({
       message: '手机号未注册用户',
+    })
+  })
+})
+
+/**
+ * 修改个人信息（`PUT /member/user/update`）。
+ *
+ * ⚠️ 后端四个字段**都不是必填**（无 `@NotNull`），更新走 `NOT_NULL` 策略 ——
+ * 所以**只发改动过的字段**；把没改的也发回去会用**陈旧值覆盖**别处的改动。
+ * 请求体由 `utils/profile.buildProfileUpdate` 构造，这里只钉住"原样透传、不额外塞键"。
+ */
+describe('修改个人信息', () => {
+  it('原样透传（只含改动字段）', async () => {
+    put.mockResolvedValue(true)
+    await updateProfile({ nickname: '李四' })
+    expect(put).toHaveBeenCalledWith('/member/user/update', { nickname: '李四' })
+  })
+
+  it('**只改昵称时 body 只有 nickname** —— 不含 avatar/email/sex', async () => {
+    put.mockResolvedValue(true)
+    await updateProfile({ nickname: '李四' })
+    expect(Object.keys(put.mock.calls[0][1] as object)).toEqual(['nickname'])
+  })
+
+  it('**邮箱清空发的是空串**（不是省略 —— 省略等于保留原值，清不掉）', async () => {
+    put.mockResolvedValue(true)
+    await updateProfile({ email: '' })
+    expect(put).toHaveBeenCalledWith('/member/user/update', { email: '' })
+  })
+
+  it('空空的对象也照发（调用方负责先判断"没改动就不发"）', async () => {
+    put.mockResolvedValue(true)
+    await updateProfile({})
+    expect(put).toHaveBeenCalledWith('/member/user/update', {})
+  })
+
+  it('失败要向上抛 —— 界面透出后端文案（邮箱非法等）', async () => {
+    put.mockRejectedValue({ message: '邮箱格式不正确' })
+    await expect(updateProfile({ email: 'abc' })).rejects.toMatchObject({
+      message: '邮箱格式不正确',
     })
   })
 })

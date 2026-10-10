@@ -27,10 +27,20 @@
 | 后端来源 | 字段 | 前端用途 |
 |---|---|---|
 | `AppMemberUserController` `/member/user/get` | `id`、`nickname`、`mobile`、`avatar` | 顶栏展示昵称或脱敏手机号（FR-016） |
+| 同上（**2026-10-09 补**） | `email`、`sex`、`point`、`experience`、`level{id,name,level,icon}` | 个人资料编辑回填（FR-011b）与积分/等级展示（FR-011d） |
 
 - **标识**：手机号为账号主体；由验证码登录隐式建号（FR-009）。
 - **末位展示**：昵称为空时回落为脱敏手机号（`138****8000`）。
 - **密码**：非注册时必须项，登录后在个人中心设置（FR-011）。
+- ⚠️ **写回时只提交改动过的字段**（FR-011b）：四个字段**都不是必填** —— 该 VO 上只有 `avatar` 的 `@URL`
+  与 `email` 的 `@Email`+`≤50`，**没有任何 `@NotNull`**；`updateById` 走默认的 `NOT_NULL` 策略，**未提交的字段不会被清空**。
+  ⚠️ 早期版本据 `@Schema(requiredMode = REQUIRED)` 写成"必须四项齐发"——**那是误读**（`@Schema` 只作文档），
+  且照做会把没改过的字段用**陈旧值写回**。**清空某字段要提交空串**（`@URL`/`@Email` 均放行空串，已核实 HV 9.1.3 字节码）。
+- **`sex` 前端要自己做枚举映射**：后端该字段是裸 `Integer`，**没有** `@InEnum` 校验；
+  值域按后端共享枚举 `SexEnum`：`0 未知 / 1 男 / 2 女`。
+- **`level` 可能为 `null`**（该会员没有等级，或后台未配置等级）：展示端必须容忍，回落为「暂无等级」（FR-011d）。
+- ⚠️ **前端类型此前缺了这些字段**：storefront 的 `MemberUser` 原本只声明 `id/nickname/mobile/avatar`，
+  实现 FR-011b/d 时**必须一并补上** `email`/`sex`/`point`/`experience`/`level`。
 
 ### 1.2 商品（ProductSpu）
 
@@ -182,6 +192,37 @@
 
 ---
 
+### 1.10 售后申请（AfterSale）
+
+| 后端来源 | 字段 | 前端用途 |
+|---|---|---|
+| `GET /app-api/trade/after-sale/page` | `id`、`no`（售后单号）、**`status`（精确售后单状态）**、`way`、`type`、`applyReason`、`applyDescription`、`applyPicUrls`、`createTime`、`refundPrice`、`refundTime`、`auditReason` | 「我的售后」列表（FR-011c） |
+| 同上 | `orderId`、`orderNo`、`orderItemId`、`spuId`、`spuName`、`skuId`、`properties`、`picUrl`、`count` | 列表里的商品快照（下单时的，不随商品改名而变） |
+| `POST /app-api/trade/after-sale/create` | 请求见 [contracts §6.2](./contracts/app-api.md) | 订单项上的「申请退款」（FR-041e） |
+| `DELETE /app-api/trade/after-sale/cancel` | query `id` = 售后单编号 | 撤销（FR-041e / FR-011c） |
+
+**状态机（后端 `AfterSaleStatusEnum`）**：`10 申请中` →（卖家同意）`20 卖家通过` →（买家退货）`30 待卖家收货`
+→（卖家收货）`40 等待平台退款` →（退款）`50 完成`；旁支：`61 买家取消`、`62 卖家拒绝`、`63 卖家拒绝收货`。
+
+- ⚠️ **`status` 与「订单项的 `afterSaleStatus`」是两个不同粒度**，别混：
+  - 售后单状态（上表 8 个值）：**只有列表/详情接口有**，`MyAfterSaleView` 用它**精确**判断能否撤销（∈ `{10,20,30}`）；
+  - 订单项的 `afterSaleStatus`（仅 `0 未售后 / 10 售后中 / 20 售后成功`）：订单详情页只有它，
+    所以那边只能在「售后中」时一律给撤销入口、不可撤销时靠后端拒（见 R13）。
+- **可再次申请**：卖家拒绝（`62`）或买家撤销（`61`）后，后端把订单项的 `afterSaleStatus` **重置回 `0`**
+  → 前端**不得缓存**"申请过"，每次 `load()` 重算即可（订单详情与列表都如此）。
+
+### 1.11 积分记录（MemberPointRecord）
+
+| 后端来源 | 字段 | 前端用途 |
+|---|---|---|
+| `GET /app-api/member/point/record/page` | `id`、`title`（事由）、`description`、`point`（变动值，正负即增减）、`createTime`（发生时间） | 积分明细页（FR-011d） |
+
+**分页参数**：后端还支持 `addStatus`（`true` 增加 / `false` 减少 / 空不筛选）与 `createTime` 区间 ——
+本期**不用**（记录条数少时筛选器只是噪音，见 R13）。
+
+- ⚠️ **租户 162 目前零积分记录、零等级配置、93 个会员积分全为 0**：该页上线后必然是空状态，
+  如实呈现「暂无」即可，**不得**为好看编造数据（spec 的 Edge Cases 有专门一条）。
+
 ## 2. 前端派生数据（不落库）
 
 这些数据**不在后台存储**，由前端按规则从真实数据算出，因此必须可验证（不得写死文案）。依据 FR-008a。
@@ -239,3 +280,5 @@
 | 面向用户的促销活动查询 | FR-026h | 不做商品页促销标签；促销在结算页单列 |
 | 注册接口 | FR-009 | 隐式注册（验证码登录即建号） |
 | 后端记录协议同意 | FR-050 | 前端门禁，不落库 |
+| `sex` 的后端枚举校验（该字段是裸 `Integer`，没有 `@InEnum`） | FR-011b | 前端按后端共享枚举 `SexEnum` 映射：`0 未知 / 1 男 / 2 女` |
+| 头像上传的体积/格式上限（由后台文件上传配置决定，前端无从得知） | FR-011b | 前端**不自行设一个数字**，失败时原样透出后端文案（见 R11） |

@@ -639,6 +639,16 @@
 .account-sidebar .s-item {
   padding: 9px 12px;
 }
+/* 2026-10-09：侧栏按主题分三组（FR-011e），组标题是胶囊式小字 */
+.account-sidebar .s-group + .s-group {
+  margin-top: 14px;
+}
+.account-sidebar .s-group-title {
+  padding: 0 12px 6px;
+  color: var(--ml-text-ph);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
 .account-main {
   min-width: 0; /* 否则内容里的长表格/长文本会把栅格撑破 */
 }

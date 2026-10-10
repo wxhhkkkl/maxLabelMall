@@ -6,6 +6,7 @@ import { OrderStatus } from '@/types'
 import {
   afterSaleItemStatusText,
   canCancelAfterSale,
+  canCancelAfterSaleByStatus,
   afterSaleWayLabel,
   allowsReturnRefund,
   canApplyRefund,
@@ -110,5 +111,36 @@ describe('文案映射', () => {
   it('售后方式的中文名与后端 AfterSaleWayEnum 一致', () => {
     expect(afterSaleWayLabel(AfterSaleWay.REFUND_ONLY)).toBe('仅退款')
     expect(afterSaleWayLabel(AfterSaleWay.RETURN_AND_REFUND)).toBe('退货退款')
+  })
+})
+
+/**
+ * **列表页**侧的可撤销判定。
+ *
+ * ⚠️ 与订单详情侧那个 `canCancelAfterSale(item)` **不是同一个函数**：那边只有订单项的
+ * 粗粒度状态（0/10/20），分不出"商家已收货待退款"这种不可撤销的情形；而「我的售后」
+ * 列表拿到的是售后单的**精确状态**（10/20/30/40/50/61/62/63），所以能准确判断。
+ */
+describe('canCancelAfterSaleByStatus —— 列表页（精确状态）', () => {
+  it('后端允许撤销的三个状态：申请中(10) / 卖家同意(20) / 待卖家收货(30)', () => {
+    expect(canCancelAfterSaleByStatus(10)).toBe(true)
+    expect(canCancelAfterSaleByStatus(20)).toBe(true)
+    expect(canCancelAfterSaleByStatus(30)).toBe(true)
+  })
+
+  it('**再往后就不能撤了** —— 商家已收货待退款(40)、完成(50)', () => {
+    expect(canCancelAfterSaleByStatus(40)).toBe(false)
+    expect(canCancelAfterSaleByStatus(50)).toBe(false)
+  })
+
+  it('已取消(61) / 卖家拒绝(62,63) 无从撤销', () => {
+    expect(canCancelAfterSaleByStatus(61)).toBe(false)
+    expect(canCancelAfterSaleByStatus(62)).toBe(false)
+    expect(canCancelAfterSaleByStatus(63)).toBe(false)
+  })
+
+  it('未知状态一律false —— 不赌', () => {
+    expect(canCancelAfterSaleByStatus(99)).toBe(false)
+    expect(canCancelAfterSaleByStatus(undefined)).toBe(false)
   })
 })

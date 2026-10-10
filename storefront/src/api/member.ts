@@ -1,5 +1,5 @@
 import { post, get, put } from '@/config/http'
-import type { AuthLoginResp, MemberUser } from '@/types'
+import type { AuthLoginResp, MemberUser, ProfileUpdateReq } from '@/types'
 import { setTokens } from '@/utils/auth'
 
 /**
@@ -111,4 +111,18 @@ export function updatePassword(password: string, code: string): Promise<boolean>
  */
 export function resetPassword(mobile: string, code: string, password: string): Promise<boolean> {
   return put<boolean>('/member/user/reset-password', { password, code, mobile })
+}
+
+/**
+ * 修改个人信息（登录后）。
+ *
+ * ⚠️ **只传改动过的字段**：后端 `AppMemberUserUpdateReqVO` 的四个字段**都不是必填**
+ * （没有任何 `@NotNull`），而更新走 MyBatis-Plus 默认的 `NOT_NULL` 策略 ——
+ * **省略 = 保留原值**。把没改的字段也发回去，会用**陈旧值覆盖**别处的改动。
+ * ⚠️ **清空要发空串**（`@Email`/`@URL` 都放行空串），省略是清不掉的。
+ *
+ * 请求体怎么构造见 `utils/profile.buildProfileUpdate`（它负责"只挑改动项"）。
+ */
+export function updateProfile(req: ProfileUpdateReq): Promise<boolean> {
+  return put<boolean>('/member/user/update', req)
 }

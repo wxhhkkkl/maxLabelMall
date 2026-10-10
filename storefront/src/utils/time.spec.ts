@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDate, formatDateTime } from './time'
+import { formatDate, formatDateTime, toMillis } from './time'
 
 /**
  * ⚠️ 这些用例存在的理由是一个**真实缺陷**（2026-09-27 实测发现）：
@@ -41,6 +41,26 @@ describe('formatDateTime', () => {
 
   it('无法识别的字符串原样返回（宁可显示原文，也不要显示 Invalid Date）', () => {
     expect(formatDateTime('待确认')).toBe('待确认')
+  })
+})
+
+describe('toMillis', () => {
+  it('epoch 毫秒数原样返回', () => {
+    expect(toMillis(1790486340000)).toBe(1790486340000)
+  })
+
+  it('可读字符串与 ISO 字符串都转成毫秒数', () => {
+    const ms = new Date(2026, 8, 24, 12, 0, 0).getTime()
+    expect(toMillis('2026-09-24 12:00:00')).toBe(ms)
+    expect(toMillis('2026-09-24T12:00:00')).toBe(ms)
+  })
+
+  it('认不出的一律给 undefined —— 让调用方按「没有截止时间」处理，而不是拿 NaN 去比大小', () => {
+    expect(toMillis(null)).toBeUndefined()
+    expect(toMillis(undefined)).toBeUndefined()
+    expect(toMillis('')).toBeUndefined()
+    expect(toMillis('待确认')).toBeUndefined()
+    expect(toMillis(Number.NaN)).toBeUndefined()
   })
 })
 

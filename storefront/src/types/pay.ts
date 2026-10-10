@@ -1,3 +1,18 @@
+/**
+ * 支付单状态（后端 `PayOrderStatusEnum`）。
+ *
+ * **只有 `WAITING` 需要继续轮询** —— 其余都是终态。注意没有单独的「已取消」：
+ * 取消、过期、渠道报错在后端一律落成 `CLOSED`。
+ */
+export const PayOrderStatus = {
+  WAITING: 0,
+  SUCCESS: 10,
+  REFUND: 20,
+  CLOSED: 30,
+} as const
+
+export type PayOrderStatusValue = (typeof PayOrderStatus)[keyof typeof PayOrderStatus]
+
 /** 提交支付（POST /pay/order/submit）。模拟通道下「提交即成功」。 */
 export interface PaySubmitReq {
   /** 下单返回的 payOrderId */

@@ -11,15 +11,16 @@ import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
+import QrPayDialog from '@/components/QrPayDialog.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
 import type { OrderDetail } from '@/types'
-import { OrderStatus } from '@/types'
+import { OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
 import { formatYuan, reconcile } from '@/utils/money'
 import { orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
-import { formatDateTime } from '@/utils/time'
+import { formatDateTime, toMillis } from '@/utils/time'
 import {
   clearWxPayPending,
   invokeWxPay,
@@ -78,6 +79,21 @@ const cancelRefundOpen = ref(false)
 const cancelRefunding = ref(false)
 
 /**
+ * 二维码弹层（电脑端微信扫码支付）。
+ *
+ * `qrContent` 是后端给的**裸 `code_url`**，不是图片地址也不是跳转地址 ——
+ * 渲染与轮询都在 `QrPayDialog` 里，这里只负责开和关。
+ */
+const qrOpen = ref(false)
+const qrContent = ref('')
+
+/**
+ * 弹层要看倒计时，所以把 `payExpireTime`（类型是 `number | string`）归一成毫秒数。
+ * 认不出就是 `undefined` —— 弹层会当作「没有截止时间」，只靠轮询发现失效。
+ */
+const qrExpireAt = computed(() => toMillis(order.value?.payExpireTime))
+
+/**
  * 微信公众号的 JSAPI 渠道码。这里**只用来分派「怎么把收银台唤起来」**，
  * 不代表前端判断渠道可用性 —— 用不用得上仍由后端的启用列表说了算（FR-038）。
  */
@@ -86,8 +102,11 @@ const WX_PUB_CHANNEL = 'wx_pub'
 /** 后端的「跳转型」展示方式 —— `displayContent` 是收银台地址，必须真的跳过去 */
 const PAY_DISPLAY_MODE_URL = 'url'
 
-/** 前端还没实现、但**不能装作没发生**的展示方式（要渲染二维码/表单，得引库） */
-const UNSUPPORTED_DISPLAY_MODES: string[] = ['qr_code', 'qr_code_url', 'form']
+/** 后端的「二维码」展示方式 —— `displayContent` 是裸的 `code_url`，由 `QrPayDialog` 渲染 */
+const PAY_DISPLAY_MODE_QR = 'qr_code'
+
+/** 前端还没实现、但**不能装作没发生**的展示方式（表单提交、二维码图片链接） */
+const UNSUPPORTED_DISPLAY_MODES: string[] = ['qr_code_url', 'form']
 
 /**
  * 付款要用的公众号 openid。**只放内存不落盘**：
@@ -256,7 +275,9 @@ async function handleWechatCallback() {
  *
  *   · `url`      —— 跳收银台（支付宝电脑网站支付）。`displayContent` 就是收银台地址，
  *                   **拿到地址却不跳 = 用户眼里什么都没发生**（2026-10-09 线上实况）。
- *   · `qr_code` / `qr_code_url` / `form` —— 前端尚未实现（要渲染二维码，得引库）。
+ *   · `qr_code`  —— 电脑端微信扫码支付（`wx_native`）。`displayContent` 是裸的
+ *                   `code_url`，交给 `QrPayDialog` 渲染二维码并盯着支付单。
+ *   · `qr_code_url` / `form` —— 仍未实现（前者要取图片链接、后者要拼表单）。
  *                   **必须明说**，不能静默：静默就是同一类 bug。
  *   · `app`      —— 唤起 App/微信内的收银台，本项目由 `wx_pub` 那条分支自己处理。
  *   · 不设（null）—— 例如 `mock`：渠道自己受理了，重拉详情确认状态即可。
@@ -272,6 +293,22 @@ async function submitAndContinue(payOrderId: number) {
   if (resp.displayMode === PAY_DISPLAY_MODE_URL) {
     redirectTo(resp.displayContent)
     // 页面即将离开，不必（也不该）再去拉详情
+    return
+  }
+  if (resp.displayMode === PAY_DISPLAY_MODE_QR) {
+    // 提交即成功（极少数渠道会这样）就不必开弹层了
+    if (resp.status === PayOrderStatus.SUCCESS) {
+      await load(true)
+      return
+    }
+    // 拿不到二维码内容要**明说** —— 开一个空白弹层就是静默降级
+    if (!resp.displayContent) {
+      message.value = '二维码获取失败，请换一个渠道重试'
+      return
+    }
+    qrContent.value = resp.displayContent
+    qrOpen.value = true
+    // 状态交给弹层的轮询驱动，这里**不** load(true)：此刻后端必然还是待支付
     return
   }
   if (UNSUPPORTED_DISPLAY_MODES.includes(resp.displayMode)) {
@@ -310,6 +347,35 @@ async function onPay() {
   } finally {
     paying.value = false
   }
+}
+
+// ========== 二维码支付（电脑端微信扫码） ==========
+
+/**
+ * 扫码支付成功。
+ *
+ * **不在这里把订单标成已支付** —— 弹层说的「支付单成功」不等于交易订单已回调，
+ * 所以重新拉一次详情，并以 `sync=true` 让后端同步一次渠道状态（FR-039）。
+ */
+async function onQrPaid() {
+  qrOpen.value = false
+  await load(true)
+}
+
+/** 二维码失效（本地倒计时归零，或后端把支付单关掉）。同样让状态以后端为准。 */
+async function onQrExpired() {
+  qrOpen.value = false
+  await load(true)
+}
+
+/**
+ * 用户主动关掉弹层。
+ *
+ * **刻意不重拉详情** —— `load()` 会连带 `loadChannels()`，把 `selectedChannel`
+ * 重置成「第一个可用渠道」，等于在用户背后改掉他刚选的渠道。
+ */
+function onQrClosed() {
+  qrOpen.value = false
 }
 
 // ========== 申请退款（按订单项） ==========
@@ -575,7 +641,7 @@ onMounted(async () => {
             id="payOrder"
             class="btn-buy"
             type="button"
-            :disabled="paying || !selectedChannel"
+            :disabled="paying || !selectedChannel || qrOpen"
             @click="onPay"
           >
             {{ paying ? '支付中…' : '立即支付' }}
@@ -632,6 +698,18 @@ onMounted(async () => {
     :order-status="order?.status ?? -1"
     @close="onRefundClosed"
     @submitted="onRefundSubmitted"
+  />
+
+  <!-- 电脑端微信扫码支付（`wx_native`）。渲染二维码 + 盯支付单，都由弹层自己做 -->
+  <QrPayDialog
+    :open="qrOpen"
+    :code-url="qrContent"
+    :pay-order-id="order?.payOrderId ?? 0"
+    :expire-at="qrExpireAt"
+    :order-no="order?.no"
+    @close="onQrClosed"
+    @paid="onQrPaid"
+    @expired="onQrExpired"
   />
 </template>
 

@@ -45,6 +45,20 @@ export function formatDateTime(v: TimeInput): string {
   return Number.isNaN(d.getTime()) ? v : fromDate(d)
 }
 
+/**
+ * 归一成 **epoch 毫秒数**，供倒计时、截止时间比较这类需要数值的场合使用。
+ *
+ * 与 {@link formatDateTime} 认同样的输入（epoch 毫秒、可读字符串、ISO 字符串），
+ * 但**认不出就给 `undefined`** —— 调用方据此当作「没有截止时间」，
+ * 而不是拿到一个 `NaN` 去参与比较（`NaN > x` 恒为 false，会把逻辑悄悄带偏）。
+ */
+export function toMillis(v: TimeInput): number | undefined {
+  if (v === null || v === undefined || v === '') return undefined
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined
+  const t = (READABLE.test(v) ? new Date(v.replace(' ', 'T')) : new Date(v)).getTime()
+  return Number.isNaN(t) ? undefined : t
+}
+
 /** 只要日期部分 `YYYY-MM-DD`。用于「有效期」这类不需要精确到秒的地方 */
 export function formatDate(v: TimeInput): string {
   const full = formatDateTime(v)

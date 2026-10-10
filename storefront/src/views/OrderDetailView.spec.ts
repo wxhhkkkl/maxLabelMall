@@ -63,6 +63,7 @@ vi.mock('@/utils/weixin', async (importOriginal) => ({
 }))
 
 const OrderDetailView = (await import('./OrderDetailView.vue')).default
+const QrPayDialog = (await import('@/components/QrPayDialog.vue')).default
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -671,8 +672,9 @@ describe('OrderDetailView —— 微信公众号 JSAPI 支付（wx_pub）', () =
  *
  * 后端用 `displayMode` 告诉前端「这次支付该怎么继续」：
  *   · `url`   —— 跳收银台（支付宝电脑网站支付）。**拿到地址却不跳 = 什么都没发生**
+ *   · `qr_code` —— 电脑端微信扫码支付：开 `QrPayDialog` 渲染二维码并轮询支付单
  *   · `app`   —— 唤起 App/微信公众号内的收银台（本项目由 `wx_pub` 分支自己处理）
- *   · `qr_code` / `qr_code_url` / `form` —— 前端尚未实现，必须**明说**而不是静默
+ *   · `qr_code_url` / `form` —— 仍未实现，必须**明说**而不是静默
  *   · 不设（null）—— 例如 `mock`：渠道自己受理了，重拉详情确认状态即可
  */
 describe('OrderDetailView —— 按 displayMode 继续支付', () => {
@@ -718,14 +720,113 @@ describe('OrderDetailView —— 按 displayMode 继续支付', () => {
     expect(String(args[3])).toMatch(/^https?:\/\//)
   })
 
-  it('前端接不住的 displayMode（二维码/表单）→ **明确提示**，不静默什么都不做', async () => {
-    submitPay.mockResolvedValue({ status: 0, displayMode: 'qr_code', displayContent: 'weixin://wxpay/...' })
+  it('**displayMode=qr_code → 渲染二维码弹层**（电脑端微信扫码支付），不再是「接不住」', async () => {
+    submitPay.mockResolvedValue({
+      status: 0,
+      displayMode: 'qr_code',
+      displayContent: 'weixin://wxpay/bizpayurl?pr=abcdefg',
+    })
+    // 有效期必须是**未来**：fixture 里的 EXPIRE_AT 是 2026-09-24，早过期了，
+    // 那样弹层一打开就自认失效，测的就不是"渲染二维码"而是"过期分支"
+    const w = await mountDetail(detail({ payExpireTime: Date.now() + 3_600_000 }))
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+    await flushPromises() // 二维码生成是异步的，多等一拍
+
+    const img = w.find('.qr-img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toMatch(/^data:image\/svg\+xml/)
+    expect(redirectTo).not.toHaveBeenCalled()
+    // 旧版那句提示必须**彻底消失** —— 只断言"二维码在"会漏掉两者并存的回归
+    expect(w.text()).not.toContain('当前页面暂不支持')
+    // 订单仍待支付，入口留着
+    expect(w.find('#payOrder').exists()).toBe(true)
+
+    w.unmount() // 停掉弹层的轮询定时器，别留到下一个用例
+  })
+
+  it('qr_code 但支付单**提交即成功** → 不开弹层，直接重拉详情', async () => {
+    submitPay.mockResolvedValue({
+      status: 10,
+      displayMode: 'qr_code',
+      displayContent: 'weixin://wxpay/bizpayurl?pr=abcdefg',
+    })
+    const w = await mountDetail(detail({ payExpireTime: Date.now() + 3_600_000 }))
+    const before = getOrderDetail.mock.calls.length
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(w.find('.qr-img').exists()).toBe(false)
+    expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+    expect(getOrderDetail).toHaveBeenLastCalledWith(1, true)
+  })
+
+  it('qr_code 但 displayContent 为空 → **明确报错**，不开一个空白弹层', async () => {
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'qr_code', displayContent: '' })
+    const w = await mountDetail(detail({ payExpireTime: Date.now() + 3_600_000 }))
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+
+    expect(w.find('.qr-img').exists()).toBe(false)
+    expect(w.text()).toContain('二维码获取失败')
+  })
+
+  it('**扫码支付成功（弹层 emit paid）→ 重拉详情，页面状态以后端为准**', async () => {
+    submitPay.mockResolvedValue({
+      status: 0,
+      displayMode: 'qr_code',
+      displayContent: 'weixin://wxpay/bizpayurl?pr=abcdefg',
+    })
+    const w = await mountDetail(detail({ payExpireTime: Date.now() + 3_600_000 }))
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+    const before = getOrderDetail.mock.calls.length
+
+    // 后端已回调，下一次详情拉取就变成待发货
+    getOrderDetail.mockResolvedValue(detail({ status: OrderStatus.UNDELIVERED }))
+    await w.findComponent(QrPayDialog).vm.$emit('paid')
+    await flushPromises()
+
+    expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+    expect(getOrderDetail).toHaveBeenLastCalledWith(1, true)
+    expect(w.get('.ml-pill').text()).toBe('待发货')
+
+    w.unmount()
+  })
+
+  it('关掉二维码弹层**不重拉详情** —— 重拉会把用户选的渠道重置掉', async () => {
+    submitPay.mockResolvedValue({
+      status: 0,
+      displayMode: 'qr_code',
+      displayContent: 'weixin://wxpay/bizpayurl?pr=abcdefg',
+    })
+    const w = await mountDetail(detail({ payExpireTime: Date.now() + 3_600_000 }))
+
+    await w.get('#payOrder').trigger('click')
+    await flushPromises()
+    const before = getOrderDetail.mock.calls.length
+
+    await w.findComponent(QrPayDialog).vm.$emit('close')
+    await flushPromises()
+
+    expect(getOrderDetail.mock.calls.length).toBe(before)
+
+    w.unmount()
+  })
+
+  it('仍然接不住的 displayMode（二维码图片链接/表单）→ **明确提示**，不静默什么都不做', async () => {
+    submitPay.mockResolvedValue({ status: 0, displayMode: 'qr_code_url', displayContent: 'https://x/qr.png' })
     const w = await mountDetail()
 
     await w.get('#payOrder').trigger('click')
     await flushPromises()
 
     expect(w.text()).toContain('扫码')
+    expect(w.find('.qr-img').exists()).toBe(false)
     expect(redirectTo).not.toHaveBeenCalled()
     // 订单仍待支付，入口留着让用户换渠道再试
     expect(w.find('#payOrder').exists()).toBe(true)

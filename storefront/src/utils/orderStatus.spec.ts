@@ -6,6 +6,8 @@ import {
   ORDER_STATUS_TEXT,
   ORDER_STATUS_VARIANT,
   canCancel,
+  canCommentItem,
+  canCommentOrder,
   canPay,
   isTerminal,
   orderStatusFilters,
@@ -102,5 +104,72 @@ describe('订单列表筛选胶囊', () => {
     expect(f).toHaveLength(6)
     expect(f[0]).toEqual({ value: '', label: '全部' })
     expect(f.map((x) => x.label)).toEqual(['全部', '待支付', '待发货', '已发货', '已完成', '已取消'])
+  })
+})
+
+/**
+ * 评价入口的可见性（FR-073）。
+ *
+ * ⚠️ 三个条件**层级不同**，只判其中一个就会给出"点了必然被拒"的按钮：
+ * - 订单级 `commentStatus` —— 后端拦这个（订单整体评过就拒绝）；
+ * - 订单项级 `commentStatus` —— 后端**不拦**，重复提交是 product 层按
+ *   `(userId, orderItemId)` 挡的；
+ * - 订单状态 —— 后端也拦（必须「已完成」）。
+ */
+describe('canCommentItem —— 能否评价这个订单项', () => {
+  const done = { status: OrderStatus.COMPLETED, commentStatus: false }
+  const item = { commentStatus: false }
+
+  it('已完成 + 订单未评 + 该项未评 → 可以', () => {
+    expect(canCommentItem(done, item)).toBe(true)
+  })
+
+  it.each([OrderStatus.UNPAID, OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.CANCELED])(
+    '订单不是已完成（%i）→ 不可以',
+    (status) => {
+      expect(canCommentItem({ ...done, status }, item)).toBe(false)
+    },
+  )
+
+  it('**订单整体已评价 → 不可以**（后端会以「订单已评价」拒绝）', () => {
+    expect(canCommentItem({ ...done, commentStatus: true }, item)).toBe(false)
+  })
+
+  it('**该项已评价 → 不可以**（后端不拦这条，但重复提交会被 product 层拒）', () => {
+    expect(canCommentItem(done, { commentStatus: true })).toBe(false)
+  })
+
+  it('订单级字段缺失时按"未评价"处理（老数据可能没有这个字段）', () => {
+    expect(canCommentItem({ status: OrderStatus.COMPLETED }, {})).toBe(true)
+  })
+})
+
+describe('canCommentOrder —— 整单是否还有可评价的项', () => {
+  const order = (over: Record<string, unknown> = {}) => ({
+    status: OrderStatus.COMPLETED,
+    commentStatus: false,
+    items: [{ commentStatus: false }],
+    ...over,
+  })
+
+  it('有未评价的项 → 可以', () => {
+    expect(canCommentOrder(order())).toBe(true)
+  })
+
+  it('所有项都评过了 → 不可以', () => {
+    expect(canCommentOrder(order({ items: [{ commentStatus: true }, { commentStatus: true }] }))).toBe(false)
+  })
+
+  it('只有部分项评过 → 仍可以（还有得评）', () => {
+    expect(canCommentOrder(order({ items: [{ commentStatus: true }, { commentStatus: false }] }))).toBe(true)
+  })
+
+  it('订单未完成 / 整体已评价 → 不可以', () => {
+    expect(canCommentOrder(order({ status: OrderStatus.DELIVERED }))).toBe(false)
+    expect(canCommentOrder(order({ commentStatus: true }))).toBe(false)
+  })
+
+  it('没有项时不可以（别给一个点了没东西可评的入口）', () => {
+    expect(canCommentOrder(order({ items: [] }))).toBe(false)
   })
 })

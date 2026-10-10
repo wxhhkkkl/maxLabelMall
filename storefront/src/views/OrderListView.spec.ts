@@ -186,3 +186,58 @@ describe('OrderListView —— 空态与错误态（FR-044 / FR-045）', () => {
     expect(w.text()).toContain('重新加载')
   })
 })
+
+/**
+ * 「去评价」入口（FR-073 / T227）。
+ *
+ * 列表页是**订单级**的入口（详情页才是逐项）—— 点进去到订单详情再选具体商品，
+ * 与上游 mall 的做法一致。判定见 `utils/orderStatus.ts` 的 `canCommentOrder`。
+ */
+describe('OrderListView —— 去评价入口', () => {
+  const ITEM = { id: 11, spuName: '三防热敏标签纸', picUrl: '', count: 1, price: 10000 }
+
+  function completed(over: Partial<OrderPageItem> = {}) {
+    return order(1, {
+      status: OrderStatus.COMPLETED,
+      commentStatus: false,
+      items: [{ ...ITEM, commentStatus: false }],
+      ...over,
+    })
+  }
+
+  async function mountList(item: OrderPageItem) {
+    pageOrders.mockResolvedValue(page([item]))
+    const w = mount(OrderListView, {
+      props: {},
+      global: { plugins: [router, createPinia()] },
+    })
+    await flushPromises()
+    return w
+  }
+
+  it('已完成且还有未评的项 → 有「去评价」，指向订单详情', async () => {
+    const w = await mountList(completed())
+    const btn = w.find('.oc-comment')
+    expect(btn.exists()).toBe(true)
+    // 是全站唯一的评价入口在详情页 —— 列表只把人送过去，不复制一份表单
+    expect(btn.attributes('href')).toBe('/order/1')
+  })
+
+  it.each([OrderStatus.UNPAID, OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.CANCELED])(
+    '订单状态 %i（非已完成）时没有评价入口',
+    async (status) => {
+      const w = await mountList(completed({ status }))
+      expect(w.find('.oc-comment').exists()).toBe(false)
+    },
+  )
+
+  it('订单整体已评价 → 没有入口', async () => {
+    const w = await mountList(completed({ commentStatus: true }))
+    expect(w.find('.oc-comment').exists()).toBe(false)
+  })
+
+  it('所有项都评过了 → 没有入口', async () => {
+    const w = await mountList(completed({ items: [{ ...ITEM, commentStatus: true }] }))
+    expect(w.find('.oc-comment').exists()).toBe(false)
+  })
+})

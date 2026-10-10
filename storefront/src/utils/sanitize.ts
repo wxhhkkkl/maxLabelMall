@@ -39,3 +39,27 @@ export function sanitizeRichText(html: string): string {
     FORBID_ATTR: ['style'],
   })
 }
+
+/**
+ * 判断一段富文本**还有没有可见内容**（FR-064 / FR-065）。
+ *
+ * 为什么需要它：决定"要不要渲染详情区块"之前，得先知道里面到底有没有东西。
+ *
+ * ⚠️ **不能剥掉标签看还剩不剩文字** —— 那正是本缺陷的成因。纯图片详情（长图、参数图）
+ * 在电商里是常态，剥完标签什么文字都不剩，于是被判成"没有详情"整块隐藏。
+ * 所以判据是：**有 `<img>` 就算有内容**，文字只是另一种。
+ *
+ * 反过来，**空壳标签不算**：`<p></p>`、`<br>`、只剩空白的 `<div>` 的可见面积是零，
+ * 放它们通过会渲染出一个什么都看不见的区块 —— 那是另一种空白块，同样要防。
+ *
+ * 用 DOM 解析而不是正则：正则判"有没有内容"本来就不可靠（自闭合标签、属性里的 `>`、
+ * 注释都能骗过它），而浏览器与 jsdom 都现成有 DOM。
+ */
+export function hasVisibleContent(html: string): boolean {
+  if (!html || !html.trim()) return false
+  const el = document.createElement('div')
+  el.innerHTML = html
+  // 图片是可见内容 —— 不能因为"没有文字"就否定它。querySelector 会找到任意层级的 img
+  if (el.querySelector('img')) return true
+  return Boolean(el.textContent?.trim())
+}

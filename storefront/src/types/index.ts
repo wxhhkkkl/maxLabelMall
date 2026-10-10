@@ -1,4 +1,6 @@
 export * from './afterSale'
+export * from './banner'
+export * from './comment'
 export * from './common'
 export * from './member'
 export * from './product'

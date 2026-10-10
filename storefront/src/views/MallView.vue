@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import { BANNER_POSITION, listBanners } from '@/api/banner'
 import { buildCategoryTree, listCategories } from '@/api/category'
 import { pageProducts, SORT_FIELD } from '@/api/product'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
+import MallBanner from '@/components/MallBanner.vue'
 import ProductCard from '@/components/ProductCard.vue'
-import type { Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
+import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
 
 /**
@@ -100,6 +102,23 @@ function onPage(n: number) {
   load()
 }
 
+/**
+ * 商城页顶部横幅（FR-080）。**拉不到就是空的** —— 由 `MallBanner` 整块不渲染，
+ * 商品列表照常从顶部开始，不会留空白（FR-082）。
+ *
+ * ⚠️ 横幅是**辅助区块**：它挂了不该影响商品列表，所以这里吞掉异常而不是置 `error`
+ * （那个 error 是给"商品加载失败"用的，会整页变错误态）。
+ */
+const banners = ref<Banner[]>([])
+
+async function loadBanners() {
+  try {
+    banners.value = await listBanners(BANNER_POSITION.MALL)
+  } catch {
+    banners.value = []
+  }
+}
+
 onMounted(async () => {
   // 分类请求也要在同一处兜错：失败时给出可重试提示，而不是抛出未处理的拒绝
   try {
@@ -109,6 +128,8 @@ onMounted(async () => {
   } catch {
     error.value = true
   }
+  // 与商品列表并行拉，不阻塞首屏
+  void loadBanners()
   await load()
 })
 </script>
@@ -118,6 +139,9 @@ onMounted(async () => {
     <RouterLink to="/">首页</RouterLink><span>/ 商城</span>
     <span class="current">全部商品</span>
   </div>
+
+  <!-- 顶部横幅（FR-080）。0 条时 MallBanner 自己整块不渲染，不留空白 -->
+  <MallBanner :banners="banners" />
 
   <div class="mall-page-main">
     <!-- 侧栏：分类树。**无价格区间/服务筛选，也无各类目计数** -->

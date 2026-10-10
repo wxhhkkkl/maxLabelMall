@@ -64,6 +64,7 @@ const NEW_PAGE_VIEWS = [
   'JobsView',
   'AfterSaleListView',
   'PointsRecordView',
+  'ProductCommentListView',
 ]
 
 const VIEWS_DIR = join(process.cwd(), 'src', 'views')

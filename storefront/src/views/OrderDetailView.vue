@@ -6,6 +6,7 @@ import { cancelOrder, getOrderDetail } from '@/api/order'
 import { getPayOrder, listEnabledChannelCodes, submitPay } from '@/api/pay'
 import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/social'
 import AccountSidebar from '@/components/AccountSidebar.vue'
+import CommentCreateDialog from '@/components/CommentCreateDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
@@ -18,7 +19,7 @@ import { OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
 import { formatYuan, reconcile } from '@/utils/money'
-import { orderStatusText } from '@/utils/orderStatus'
+import { canCommentItem, orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
 import { formatDateTime, toMillis } from '@/utils/time'
 import {
@@ -77,6 +78,10 @@ const refundOpen = ref(false)
 const cancelRefundItem = ref<OrderDetail['items'][number] | null>(null)
 const cancelRefundOpen = ref(false)
 const cancelRefunding = ref(false)
+
+/** 正在评价的那个订单项 —— 后端是按**订单项**提交评价的 */
+const commentItem = ref<OrderDetail['items'][number] | null>(null)
+const commentOpen = ref(false)
 
 /**
  * 二维码弹层（电脑端微信扫码支付）。
@@ -378,6 +383,34 @@ function onQrClosed() {
   qrOpen.value = false
 }
 
+// ========== 评价（按订单项） ==========
+
+/** 该项现在能不能评价。判定要**同时**看订单状态与两个层级的 commentStatus —— 见 `canCommentItem` */
+function canComment(it: OrderDetail['items'][number]): boolean {
+  return order.value ? canCommentItem(order.value, it) : false
+}
+
+function openComment(it: OrderDetail['items'][number]) {
+  message.value = ''
+  commentItem.value = it
+  commentOpen.value = true
+}
+
+/**
+ * 评价提交成功。
+ *
+ * **重拉详情**（`sync=true`）：后端已把该订单项标成已评价，入口应当随之消失 ——
+ * 状态一律以后端为准，不做本地乐观更新。文案由弹层自己给（"审核通过后展示"，FR-078）。
+ */
+async function onCommentSubmitted() {
+  await load(true)
+}
+
+function onCommentClosed() {
+  commentOpen.value = false
+  commentItem.value = null
+}
+
 // ========== 申请退款（按订单项） ==========
 
 /** 该项的售后状态文案；未售后返回空串（不渲染标签） */
@@ -565,6 +598,20 @@ onMounted(async () => {
                 >
                   申请退款
                 </button>
+                <!--
+                  评价入口（FR-073）。与上面两个互不相干 —— 售后是订单项的另一个维度。
+                  判定见 `canCommentItem`：要**同时**看订单状态、订单级与订单项级的
+                  commentStatus，只看一个就会给出"点了必然被拒"的按钮。
+                -->
+                <button
+                  v-if="canComment(it)"
+                  class="od-comment"
+                  type="button"
+                  :data-item="it.id"
+                  @click="openComment(it)"
+                >
+                  评价
+                </button>
               </div>
             </div>
             <div class="od-price">{{ formatYuan(it.price) }}</div>
@@ -698,6 +745,14 @@ onMounted(async () => {
     :order-status="order?.status ?? -1"
     @close="onRefundClosed"
     @submitted="onRefundSubmitted"
+  />
+
+  <!-- 写评价（按订单项）。提交成功后由弹层先告知"审核通过后展示"，再回这里重拉详情 -->
+  <CommentCreateDialog
+    :open="commentOpen"
+    :item="commentItem"
+    @close="onCommentClosed"
+    @submitted="onCommentSubmitted"
   />
 
   <!-- 电脑端微信扫码支付（`wx_native`）。渲染二维码 + 盯支付单，都由弹层自己做 -->

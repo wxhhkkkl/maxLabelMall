@@ -12,6 +12,12 @@ vi.mock('@/api/product', () => ({
 
 const addToCart = vi.fn()
 const getCartCount = vi.fn()
+// T214 的评价区。默认给空列表 —— 绝大多数既有用例不关心评价，不该被它影响
+const pageComments = vi.fn()
+vi.mock('@/api/comment', () => ({
+  COMMENT_TYPE: { ALL: 0, GOOD: 1, MEDIOCRE: 2, NEGATIVE: 3 },
+  pageComments: (...a: unknown[]) => pageComments(...a),
+}))
 vi.mock('@/api/cart', () => ({
   addToCart: (...a: unknown[]) => addToCart(...a),
   getCartCount: (...a: unknown[]) => getCartCount(...a),
@@ -63,6 +69,7 @@ const router = createRouter({
   history: createMemoryHistory(),
   routes: [
     { path: '/product/:id', component: { template: '<div/>' } },
+    { path: '/product/:id/comments', component: { template: '<div/>' } },
     { path: '/mall', component: { template: '<div/>' } },
     { path: '/cart', component: { template: '<div/>' } },
     { path: '/checkout', component: { template: '<div/>' } },
@@ -76,6 +83,10 @@ beforeEach(async () => {
   addToCart.mockResolvedValue(1)
   getCartCount.mockReset()
   getCartCount.mockResolvedValue(0)
+  // 评价默认空列表。**放在 beforeEach 而不是 mountDetail 里** —— mountDetail 会先被调用、
+  // 再挂载，若在那里 reset 就会把用例自己设好的 mock 冲掉
+  pageComments.mockReset()
+  pageComments.mockResolvedValue({ list: [], total: 0 })
   useToasts().reset()
   // router 是模块级单例，跨用例共享。不复位的话，上一个用例导航到的 /checkout
   // 会被下一个用例当成自己的结果（「未选规格不结算」就是这么挂的）。
@@ -91,6 +102,8 @@ async function mountDetail(p: ProductSpu | null) {
     props: { id: 7 },
     global: { plugins: [router, createPinia()] },
   })
+  await flushPromises()
+  // 评价是**第二条**异步链（详情好了才去拉），一拍 flushPromises 盖不住
   await flushPromises()
   return w
 }
@@ -249,6 +262,83 @@ describe('ProductView —— 富文本详情（FR-005b / FR-005c / SC-020）', (
   it('富文本只有空白时也不渲染', async () => {
     const w = await mountDetail(spu({ description: '   \n  ' }))
     expect(w.find('.pd-desc').exists()).toBe(false)
+  })
+
+  /**
+   * ⚠️ **下面这两条是本次修复的核心**（FR-063 / FR-064）。
+   *
+   * 上面那几条"空/纯空白不渲染"的用例一直都在，且一直是绿的 —— 但**纯图片详情从来没被断言过**，
+   * 于是它被"剥掉标签看还剩不剩文字"的旧判据默默吞掉，谁也发现不了。这正是漏掉它的原因。
+   */
+  it('**富文本只有图片（没有文字）时照样渲染** —— 电商里长图详情是常态', async () => {
+    const w = await mountDetail(spu({ description: '<p><img src="http://x/detail.png"></p>' }))
+    expect(w.find('.pd-desc').exists()).toBe(true)
+    expect(w.find('.pd-desc img').exists()).toBe(true)
+  })
+
+  it('**富文本只有空壳标签时不渲染**，且不留占位文案', async () => {
+    const w = await mountDetail(spu({ description: '<p></p><div><br></div>' }))
+    expect(w.find('.pd-desc').exists()).toBe(false)
+    // 不能退化成"渲染一个空区块 + 一句'暂无详情'"——那也是空白块
+    expect(w.text()).not.toContain('暂无详情')
+    expect(w.text()).not.toContain('商品详情')
+  })
+})
+
+/**
+ * 商品详情页的评价区（FR-067 / FR-069 / FR-071）。
+ *
+ * ⚠️ **评价区的失败绝不能带崩详情页** —— 这一页在支付链路上，
+ * 为了一个辅助区块白屏，代价远大于收益。所以专门有一条"接口挂了页面照样正常"。
+ */
+describe('ProductView —— 评价区', () => {
+  function comment(over: Record<string, unknown> = {}) {
+    return {
+      id: 1,
+      userNickname: '李四',
+      scores: 4,
+      content: '标签清晰不掉色',
+      createTime: new Date(2026, 9, 10, 9, 0, 0).getTime(),
+      ...over,
+    }
+  }
+
+  it('有评价时渲染评价区', async () => {
+    pageComments.mockResolvedValue({ list: [comment()], total: 1 })
+    const w = await mountDetail(spu())
+    expect(w.find('.pd-comments').exists()).toBe(true)
+    expect(w.findAll('.cm-item')).toHaveLength(1)
+    expect(w.text()).toContain('标签清晰不掉色')
+  })
+
+  it('按当前商品编号去拉评价', async () => {
+    await mountDetail(spu())
+    expect(pageComments).toHaveBeenCalledWith(expect.objectContaining({ spuId: 7 }))
+  })
+
+  it('**没有评价时明确说明**，不留空白（FR-069）', async () => {
+    pageComments.mockResolvedValue({ list: [], total: 0 })
+    const w = await mountDetail(spu())
+    expect(w.find('.pd-comments').exists()).toBe(true)
+    expect(w.text()).toContain('暂无评价')
+  })
+
+  it('**评价接口挂了，详情页照样正常**（只降级该区块，不整页报错）', async () => {
+    pageComments.mockRejectedValue(new Error('boom'))
+    const w = await mountDetail(spu())
+    expect(w.find('.pd-comments').exists()).toBe(false)
+    // 详情本身还在
+    expect(w.find('.pd-desc').exists()).toBe(true)
+    expect(w.text()).toContain('产品详情正文')
+    expect(w.text()).not.toContain('加载失败')
+  })
+
+  it('点「查看全部评价」跳到该商品的全部评价页', async () => {
+    pageComments.mockResolvedValue({ list: [comment()], total: 30 })
+    const w = await mountDetail(spu())
+    await w.get('.cm-view-all').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/product/7/comments')
   })
 })
 

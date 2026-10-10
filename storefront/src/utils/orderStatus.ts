@@ -61,6 +61,37 @@ export function isTerminal(status: number): boolean {
   return status === OrderStatus.COMPLETED || status === OrderStatus.CANCELED
 }
 
+/**
+ * 能否评价**这个订单项**（FR-073）。
+ *
+ * ⚠️ 三个条件缺一不可，而且它们**层级不同** —— 这是最容易写错的地方：
+ *
+ * 1. **订单状态必须是「已完成」**（后端拦这个）；
+ * 2. **订单级** `commentStatus` 必须为 `false` —— 后端也拦这个：订单整体评过就拒绝，
+ *    报「创建交易订单项的评价失败，订单已评价」；
+ * 3. **订单项级** `commentStatus` 必须为 `false` —— 后端**不拦**这个（它只看订单级的），
+ *    重复提交是 product 层按 `(userId, orderItemId)` 挡的，报「订单的商品评价已存在」。
+ *
+ * 所以只判其中一个就会给出"点了必然被拒"的按钮：只判订单级 → 已评过的项还显示入口；
+ * 只判订单项级 → 订单没完成时也显示入口。
+ */
+export function canCommentItem(
+  order: { status: number; commentStatus?: boolean },
+  item: { commentStatus?: boolean },
+): boolean {
+  return order.status === OrderStatus.COMPLETED && !order.commentStatus && !item.commentStatus
+}
+
+/** 订单列表页：整单是否**还有项可评价**（有则给「去评价」入口）。粒度是订单，不是订单项 */
+export function canCommentOrder(order: {
+  status: number
+  commentStatus?: boolean
+  items?: Array<{ commentStatus?: boolean }>
+}): boolean {
+  if (order.status !== OrderStatus.COMPLETED || order.commentStatus) return false
+  return (order.items ?? []).some((it) => !it.commentStatus)
+}
+
 /** 订单列表的筛选胶囊。顺序与设计一致：全部在最前 */
 export function orderStatusFilters(): Array<{ value: OrderStatusValue | ''; label: string }> {
   return [

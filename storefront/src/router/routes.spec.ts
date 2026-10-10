@@ -34,11 +34,12 @@ function makeRouter() {
   return r
 }
 
-/** 设计稿 6 条 + 功能页 13 条 + 信息页 6 条 = 25（另加行业详情 1 条 = 26） */
+/** 设计稿 6 条 + 功能页 14 条 + 信息页 6 条 = 26（另加行业详情 1 条 = 27） */
 const ALL_PATHS = [
   '/',
   '/mall',
   '/product/1',
+  '/product/1/comments',
   '/software',
   '/solutions',
   '/solutions/warehouse',
@@ -65,7 +66,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 26 条路径（设计稿 6 + 功能页 13 + 信息页 6 + 行业详情 1）', () => {
+  it('声明了 27 条路径（设计稿 6 + 功能页 14 + 信息页 6 + 行业详情 1）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -78,7 +79,8 @@ describe('路由表', () => {
     // 叶子路由。注意首页那条 path 为 ''，解析后就是 '/'，不要额外过滤掉它。
     // 2026-10-09：个人中心整理新增 /account/after-sale 与 /account/points（23 → 26，
     // 其中 23 之后先由行业方案加了 1 条）。
-    expect(paths).toHaveLength(26)
+    // 2026-10-10：商品详情改版追加 /product/:id/comments（26 → 27）。
+    expect(paths).toHaveLength(27)
     expect(paths).toContain('/')
   })
 

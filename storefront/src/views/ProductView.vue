@@ -2,15 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { pageComments } from '@/api/comment'
 import { getProductDetail } from '@/api/product'
+import CommentList from '@/components/CommentList.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import { useToasts } from '@/components/base/useToasts'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
 import { formatYuan } from '@/utils/money'
-import { sanitizeRichText } from '@/utils/sanitize'
-import type { ProductSpu, ProductSku } from '@/types'
+import { hasVisibleContent, sanitizeRichText } from '@/utils/sanitize'
+import type { ProductComment, ProductSpu, ProductSku } from '@/types'
 
 /**
  * 商品详情页 —— 按设计稿 `www/product.html` 还原，沿用其 class 名。
@@ -73,14 +75,17 @@ const stock = computed(() => currentSku.value?.stock ?? spu.value?.stock ?? 0)
 const priceText = computed(() => formatYuan(price.value))
 const marketText = computed(() => (marketPrice.value > 0 ? formatYuan(marketPrice.value) : ''))
 
-/** 富文本：过滤后仍需判断是否为空 —— 空或只有空白时整块不渲染（FR-005b） */
+/**
+ * 富文本：过滤后仍需判断是否为空 —— 空或只有空白时整块不渲染（FR-005b）。
+ *
+ * ⚠️ 判"有没有内容"必须用 {@link hasVisibleContent}，**不能剥掉标签看还剩不剩文字** ——
+ * 那会把**纯图片的详情**（长图、参数图，电商里的常态）判成空、整块隐藏（FR-064）。
+ */
 const safeDescription = computed(() => {
   const raw = spu.value?.description ?? ''
   if (!raw.trim()) return ''
   const clean = sanitizeRichText(raw)
-  // 过滤后可能只剩空标签，用文本判断是否真有内容
-  const textOnly = clean.replace(/<[^>]*>/g, '').trim()
-  return textOnly ? clean : ''
+  return hasVisibleContent(clean) ? clean : ''
 })
 
 function pickSku(s: ProductSku) {
@@ -148,9 +153,40 @@ function onBuyNow(): void {
     .catch(() => undefined)
 }
 
+/**
+ * 评价列表。**`null` 与 `[]` 是两回事**：
+ * - `null` = 还没拿到、或没拿到（接口挂了）→ **不渲染评价区**；
+ * - `[]`   = 拿到了但一条评价都没有 → 按 FR-069 **明说"暂无评价"**，不留空白。
+ */
+const comments = ref<ProductComment[] | null>(null)
+const commentTotal = ref(0)
+
+/**
+ * 拉评价。
+ *
+ * ⚠️ **不 await、失败也不上抛**：评价是辅助区块，详情页在支付链路上，
+ * 为一个副区块白屏的代价远大于收益（plan 风险 R1）。
+ */
+async function loadComments() {
+  try {
+    const res = await pageComments({ spuId: Number(props.id), pageSize: 5 })
+    comments.value = res.list ?? []
+    commentTotal.value = res.total ?? 0
+  } catch {
+    comments.value = null
+    commentTotal.value = 0
+  }
+}
+
+function goAllComments() {
+  void router.push(`/product/${props.id}/comments`)
+}
+
 async function load() {
   loading.value = true
   notFound.value = false
+  // 换商品时先清掉，免得短暂显示上一个商品的评价
+  comments.value = null
   try {
     const detail = await getProductDetail(Number(props.id))
     spu.value = detail
@@ -159,6 +195,8 @@ async function load() {
     currentSkuId.value = list.find((s) => s.stock > 0)?.id ?? null
     // 换了商品要把"用户点过的那张图"清掉，否则会显示上一个商品选中的图
     pickedPic.value = ''
+    // 不 await —— 评价区不阻塞详情渲染
+    void loadComments()
   } catch {
     // 已下架 / 不存在：后端返回业务异常，这里给出明确提示而非空白页（FR-007）
     notFound.value = true
@@ -269,5 +307,19 @@ watch(() => props.id, load)
       <h2>商品详情</h2>
       <div class="pd-desc" v-html="safeDescription"></div>
     </div>
+
+    <!--
+      评价区（FR-067 / FR-069 / FR-071 / FR-072）。**异步加载**：
+      拉不到就整块不渲染 —— 这一页在支付链路上，不能为一个辅助区块白屏。
+      文案用中性的「用户评价」，**不写**「最新评价」：后端该接口没有排序（契约 §2.1）。
+    -->
+    <section v-if="comments" class="params pd-comments">
+      <h2>用户评价</h2>
+      <CommentList
+        :comments="comments"
+        :show-view-all="commentTotal > comments.length"
+        @view-all="goAllComments"
+      />
+    </section>
   </template>
 </template>

@@ -69,6 +69,14 @@ export interface OrderPageItem {
   createTime: number | string
   payPrice: number
   /**
+   * **订单整体是否已评价**（后端 `AppTradeOrderPageItemRespVO.commentStatus`）。
+   *
+   * ⚠️ 这是**订单级**的：只有当订单里**所有**订单项都评过，后端才会把它置为 `true`。
+   * 它与下面订单项级的 `commentStatus` **是两个不同的判定**，评价入口要**同时**看两个
+   * （后端拦的是订单级，重复提交是 product 层按订单项拦的）。
+   */
+  commentStatus?: boolean
+  /**
    * 订单项。**名称 / 规格 / 单价 / 数量都是下单时的快照** —— 商品后续改名、
    * 换规格、调价都不应让历史订单跟着变。
    */
@@ -83,6 +91,8 @@ export interface OrderPageItem {
     price: number
     /** 该项应付金额（总），单位：分。**也是「申请退款」的金额上限**（后端按它校验） */
     payPrice?: number
+    /** **该订单项是否已评价**。与订单级的 `commentStatus` 是两回事，见上 */
+    commentStatus?: boolean
     /**
      * 该订单项的**售后**编号与状态（后端 `AppTradeOrderItemRespVO`）。
      * `afterSaleStatus`：0 未售后 / 10 售后中 / 20 售后成功 —— 见 `@/types/afterSale`。

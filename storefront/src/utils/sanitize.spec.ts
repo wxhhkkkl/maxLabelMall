@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sanitizeRichText } from './sanitize'
+import { hasVisibleContent, sanitizeRichText } from './sanitize'
 
 /**
  * 富文本安全过滤（FR-005c / SC-020）。
@@ -88,5 +88,55 @@ describe('sanitizeRichText —— 保留排版、剔除可执行内容', () => {
 
   it('纯文本原样保留', () => {
     expect(sanitizeRichText('就是一段纯文本')).toBe('就是一段纯文本')
+  })
+})
+
+/**
+ * 「有没有可见内容」的判定（FR-064 / FR-065）。
+ *
+ * ⚠️ **这里是本次修复的核心**。原判定是"剥掉所有标签后看还剩不剩**文字**"，
+ * 于是**纯图片的详情被判成空、整块不显示** —— 而纯图片详情在电商里是常态，
+ * 存量数据里就有好几件。新判据把图片与文字**同等对待**。
+ *
+ * 判据故意收得紧：空壳标签（`<p></p>`、`<br>`）**不算**有内容。放宽它们会让
+ * "详情区块渲染出来了但什么也看不见"——那是另一种空白块，同样要防。
+ */
+describe('hasVisibleContent —— 图片与文字同等计为"有内容"', () => {
+  it('**纯图片算有内容**（本次修复的那一类）', () => {
+    expect(hasVisibleContent('<img src="http://x/a.png">')).toBe(true)
+    expect(hasVisibleContent('<p><img src="http://x/a.png"></p>')).toBe(true)
+  })
+
+  it('表格里嵌的图片也算（不能只看直接子节点）', () => {
+    expect(hasVisibleContent('<table><tr><td><img src="x.png"></td></tr></table>')).toBe(true)
+  })
+
+  it('纯文本算有内容', () => {
+    expect(hasVisibleContent('就是一段纯文本')).toBe(true)
+    expect(hasVisibleContent('<p>三防热敏纸</p>')).toBe(true)
+  })
+
+  it('图文混排算有内容', () => {
+    expect(hasVisibleContent('<img src="a.png"><p>说明文字</p>')).toBe(true)
+  })
+
+  it('**空壳标签不算**有内容 —— 否则会渲染出一个什么都看不见的空白块', () => {
+    expect(hasVisibleContent('<p></p>')).toBe(false)
+    expect(hasVisibleContent('<div></div><div></div>')).toBe(false)
+    expect(hasVisibleContent('<br>')).toBe(false)
+    expect(hasVisibleContent('<p><br></p><div><span>   </span></div>')).toBe(false)
+  })
+
+  it('空串 / 空白串不算有内容', () => {
+    expect(hasVisibleContent('')).toBe(false)
+    expect(hasVisibleContent('   \n  ')).toBe(false)
+  })
+
+  it('清洗后什么都不剩（例如只有 script）不算有内容', () => {
+    expect(hasVisibleContent(sanitizeRichText('<script>alert(1)</script>'))).toBe(false)
+  })
+
+  it('只有表格文字也算有内容', () => {
+    expect(hasVisibleContent('<table><tr><td>30dpi</td></tr></table>')).toBe(true)
   })
 })

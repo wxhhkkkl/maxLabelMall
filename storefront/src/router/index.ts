@@ -35,6 +35,14 @@ const router = createRouter({
           // `Number(undefined)` 变成 NaN，请求就成了 `get-detail?id=NaN`。
           props: true,
         },
+        {
+          // 某个商品的全部评价。放在 `product/:id` 之后 —— 静态段 `comments` 比
+          // 动态段更具体，vue-router 会优先匹配它，不会把 `/product/1/comments` 吞掉。
+          path: 'product/:id/comments',
+          name: 'product-comments',
+          component: () => import('@/views/ProductCommentListView.vue'),
+          props: true,
+        },
         { path: 'software', name: 'software', component: () => import('@/views/SoftwareView.vue') },
         { path: 'solutions', alias: '/solution', name: 'solutions', component: () => import('@/views/SolutionsView.vue') },
         { path: 'solutions/:industry', alias: '/solution/:industry', name: 'solution-detail', component: () => import('@/views/IndustrySolutionView.vue') },

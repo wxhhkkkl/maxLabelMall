@@ -12,7 +12,7 @@ import MlPill from '@/components/base/MlPill.vue'
 import type { OrderPageItem } from '@/types'
 import { OrderStatus } from '@/types'
 import { formatYuan } from '@/utils/money'
-import { orderStatusFilters } from '@/utils/orderStatus'
+import { canCommentOrder, orderStatusFilters } from '@/utils/orderStatus'
 import { formatDateTime } from '@/utils/time'
 
 /**
@@ -170,6 +170,17 @@ onMounted(load)
           <div class="oc-foot">
             <span class="oc-total-label">应付金额</span>
             <span class="oc-total">{{ formatYuan(o.payPrice) }}</span>
+            <!--
+              评价入口（FR-073）。与支付同理：**表单只在详情页有一份**，列表这里只把人送过去。
+              列表页拿得到"整单还有没有项待评价"，但逐项入口在详情页更合适（卡片不至于太长）。
+            -->
+            <RouterLink
+              v-if="canCommentOrder(o)"
+              class="btn-cart oc-comment"
+              :to="`/order/${o.id}`"
+            >
+              去评价
+            </RouterLink>
             <!--
               支付入口在订单详情页（T117）—— 全站只有一处实现支付调用，
               列表这里只把人送过去，不复制一份支付逻辑。

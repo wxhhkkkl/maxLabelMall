@@ -54,6 +54,13 @@ vi.mock('@/api/social', () => ({
   getSocialAuthRedirectUrl: (...a: unknown[]) => getSocialAuthRedirectUrl(...a),
 }))
 
+// 写评价弹层（T226 接的入口）会用到这里；不 mock 会让弹层一挂载就发真实请求
+const createOrderItemComment = vi.fn()
+vi.mock('@/api/tradeComment', () => ({
+  createOrderItemComment: (...a: unknown[]) => createOrderItemComment(...a),
+}))
+vi.mock('@/api/upload', () => ({ uploadFile: vi.fn() }))
+
 // 只把「整页跳转」换掉（jsdom 里赋值 location.href 会报 not implemented），
 // 其余走真实实现 —— 这样「到底有没有真的去唤起收银台」才是被真实验证过的。
 const redirectTo = vi.fn()
@@ -1040,5 +1047,101 @@ describe('OrderDetailView —— 撤销退款申请', () => {
     await flushPromises()
 
     expect(w.text()).toContain('售后单状态不允许取消')
+  })
+})
+
+/**
+ * 评价入口（FR-073 / T226）。
+ *
+ * ⚠️ 入口的判定要**同时**看三样，且它们**层级不同** —— 只判一个就会给出
+ * "点了必然被拒"的按钮（判定逻辑见 `utils/orderStatus.ts` 的 `canCommentItem`）：
+ *   订单状态「已完成」 / **订单级** commentStatus / **订单项级** commentStatus。
+ * 前两个后端会拦，第三个后端**不拦**（重复提交是 product 层按订单项挡的）。
+ */
+describe('OrderDetailView —— 评价入口', () => {
+  const ITEM = {
+    id: 11,
+    spuName: '三防热敏标签纸',
+    picUrl: '',
+    properties: [{ propertyName: '版本', valueName: '标配' }],
+    count: 1,
+    price: 10000,
+    payPrice: 7000,
+  }
+
+  /** 已完成、且订单与订单项都没评过 */
+  function completed(over: Partial<OrderDetail> = {}) {
+    return detail({
+      status: OrderStatus.COMPLETED,
+      commentStatus: false,
+      items: [{ ...ITEM, commentStatus: false }],
+      ...over,
+    })
+  }
+
+  it('已完成 + 订单未评 + 该项未评 → 有评价入口', async () => {
+    const w = await mountDetail(completed())
+    expect(w.find('.od-comment').exists()).toBe(true)
+  })
+
+  it.each([OrderStatus.UNPAID, OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.CANCELED])(
+    '订单状态 %i（非已完成）时没有评价入口',
+    async (status) => {
+      const w = await mountDetail(completed({ status }))
+      expect(w.find('.od-comment').exists()).toBe(false)
+    },
+  )
+
+  it('**订单整体已评价 → 没有入口**（后端会以「订单已评价」拒绝）', async () => {
+    const w = await mountDetail(completed({ commentStatus: true }))
+    expect(w.find('.od-comment').exists()).toBe(false)
+  })
+
+  it('**该项已评价 → 没有入口**（重复提交会被 product 层拒）', async () => {
+    const w = await mountDetail(
+      completed({ items: [{ ...ITEM, commentStatus: true }] }),
+    )
+    expect(w.find('.od-comment').exists()).toBe(false)
+  })
+
+  it('多项商品时只给未评价的那一项入口', async () => {
+    const w = await mountDetail(
+      completed({
+        items: [
+          { ...ITEM, commentStatus: true },
+          { ...ITEM, id: 12, spuName: '另一件商品', commentStatus: false },
+        ],
+      }),
+    )
+    const buttons = w.findAll('.od-comment')
+    expect(buttons).toHaveLength(1)
+    // 挂在未评价的那一项上
+    expect(buttons[0]?.attributes('data-item')).toBe('12')
+  })
+
+  it('点入口打开写评价弹层', async () => {
+    const w = await mountDetail(completed())
+    await w.get('.od-comment').trigger('click')
+    await flushPromises()
+    expect(w.find('#commentSubmit').exists()).toBe(true)
+  })
+
+  it('**提交成功后重拉订单**（入口随之消失，状态以后端为准）', async () => {
+    createOrderItemComment.mockResolvedValue(1)
+    const w = await mountDetail(completed())
+    const before = getOrderDetail.mock.calls.length
+
+    await w.get('.od-comment').trigger('click')
+    await flushPromises()
+    await w.get('#commentContent').setValue('很好用')
+    // 提交后后端会把该项标成已评价
+    getOrderDetail.mockResolvedValue(completed({ items: [{ ...ITEM, commentStatus: true }] }))
+    await w.get('#commentSubmit').trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+    expect(getOrderDetail).toHaveBeenLastCalledWith(1, true)
+    expect(w.find('.od-comment').exists()).toBe(false)
   })
 })

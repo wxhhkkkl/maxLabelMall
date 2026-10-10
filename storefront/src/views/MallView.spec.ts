@@ -26,6 +26,13 @@ vi.mock('@/api/category', () => ({
   buildCategoryTree: (l: unknown[]) => l,
 }))
 
+// 顶部横幅（T238）。默认空数组 —— 绝大多数用例不关心它
+const listBanners = vi.fn()
+vi.mock('@/api/banner', () => ({
+  BANNER_POSITION: { HOME: 1, MALL: 6 },
+  listBanners: (...a: unknown[]) => listBanners(...a),
+}))
+
 const MallView = (await import('./MallView.vue')).default
 
 const router = createRouter({
@@ -76,6 +83,9 @@ function lastParams() {
 beforeEach(() => {
   setActivePinia(createPinia())
   window.localStorage.clear()
+  // 横幅默认空 —— 只有专门测它的用例才覆盖
+  listBanners.mockReset()
+  listBanners.mockResolvedValue([])
 })
 
 describe('MallView —— 商品网格与总数', () => {
@@ -247,5 +257,39 @@ describe('MallView —— 分页', () => {
   it('只有一页时不渲染分页', async () => {
     const w = await mountMall([spu(1)], 1)
     expect(w.find('.pager').exists()).toBe(false)
+  })
+})
+
+/**
+ * 商城页顶部横幅（FR-080 / FR-082 / T238）。
+ *
+ * 页面这一层只需要保证两件事：**按「商城页」位置去拉**、以及**拉不到时不留空白**。
+ * 三态的渲染细节由 `MallBanner.spec.ts` 覆盖。
+ */
+describe('MallView —— 顶部横幅', () => {
+  it('按「商城页」位置（6）拉横幅', async () => {
+    await mountMall()
+    expect(listBanners).toHaveBeenCalledWith(6)
+  })
+
+  it('有横幅时渲染出来', async () => {
+    listBanners.mockResolvedValue([{ id: 1, title: '活动', picUrl: 'http://x/a.png', url: 'http://x' }])
+    const w = await mountMall()
+    expect(w.find('.mall-banner-wrap').exists()).toBe(true)
+  })
+
+  it('**没有横幅时整块不渲染**（不留空白占位，商品列表照常）', async () => {
+    const w = await mountMall()
+    expect(w.find('.mall-banner-wrap').exists()).toBe(false)
+    expect(w.findAll('.p-card').length).toBeGreaterThan(0)
+  })
+
+  it('**横幅接口挂了不影响商品列表**（辅助区块不该带崩这一页）', async () => {
+    listBanners.mockRejectedValue(new Error('boom'))
+    const w = await mountMall()
+    expect(w.find('.mall-banner-wrap').exists()).toBe(false)
+    // 商品照常渲染 —— 这才是关键：不能因为横幅失败就整页报错
+    expect(w.findAll('.p-card').length).toBeGreaterThan(0)
+    expect(w.text()).not.toContain('加载失败')
   })
 })

@@ -6,34 +6,38 @@ import type { Banner } from '@/types'
 import MallBanner from './MallBanner.vue'
 
 /**
- * 商城页顶部横幅（FR-080~083）。
+ * 商城页顶部横幅（FR-080~083）—— **组合式**：后台配的图 + 后台配的文案，前端负责排版。
  *
- * ⚠️ 组件**不发请求** —— 数据由 `MallView` 拉好传进来，这样"拉失败"由页面决定怎么降级，
- * 组件只管渲染三态（0 条 / 1 条 / 多条），也才好测。
+ * 为什么不是"上传一张拍平的图"：设计稿的横幅是一张产品图 + 一层渐变 + 几段排版文字。
+ * 拍平成一张 PNG 后，窄屏要么被裁掉左边的字、要么缩得很小。组合式则怎么缩放都不丢内容。
  *
- * 三条容易写错的：
- * - **0 条必须整块不渲染** —— 渲染一个空容器会把商品列表顶下去、留一片空白；
- * - **1 条不得出现轮播控件** —— 一张图配圆点与箭头是无意义的交互噪音；
- * - **没有 url 时不得跳转** —— 后端该字段可为空，套个 `<a href="">` 会导致点一下刷页。
+ * 文案的来源见 `utils/banner.ts` 的表格（`标题` 分行、`描述` 拆副标题 / 胶囊）。
+ *
+ * ⚠️ 组件**不发请求** —— 数据由 `MallView` 拉好传进来，这样"拉失败"由页面决定怎么降级。
  */
 function banner(over: Partial<Banner> = {}): Banner {
-  return { id: 1, title: '标签耗材满减', picUrl: 'http://x/a.png', url: 'http://x/act', ...over }
+  return {
+    id: 1,
+    title: '从设计到打印\n每一步，都有好搭档',
+    memo: '标签软件 · 打印设备 · 标签耗材\nMaxLabel 软件开发中',
+    picUrl: 'http://x/product.webp',
+    url: 'http://x/act',
+    ...over,
+  }
 }
 
 function mountBanner(banners: Banner[]) {
   return mount(MallBanner, { props: { banners } })
 }
 
-describe('MallBanner —— 三态', () => {
+describe('MallBanner —— 三态（0 条 / 1 条 / 多条）', () => {
   it('**0 条时整块不渲染**（不留空白占位，商品列表从顶部正常开始）', () => {
-    const w = mountBanner([])
-    expect(w.find('.mall-banner-wrap').exists()).toBe(false)
+    expect(mountBanner([]).find('.mall-banner-wrap').exists()).toBe(false)
   })
 
-  it('1 条时渲染图片，且**没有任何轮播控件**', () => {
+  it('1 条时渲染，且**没有任何轮播控件**', () => {
     const w = mountBanner([banner()])
     expect(w.find('.mall-banner-wrap').exists()).toBe(true)
-    expect(w.get('.mbn-img').attributes('src')).toBe('http://x/a.png')
     expect(w.find('.car-dot').exists()).toBe(false)
     expect(w.find('.car-arrow').exists()).toBe(false)
   })
@@ -41,35 +45,60 @@ describe('MallBanner —— 三态', () => {
   it('多条时走轮播，圆点数量与横幅数一致', () => {
     const w = mountBanner([banner(), banner({ id: 2, title: '第二张' })])
     expect(w.findAll('.car-dot')).toHaveLength(2)
-    expect(w.findAll('.mbn-img')).toHaveLength(2)
   })
+})
 
-  it('图片的 alt 用后端给的 title（可访问性，也便于排查是哪张图挂了）', () => {
+describe('MallBanner —— 文案排版（后台配文，前端排版）', () => {
+  it('主标题按换行分成多行渲染', () => {
     const w = mountBanner([banner()])
-    expect(w.get('.mbn-img').attributes('alt')).toBe('标签耗材满减')
+    const lines = w.findAll('.mbn-title-line').map((n) => n.text())
+    expect(lines).toEqual(['从设计到打印', '每一步，都有好搭档'])
   })
 
-  it('多条时每张都渲染出来', () => {
-    const w = mountBanner([banner(), banner({ id: 2, picUrl: 'http://x/b.png' })])
-    const srcs = w.findAll('.mbn-img').map((i) => i.attributes('src'))
-    expect(srcs).toEqual(['http://x/a.png', 'http://x/b.png'])
+  it('副标题来自「描述」第一行', () => {
+    expect(mountBanner([banner()]).get('.mbn-subtitle').text()).toBe('标签软件 · 打印设备 · 标签耗材')
+  })
+
+  it('胶囊来自「描述」第二行', () => {
+    expect(mountBanner([banner()]).get('.mbn-badge').text()).toBe('MaxLabel 软件开发中')
+  })
+
+  it('**「描述」只有一行时不渲染胶囊**', () => {
+    const w = mountBanner([banner({ memo: '只有副标题' })])
+    expect(w.get('.mbn-subtitle').text()).toBe('只有副标题')
+    expect(w.find('.mbn-badge').exists()).toBe(false)
+  })
+
+  it('**没有「描述」时副标题与胶囊都不渲染**（不留空壳）', () => {
+    const w = mountBanner([banner({ memo: undefined })])
+    expect(w.find('.mbn-subtitle').exists()).toBe(false)
+    expect(w.find('.mbn-badge').exists()).toBe(false)
+    // 标题还在
+    expect(w.findAll('.mbn-title-line')).toHaveLength(2)
+  })
+
+  it('品牌行是前端固定的（站点自己的名字，页头页脚本来就写着）', () => {
+    expect(mountBanner([banner()]).get('.mbn-brand').text()).toContain('MaxLabel')
+  })
+
+  it('图片用 title 当 alt（可访问性，也便于排查是哪张图挂了）', () => {
+    expect(mountBanner([banner()]).get('.mbn-photo').attributes('alt')).toContain('从设计到打印')
   })
 })
 
 describe('MallBanner —— 跳转（FR-083）', () => {
-  it('配了 url → 是链接，且新开标签页（不把用户带离本站）', () => {
-    const w = mountBanner([banner({ url: 'http://x/act' })])
-    const a = w.get('.mbn-link')
+  it('配了 url → 整块是链接，且新开标签页（不把用户带离本站）', () => {
+    const a = mountBanner([banner({ url: 'http://x/act' })]).get('.mbn-link')
     expect(a.attributes('href')).toBe('http://x/act')
     expect(a.attributes('target')).toBe('_blank')
     expect(a.attributes('rel')).toContain('noopener')
   })
 
-  it('**没配 url → 不是链接**（点了不跳转、也不报错）', () => {
+  it('**没配 url → 不是链接**（点了不跳转、也不报错），但内容照常渲染', () => {
     const w = mountBanner([banner({ url: undefined })])
     expect(w.find('.mbn-link').exists()).toBe(false)
-    // 图还在，只是不可点
-    expect(w.find('.mbn-img').exists()).toBe(true)
+    expect(w.find('.mbn-photo').exists()).toBe(true)
+    expect(w.findAll('.mbn-title-line')).toHaveLength(2)
   })
 
   it('多条时逐张判 url（一条有、一条没有）', () => {
@@ -79,44 +108,34 @@ describe('MallBanner —— 跳转（FR-083）', () => {
 })
 
 /**
- * 横幅图片的尺寸契约（2026-10-10 一轮修两次，这里把结论钉死）。
+ * 图片的尺寸契约。
  *
- * 所有者定的口径是**高度固定 220px**，同时**不许裁、不许拉伸**。
- * 三条同时满足只有一种做法：**`object-fit: contain`** —— 图片完整放进盒子里、
- * 保持自身比例，装不满的地方留白。
+ * 所有者定的口径是**高度固定 220px**，同时**不许裁、不许拉伸** ——
+ * 三条同时满足只有 `object-fit: contain`（图片完整放进盒子、保持自身比例，装不满处留白）。
  *
- * ⚠️ **不要写回 `cover`**：`cover` 是"等比放大到填满、溢出部分裁掉"，后果两条 ——
- *   · 窄屏时左右被切 → **图片最左边的文字看不到**；
- *   · 源图比容器小时被放大到填满 → **模糊**。
- * 第一版就是 `cover`，被所有者当场发现了。
+ * ⚠️ **不要写回 `cover`**：`cover` 是"放大到填满、溢出裁掉"，窄屏会切掉图片左右。
+ * 组合式横幅把这个风险降到了最低（文字在 HTML 里、图只是配景），但「不许裁」这条依然有效。
  *
- * jsdom 没有排版引擎，测不了"到底裁没裁"；所以这里钉的是**样式契约**本身 ——
- * 与 `styles/design-consistency.spec.ts` 读样式文本做断言是同一套做法。
+ * jsdom 没有排版引擎，测不了"到底裁没裁"，所以钉的是**样式契约**本身 ——
+ * 与 `styles/design-consistency.spec.ts` 读样式文本断言是同一套做法。
  */
-describe('MallBanner —— 图片尺寸契约', () => {
-  /**
-   * 取样式块，**并剥掉 `/* … *\/` 注释**。
-   *
-   * 注释里会引用反例（"不要写回 `object-fit: cover`"），不剥掉的话反面断言会被
-   * 自己的散文绊倒 —— 断言的对象应该是**真实生效的 CSS**，不是解释文字。
-   */
-  async function styleBlock(): Promise<string> {
+describe('MallBanner —— 尺寸契约', () => {
+  /** 取某个组件样式块并**剥掉注释** —— 注释里会引用反例，不该把断言绊倒 */
+  async function styleOf(file: string): Promise<string> {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
-    const src = readFileSync(join(process.cwd(), 'src', 'components', 'MallBanner.vue'), 'utf8')
+    const src = readFileSync(join(process.cwd(), 'src', 'components', file), 'utf8')
     return src.slice(src.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '')
   }
 
-  it('**用 contain 而不是 cover** —— cover 会裁掉图片左右（最左的文字就没了）', async () => {
-    const style = await styleBlock()
-    expect(style).toMatch(/object-fit:\s*contain/)
-    // 反面断言：绝不能出现 cover（"删掉整条规则"不该算通过）
-    expect(style).not.toMatch(/object-fit:\s*cover/)
+  it('**容器高度固定 220px** —— 要压过 design.css 在窄屏把它设成 auto 的那条规则', async () => {
+    const style = await styleOf('MallBanner.vue')
+    expect(style).toMatch(/\.mall-banner[^}]*height:\s*220px/)
   })
 
-  it('高度是固定的 220px（所有者定的口径，不是 auto）', async () => {
-    const style = await styleBlock()
-    expect(style).toMatch(/\.mbn-img[^}]*height:\s*220px/)
-    expect(style).not.toMatch(/\.mbn-img[^}]*height:\s*auto/)
+  it('**产品图用 contain 而不是 cover** —— cover 会裁掉图', async () => {
+    const style = await styleOf('BannerSlide.vue')
+    expect(style).toMatch(/object-fit:\s*contain/)
+    expect(style).not.toMatch(/object-fit:\s*cover/)
   })
 })

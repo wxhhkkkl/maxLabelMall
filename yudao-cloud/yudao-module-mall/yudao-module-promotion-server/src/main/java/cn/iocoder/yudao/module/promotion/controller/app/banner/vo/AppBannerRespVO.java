@@ -23,4 +23,14 @@ public class AppBannerRespVO {
     @NotNull(message = "图片地址不能为空")
     private String picUrl;
 
+    /**
+     * 描述（后台表单里的「描述」字段）。
+     *
+     * **本项目新增**（2026-10-10）：商城的横幅是**组合式**的 —— 后台配图与文案，
+     * 前端负责排版。副标题与胶囊两段文案就来自这个字段（按换行拆，见前端 `utils/banner.ts`）。
+     * 上游这个 VO 只有 id/title/url/picUrl 四个字段，不补这个字段的话文案到不了前端。
+     */
+    @Schema(description = "描述（前端按换行拆成副标题与胶囊）")
+    private String memo;
+
 }

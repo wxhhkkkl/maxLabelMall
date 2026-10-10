@@ -117,7 +117,15 @@
 
 ### 5.1 `GET /promotion/banner/list?position=<位置值>`
 
-- **无需登录**。返回 `AppBannerRespVO[]`：`{ id, title, url, picUrl }`。
+- **无需登录**。返回 `AppBannerRespVO[]`：`{ id, title, url, picUrl, memo }`。
+  - `picUrl` 是**产品图**（不是整张横幅）：商城的横幅是**组合式**的 —— 后台配图与文案、
+    前端负责排版，所以文字不会随图片被裁掉，窄屏也不会缩成一团。
+  - 文案按**换行**拆（2026-10-10 与所有者约定，见前端 `src/utils/banner.ts`）：
+    `title` 的每一行是主标题的一行；`memo` 第 1 行是副标题、第 2 行是胶囊（没有第 2 行就不渲染胶囊）；
+    品牌行由前端固定（站点自己的名字）。**约定隐晦，但换来零数据结构改动、且内容仍由后台下发。**
+  - ⚠️ **`memo` 是本项目补的字段**：上游的 `AppBannerRespVO` 只有 `id/title/url/picUrl`，
+    后台虽能填「描述」但 C 端拿不到。已加一行并配了单测
+    （`BannerConvertTest` —— MapStruct 对"目标有、源没有"只报 WARN，不写测试发现不了）。
 - `url` **可为空** —— 为空时前端**不得跳转**（FR-083）。
 
 ⚠️ **`position` 是必传参数**（后端没有默认值），缺失即 400。

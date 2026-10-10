@@ -49,10 +49,13 @@ describe('MallBanner —— 三态（0 条 / 1 条 / 多条）', () => {
 })
 
 describe('MallBanner —— 文案排版（后台配文，前端排版）', () => {
-  it('主标题按换行分成多行渲染', () => {
-    const w = mountBanner([banner()])
-    const lines = w.findAll('.mbn-title-line').map((n) => n.text())
-    expect(lines).toEqual(['从设计到打印', '每一步，都有好搭档'])
+  it('主标题**就一行**（后台的「标题」是单行输入框，敲不出回车）', () => {
+    const w = mountBanner([banner({ title: '从设计到打印，每一步都有好搭档' })])
+    expect(w.get('.mbn-title').text()).toBe('从设计到打印，每一步都有好搭档')
+  })
+
+  it('标题为空时不渲染标题块', () => {
+    expect(mountBanner([banner({ title: '' })]).find('.mbn-title').exists()).toBe(false)
   })
 
   it('副标题来自「描述」第一行', () => {
@@ -74,7 +77,7 @@ describe('MallBanner —— 文案排版（后台配文，前端排版）', () =
     expect(w.find('.mbn-subtitle').exists()).toBe(false)
     expect(w.find('.mbn-badge').exists()).toBe(false)
     // 标题还在
-    expect(w.findAll('.mbn-title-line')).toHaveLength(2)
+    expect(w.get('.mbn-title').text()).toBeTruthy()
   })
 
   it('品牌行是前端固定的（站点自己的名字，页头页脚本来就写着）', () => {
@@ -98,7 +101,7 @@ describe('MallBanner —— 跳转（FR-083）', () => {
     const w = mountBanner([banner({ url: undefined })])
     expect(w.find('.mbn-link').exists()).toBe(false)
     expect(w.find('.mbn-photo').exists()).toBe(true)
-    expect(w.findAll('.mbn-title-line')).toHaveLength(2)
+    expect(w.get('.mbn-title').text()).toBeTruthy()
   })
 
   it('多条时逐张判 url（一条有、一条没有）', () => {

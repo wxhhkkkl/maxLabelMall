@@ -36,9 +36,8 @@ const copy = computed(() => parseBannerCopy(props.banner))
 
       <div class="mbn-copy">
         <p class="mbn-brand">赋签 | MaxLabel</p>
-        <h2 v-if="copy.titleLines.length" class="mbn-title">
-          <span v-for="(line, i) in copy.titleLines" :key="i" class="mbn-title-line">{{ line }}</span>
-        </h2>
+        <!-- 主标题**就一行** —— 后台的「标题」是单行输入框，敲不出回车，所以不拆 -->
+        <h2 v-if="banner.title" class="mbn-title">{{ banner.title }}</h2>
         <p v-if="copy.subtitle" class="mbn-subtitle">{{ copy.subtitle }}</p>
         <span v-if="copy.badge" class="mbn-badge">{{ copy.badge }}</span>
       </div>

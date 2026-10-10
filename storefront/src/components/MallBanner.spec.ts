@@ -79,29 +79,44 @@ describe('MallBanner —— 跳转（FR-083）', () => {
 })
 
 /**
- * 横幅图片的尺寸契约（缺陷修复，2026-10-10）。
+ * 横幅图片的尺寸契约（2026-10-10 一轮修两次，这里把结论钉死）。
  *
- * ⚠️ **绝对不要给横幅图片钉死高度**。第一版写的是 `height: 220px; object-fit: cover`
- * —— `cover` 的意思是"等比放大到填满容器、溢出的裁掉"，于是：
- *   · 窄屏时左右被切掉 → **图片最左边的文字看不到**；
- *   · 源图比容器小时被放大 → **模糊**（运营传了张 logo 就特别明显）。
+ * 所有者定的口径是**高度固定 220px**，同时**不许裁、不许拉伸**。
+ * 三条同时满足只有一种做法：**`object-fit: contain`** —— 图片完整放进盒子里、
+ * 保持自身比例，装不满的地方留白。
  *
- * 正确做法是 `width: 100%; height: auto`：高度由**图片自己的比例**决定，
- * 既不会裁、也不会为了填满而拉伸。
+ * ⚠️ **不要写回 `cover`**：`cover` 是"等比放大到填满、溢出部分裁掉"，后果两条 ——
+ *   · 窄屏时左右被切 → **图片最左边的文字看不到**；
+ *   · 源图比容器小时被放大到填满 → **模糊**。
+ * 第一版就是 `cover`，被所有者当场发现了。
  *
  * jsdom 没有排版引擎，测不了"到底裁没裁"；所以这里钉的是**样式契约**本身 ——
  * 与 `styles/design-consistency.spec.ts` 读样式文本做断言是同一套做法。
  */
-describe('MallBanner —— 图片尺寸不得写死', () => {
-  it('`.mbn-img` 的 height 必须是 auto，不能是固定像素', async () => {
+describe('MallBanner —— 图片尺寸契约', () => {
+  /**
+   * 取样式块，**并剥掉 `/* … *\/` 注释**。
+   *
+   * 注释里会引用反例（"不要写回 `object-fit: cover`"），不剥掉的话反面断言会被
+   * 自己的散文绊倒 —— 断言的对象应该是**真实生效的 CSS**，不是解释文字。
+   */
+  async function styleBlock(): Promise<string> {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
     const src = readFileSync(join(process.cwd(), 'src', 'components', 'MallBanner.vue'), 'utf8')
-    const style = src.slice(src.indexOf('<style'))
+    return src.slice(src.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '')
+  }
 
-    // `height: 220px` / `height: 150px` 都会命中；`height: auto` 不会
-    expect(style).not.toMatch(/\.mbn-img[^}]*height:\s*\d+px/)
-    // 反面断言：确实声明了 height: auto（防止把整条规则删掉也算"通过"）
-    expect(style).toMatch(/\.mbn-img[^}]*height:\s*auto/)
+  it('**用 contain 而不是 cover** —— cover 会裁掉图片左右（最左的文字就没了）', async () => {
+    const style = await styleBlock()
+    expect(style).toMatch(/object-fit:\s*contain/)
+    // 反面断言：绝不能出现 cover（"删掉整条规则"不该算通过）
+    expect(style).not.toMatch(/object-fit:\s*cover/)
+  })
+
+  it('高度是固定的 220px（所有者定的口径，不是 auto）', async () => {
+    const style = await styleBlock()
+    expect(style).toMatch(/\.mbn-img[^}]*height:\s*220px/)
+    expect(style).not.toMatch(/\.mbn-img[^}]*height:\s*auto/)
   })
 })

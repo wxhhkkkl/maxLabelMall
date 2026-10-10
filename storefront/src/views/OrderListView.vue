@@ -101,28 +101,32 @@ onMounted(load)
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
-    <RouterLink to="/">首页</RouterLink><span>/ 我的订单</span>
-  </div>
-
-  <div class="ml-page-head">
-    <h1 class="ml-page-title">我的订单</h1>
+    <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> / <span>我的订单</span>
   </div>
 
   <div class="account-wrap">
     <AccountSidebar />
     <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
-    <div class="account-main">
-      <div class="cat-pills">
-        <span
+    <div class="account-main account-section-main">
+      <div class="account-page-heading">
+        <div><h1>我的订单</h1><p>查看采购记录，跟进订单与物流状态。</p></div>
+        <RouterLink to="/mall" class="account-heading-link">前往商城 <span aria-hidden="true">↗</span></RouterLink>
+      </div>
+      <div class="account-content-card">
+      <div class="cat-pills account-tabs" aria-label="订单状态">
+        <button
           v-for="f in filters"
           :key="String(f.value)"
           class="tab"
           :class="{ active: status === f.value }"
+          :aria-pressed="status === f.value"
+          type="button"
           @click="pickStatus(f.value)"
         >
           {{ f.label }}
-        </span>
+        </button>
       </div>
 
       <p v-if="message" class="ol-msg">{{ message }}</p>
@@ -148,6 +152,7 @@ onMounted(load)
       />
 
       <template v-else>
+        <div class="account-order-list">
         <div v-for="o in list" :key="o.id" class="p-card order-card">
           <div class="oc-head">
             <span class="oc-no">订单号 {{ o.no }}</span>
@@ -170,6 +175,7 @@ onMounted(load)
           <div class="oc-foot">
             <span class="oc-total-label">应付金额</span>
             <span class="oc-total">{{ formatYuan(o.payPrice) }}</span>
+            <div class="oc-actions">
             <!--
               评价入口（FR-073）。与支付同理：**表单只在详情页有一份**，列表这里只把人送过去。
               列表页拿得到"整单还有没有项待评价"，但逐项入口在详情页更合适（卡片不至于太长）。
@@ -202,11 +208,14 @@ onMounted(load)
               取消订单
             </button>
             <RouterLink class="btn-cart" :to="`/order/${o.id}`">查看详情</RouterLink>
+            </div>
           </div>
+        </div>
         </div>
 
         <Pagination :page-no="pageNo" :page-size="pageSize" :total="total" @update:page-no="onPage" />
       </template>
+      </div>
     </div>
   </div>
 
@@ -224,6 +233,7 @@ onMounted(load)
       </button>
     </template>
   </MlModal>
+  </div>
 </template>
 
 <style scoped>
@@ -235,19 +245,26 @@ onMounted(load)
 /* 订单卡：版式沿用 §3.3 说的 .p-card，但它是给商品卡设计的（悬停上浮、
    纵向堆叠、图片区 190px），这里按订单卡的层级重排，并去掉悬停动效。 */
 .order-card {
+  display: block;
+  padding: 0;
   gap: 0;
-  margin-bottom: 16px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: none;
   cursor: default;
 }
 .order-card:hover {
   transform: none;
-  box-shadow: 0 8px 24px rgba(39, 58, 98, 0.08);
+  box-shadow: none;
 }
 .oc-head {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-bottom: 12px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+  background: #F5F8FF;
   border-bottom: 1px solid var(--ml-border);
 }
 .oc-no {
@@ -255,7 +272,11 @@ onMounted(load)
   font-weight: 600;
   color: var(--ml-text);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
+.oc-head .ml-pill { margin-left: auto; }
+.oc-items { padding-inline: 20px; }
 .oc-time {
   font-size: 13px;
   color: var(--ml-text-ph);
@@ -263,14 +284,16 @@ onMounted(load)
 }
 .oc-item {
   display: grid;
-  grid-template-columns: 56px 1fr auto auto;
-  gap: 12px;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  gap: 20px;
   align-items: center;
-  padding: 12px 0;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--ml-border);
 }
+.oc-item:last-child { border-bottom: 0; }
 .oc-thumb {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--ml-radius-field);
   overflow: hidden;
   background: var(--ml-bg-card);
@@ -283,7 +306,10 @@ onMounted(load)
 .oc-name {
   font-size: 14px;
   color: var(--ml-text);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
+.oc-thumb .ph { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ml-text-ph); font-size: 12px; }
 .oc-count,
 .oc-price {
   font-size: 13px;
@@ -295,7 +321,8 @@ onMounted(load)
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 12px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--ml-border);
 }
 .oc-total-label {
@@ -311,23 +338,37 @@ onMounted(load)
 }
 .oc-foot .btn-buy,
 .oc-foot .btn-cart {
-  padding: 6px 16px;
+  padding: 8px 16px;
   font-size: 13px;
+  width: auto;
 }
+.oc-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 @media (max-width: 768px) {
   .oc-head {
     flex-wrap: wrap;
     gap: 8px;
   }
   .oc-item {
-    grid-template-columns: 56px 1fr;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 10px 14px;
   }
-  .oc-count,
-  .oc-price {
-    grid-column: 2;
-  }
+  .oc-thumb { grid-row: 1 / 3; width: 56px; height: 56px; }
+  .oc-name { grid-column: 2 / 4; }
+  .oc-count { grid-column: 2; }
+  .oc-price { grid-column: 3; }
   .oc-foot {
     flex-wrap: wrap;
   }
+}
+@media (max-width: 480px) {
+  .oc-head, .oc-foot { padding: 14px; gap: 10px; }
+  .oc-no { flex: 1 1 100%; font-size: 12px; }
+  .oc-time { font-size: 11px; }
+  .oc-items { padding-inline: 14px; }
+  .oc-name { font-size: 13px; }
+  .oc-total { margin-right: 0; }
+  .oc-total-label { flex: 1; }
+  .oc-foot .btn-cart { font-size: 12px; padding: 8px 12px; }
+  .oc-actions { flex-basis: 100%; }
 }
 </style>

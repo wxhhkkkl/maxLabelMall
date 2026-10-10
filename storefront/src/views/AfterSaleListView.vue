@@ -111,16 +111,23 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
     <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> /
     <span>我的售后</span>
   </div>
 
-  <div class="acct-layout">
+  <div class="account-wrap">
     <AccountSidebar />
 
-    <div class="acct-main">
-      <h1 class="acct-title">我的售后</h1>
+    <div class="account-main account-section-main">
+      <div class="account-page-heading">
+        <div><h1>我的售后</h1><p>查看退款申请与处理进度。</p></div>
+        <RouterLink to="/order" class="account-heading-link">查看我的订单 <span aria-hidden="true">→</span></RouterLink>
+      </div>
+
+      <div class="account-content-card as-records">
+      <div class="account-section-heading"><h2>售后记录</h2><span v-if="!loading && !error">共 {{ total }} 条</span></div>
 
       <p v-if="message" class="as-msg">{{ message }}</p>
 
@@ -138,12 +145,13 @@ onMounted(() => {
       <EmptyState
         v-else-if="!list.length"
         title="还没有售后记录"
-        desc="订单里的商品如需退款，可在订单详情点「申请退款」"
+        desc="如需退款，请进入对应订单详情，选择「申请退款」。"
         action-text="去看订单"
         @action="$router.push('/order')"
       />
 
       <template v-else>
+        <div class="as-list">
         <div v-for="it in list" :key="it.id" class="as-card ml-card">
           <div class="as-head">
             <span class="as-no">售后单号 {{ it.no }}</span>
@@ -161,7 +169,7 @@ onMounted(() => {
               <div class="as-name">{{ it.spuName }}</div>
               <div v-if="it.properties?.length" class="as-spec">
                 <template v-for="p in it.properties" :key="p.valueName">
-                  {{ p.propertyName }}：{{ p.valueName }}
+                  <span>{{ p.propertyName }}：{{ p.valueName }}</span>
                 </template>
               </div>
               <div class="as-meta">
@@ -188,9 +196,11 @@ onMounted(() => {
             </button>
           </div>
         </div>
+        </div>
 
         <Pagination :page-no="pageNo" :page-size="PAGE_SIZE" :total="total" @update:page-no="onPage" />
       </template>
+      </div>
     </div>
   </div>
 
@@ -214,34 +224,38 @@ onMounted(() => {
       </button>
     </template>
   </MlModal>
+  </div>
 </template>
 
 <style scoped>
 .as-msg {
-  margin-bottom: 12px;
+  margin-top: 16px;
   color: var(--ml-orange);
   font-size: 13px;
 }
-.as-card {
-  margin-bottom: 12px;
-}
+.as-list { display: grid; gap: 16px; margin-top: 24px; }
+.as-list .as-card { margin: 0; padding: 0; border-radius: 12px; overflow: hidden; }
 .as-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 10px;
+  padding: 14px 20px;
+  gap: 12px;
+  background: #F5F8FF;
   border-bottom: 1px solid var(--ml-border);
   font-size: 13px;
   color: var(--ml-text-sub);
 }
 .as-body {
-  display: flex;
-  gap: 12px;
-  padding: 12px 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+  padding: 24px 20px;
 }
 .as-thumb {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   flex: none;
   overflow: hidden;
   border-radius: var(--ml-radius-field);
@@ -267,14 +281,21 @@ onMounted(() => {
 }
 .as-name {
   font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
   color: var(--ml-text);
 }
 .as-spec,
 .as-meta {
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: 12px;
-  color: var(--ml-text-ph);
+  color: var(--ml-text-sub);
+  line-height: 1.8;
 }
+.as-spec { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.as-no, .as-audit { overflow-wrap: anywhere; }
+.as-head .ml-pill { flex-shrink: 0; }
 .as-audit {
   margin-top: 4px;
   font-size: 12px;
@@ -289,20 +310,26 @@ onMounted(() => {
   display: block;
   font-size: 12px;
   color: var(--ml-text-ph);
+  margin-bottom: 8px;
 }
+.as-amount b { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .as-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 10px;
+  padding: 14px 20px;
+  gap: 16px;
   border-top: 1px solid var(--ml-border);
 }
 .as-order {
   font-size: 13px;
   color: var(--ml-text-sub);
+  overflow-wrap: anywhere;
 }
 .as-cancel {
-  padding: 4px 14px;
+  padding: 8px 16px;
+  flex-shrink: 0;
+  white-space: nowrap;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius-pill);
   background: var(--ml-bg-card);
@@ -313,5 +340,16 @@ onMounted(() => {
 .as-cancel:hover {
   border-color: var(--ml-primary);
   color: var(--ml-primary);
+}
+@media (max-width: 480px) {
+  .as-head { padding: 12px 14px; align-items: flex-start; font-size: 11px; }
+  .as-body { grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 20px 14px; }
+  .as-thumb { width: 52px; height: 52px; }
+  .as-amount { grid-column: 2; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; text-align: left; }
+  .as-amount-label { margin: 0; }
+  .as-name { font-size: 13px; }
+  .as-foot { flex-wrap: wrap; padding: 14px; gap: 12px; }
+  .as-order { flex: 1 1 100%; font-size: 12px; }
+  .as-cancel { margin-left: auto; }
 }
 </style>

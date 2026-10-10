@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { isCaptchaEnabled } from '@/api/captcha'
@@ -8,6 +8,7 @@ import AccountSidebar from '@/components/AccountSidebar.vue'
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 import CaptchaSlider from '@/components/CaptchaSlider.vue'
 import MlField from '@/components/base/MlField.vue'
+import MlModal from '@/components/base/MlModal.vue'
 import { useUserStore } from '@/store/user'
 
 /**
@@ -38,6 +39,27 @@ const captchaOpen = ref(false)
 /** 编辑资料弹层开关与保存成功提示 */
 const profileOpen = ref(false)
 const profileOk = ref('')
+const passwordOpen = ref(false)
+
+async function openPassword() {
+  passwordOpen.value = true
+  await nextTick()
+  document.getElementById('newPassword')?.focus()
+}
+
+async function closePassword() {
+  if (submitting.value || captchaOpen.value) return
+  passwordOpen.value = false
+  password.value = ''
+  password2.value = ''
+  code.value = ''
+  error.value = ''
+  codeError.value = ''
+  ok.value = ''
+  // Keep the SMS countdown when closing so reopening cannot bypass the interval.
+  await nextTick()
+  document.getElementById('changePassword')?.focus()
+}
 
 /**
  * 资料保存成功。
@@ -162,6 +184,7 @@ async function onLogout() {
 </script>
 
 <template>
+  <div class="account-page">
   <div class="crumbs">
     <RouterLink to="/">首页</RouterLink><span>/ 个人中心</span>
   </div>
@@ -169,8 +192,12 @@ async function onLogout() {
   <div class="account-wrap">
     <AccountSidebar />
 
-    <div class="account-main">
-      <div class="ml-card">
+    <div class="account-main account-dashboard">
+      <div class="acct-heading">
+        <div><h1>个人中心</h1><p>管理账户信息，轻松处理每一笔采购。</p></div>
+        <RouterLink to="/mall" class="acct-shop-link">前往商城 <span aria-hidden="true">↗</span></RouterLink>
+      </div>
+      <div class="ml-card acct-profile-card">
         <div class="ml-card-title">账号信息</div>
         <div class="acct-profile">
           <img
@@ -179,7 +206,9 @@ async function onLogout() {
             :src="userStore.member.avatar"
             :alt="userStore.displayName || '头像'"
           />
-          <span v-else class="acct-avatar-ph">未设置</span>
+          <span v-else class="acct-avatar-ph" aria-label="尚未设置头像">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>
+          </span>
           <div class="acct-profile-info">
             <p class="acct-name">
               {{ userStore.displayName || '未登录' }}
@@ -189,9 +218,14 @@ async function onLogout() {
               尚未设置昵称，当前展示脱敏手机号
             </p>
           </div>
+          <div class="acct-profile-actions">
           <button id="editProfile" class="btn-cart" type="button" @click="profileOpen = true">
             编辑资料
           </button>
+          <button id="changePassword" class="acct-password-link" type="button" @click="openPassword">
+            修改密码
+          </button>
+          </div>
         </div>
         <p v-if="profileOk" class="acct-ok">{{ profileOk }}</p>
       </div>
@@ -199,21 +233,23 @@ async function onLogout() {
       <!-- 快捷入口三卡（design-new-pages.md §3.5）—— 订单 / 地址 / 券 -->
       <div class="acct-entries">
         <RouterLink class="entry-card" to="/order">
-          <h3>我的订单</h3>
-          <p>查看订单状态与物流</p>
+          <span class="acct-entry-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 15h6"/></svg></span>
+          <div><h3>我的订单</h3><p>查看订单状态与物流</p></div><span class="acct-entry-arrow" aria-hidden="true">→</span>
         </RouterLink>
         <RouterLink class="entry-card" to="/account/address">
-          <h3>收货地址</h3>
-          <p>管理收货信息</p>
+          <span class="acct-entry-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <div><h3>收货地址</h3><p>管理常用收货信息</p></div><span class="acct-entry-arrow" aria-hidden="true">→</span>
         </RouterLink>
         <RouterLink class="entry-card" to="/coupon/mine">
-          <h3>我的券</h3>
-          <p>未使用 / 已使用 / 已过期</p>
+          <span class="acct-entry-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4Z"/><path d="M15 5v3m0 3v2m0 3v3"/></svg></span>
+          <div><h3>我的券</h3><p>查看可用优惠与使用记录</p></div><span class="acct-entry-arrow" aria-hidden="true">→</span>
         </RouterLink>
       </div>
 
-      <div class="ml-card">
-        <div class="ml-card-title">积分与等级</div>
+      <div class="ml-card acct-benefits">
+        <div class="acct-section-head"><div class="ml-card-title">积分与等级</div>
+          <RouterLink class="acct-detail-link" to="/account/points">查看积分明细 <span aria-hidden="true">→</span></RouterLink>
+        </div>
         <!-- 数据直接来自 /member/user/get，不需要额外请求 -->
         <div class="acct-stats">
           <div class="acct-stat">
@@ -230,17 +266,17 @@ async function onLogout() {
             <b>{{ levelName }}</b>
           </div>
         </div>
-        <RouterLink class="acct-detail-link" to="/account/points">查看积分明细</RouterLink>
       </div>
 
-      <div class="ml-card">
-        <div class="ml-card-title">设置登录密码</div>
-        <p class="ml-hint">
-          注册是通过验证码登录完成的，初始没有密码。设置之后即可用手机号 + 密码登录。
+      <MlModal :open="passwordOpen" title="修改登录密码" @close="closePassword">
+        <p class="acct-password-hint">
+          通过绑定手机号验证后，即可设置新的登录密码。
         </p>
-        <MlField label="新密码" required :error="error">
+        <div class="acct-password-form">
+        <MlField label="新密码" required :error="error" class="acct-password-field">
           <input
             id="newPassword"
+            aria-label="新密码"
             v-model="password"
             class="ml-input"
             type="password"
@@ -248,9 +284,10 @@ async function onLogout() {
             autocomplete="new-password"
           />
         </MlField>
-        <MlField label="确认新密码" required>
+        <MlField label="确认新密码" required class="acct-password-field">
           <input
             id="newPassword2"
+            aria-label="确认新密码"
             v-model="password2"
             class="ml-input"
             type="password"
@@ -259,10 +296,11 @@ async function onLogout() {
           />
         </MlField>
         <!-- 改密必须带一张 scene 3 的码：后端 `code` 必填且会实际核销 -->
-        <MlField label="手机验证码" required :error="codeError">
+        <MlField label="手机验证码" required :error="codeError" class="acct-code-field">
           <div class="code-row">
             <input
               id="setPasswordCode"
+              aria-label="手机验证码"
               v-model.trim="code"
               class="ml-input"
               type="text"
@@ -282,6 +320,8 @@ async function onLogout() {
           </div>
         </MlField>
         <p v-if="ok" class="acct-ok">{{ ok }}</p>
+        </div>
+        <template #foot>
         <button
           id="setPasswordBtn"
           class="btn-primary"
@@ -291,13 +331,13 @@ async function onLogout() {
         >
           {{ submitting ? '提交中…' : '保存密码' }}
         </button>
-      </div>
+        </template>
+      </MlModal>
 
-      <div class="ml-card">
-        <div class="ml-card-title">其他</div>
+      <div class="acct-bottom">
         <p class="acct-links">
           <RouterLink to="/agreement/user">《用户协议》</RouterLink>
-          · <RouterLink to="/agreement/privacy">《隐私政策》</RouterLink>
+          <RouterLink to="/agreement/privacy">《隐私政策》</RouterLink>
         </p>
         <button class="btn-cart" type="button" @click="onLogout">退出登录</button>
       </div>
@@ -314,109 +354,103 @@ async function onLogout() {
     <!-- 发短信前的图形验证码闸门（开关由服务端决定，关着时不会被打开） -->
     <CaptchaSlider :open="captchaOpen" @close="captchaOpen = false" @success="onCaptchaPassed" />
   </div>
+  </div>
 </template>
 
 <style scoped>
-.acct-name {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--ml-text);
-  margin-bottom: 6px;
-}
-/* 快捷入口三卡。`.entry-card` 的版式（含悬停阴影）来自 design.css，这里只排布 */
-.acct-entries {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-.acct-entries .entry-card {
-  display: block;
-  text-align: center;
-}
-/* 输入框 + 「获取验证码」并排。与 LoginDialog 的 `.code-row` 同形 ——
-   边距与按钮尺寸跟随 design.css / store.css 的令牌，不另立一套视觉 */
-.code-row {
-  display: flex;
-  gap: 10px;
-}
-.code-row .ml-input {
-  flex: 1;
-}
-.code-btn {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.code-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.acct-ok {
-  color: var(--ml-primary);
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-.acct-links {
-  margin-bottom: 14px;
-  font-size: 14px;
-}
-.acct-links a {
-  color: var(--ml-primary);
-}
-/* 账号信息：头像 + 资料 + 「编辑资料」 */
-.acct-profile {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.acct-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--ml-border);
-}
-.acct-avatar-ph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 1px dashed var(--ml-border);
-  color: var(--ml-text-ph);
-  font-size: 12px;
-}
-.acct-profile-info {
-  flex: 1;
-  min-width: 0;
-}
-.acct-mobile {
-  margin-top: 2px;
-  font-size: 13px;
-  color: var(--ml-text-sub);
-}
-/* 积分与等级 */
-.acct-stats {
-  display: flex;
-  gap: 28px;
-}
-.acct-stat .k {
-  display: block;
-  font-size: 12px;
-  color: var(--ml-text-ph);
-}
-.acct-stat b {
-  font-size: 18px;
-}
-.acct-detail-link {
-  display: inline-block;
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--ml-primary);
+.account-page { background: #F5F8FF; min-height: 70vh; }
+.account-page > .crumbs { max-width: 1240px; margin: 0 auto; padding: 22px 24px; }
+.account-dashboard { display: grid; gap: 20px; }
+.account-dashboard > .ml-card { margin: 0; padding: 28px 32px; border-radius: 14px; }
+.acct-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 2px 0 4px; }
+.acct-heading h1 { color: #0C2148; font-size: 26px; line-height: 1.4; letter-spacing: -.02em; }
+.acct-heading p { margin-top: 8px; font-size: 13px; color: var(--ml-text-sub); line-height: 1.7; }
+.acct-shop-link { color: var(--ml-primary); font-size: 13px; white-space: nowrap; }
+.acct-shop-link span { margin-left: 10px; }
+.account-dashboard .ml-card-title { font-size: 16px; margin-bottom: 20px; }
+.account-dashboard .acct-profile-card { background: linear-gradient(110deg, #FFFFFF 35%, #F0F4FB); }
+.acct-profile { display: flex; align-items: center; gap: 20px; }
+.acct-avatar, .acct-avatar-ph { width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0; }
+.acct-avatar { object-fit: cover; border: 1px solid var(--ml-border); }
+.acct-avatar-ph { display: inline-flex; align-items: center; justify-content: center; background: #EAF1FF; color: var(--ml-primary); }
+.acct-avatar-ph svg { width: 32px; height: 32px; }
+.acct-profile-info { flex: 1; min-width: 0; }
+.acct-name { font-size: 22px; font-weight: 600; color: var(--ml-text); overflow-wrap: anywhere; }
+.acct-mobile { margin-top: 6px; font-size: 13px; color: var(--ml-text-sub); }
+.acct-profile-info .ml-hint { margin-top: 8px; line-height: 1.6; }
+.acct-profile .btn-cart { background: #FFFFFF; white-space: nowrap; padding: 10px 18px; font-size: 13px; }
+.acct-profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.acct-password-link { border: 0; background: transparent; color: var(--ml-text-sub); padding: 10px 0; font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.acct-password-link:hover { color: var(--ml-primary); }
+.acct-password-link:focus-visible { outline: 2px solid var(--ml-primary); outline-offset: 3px; border-radius: 4px; }
+.acct-entries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.acct-entries .entry-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 24px 20px; text-align: left; border: 1px solid var(--ml-border); border-radius: 14px; background: #FFFFFF; transition: border-color .15s, box-shadow .15s; }
+.acct-entries .entry-card:hover { border-color: var(--ml-primary); box-shadow: 0 6px 18px rgba(46,124,214,.07); }
+.acct-entry-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 40px; height: 40px; border-radius: 12px; background: #F5F8FF; color: var(--ml-primary); }
+.acct-entry-icon svg { width: 23px; height: 23px; }
+.acct-entries .entry-card h3 { font-size: 15px; line-height: 1.5; }
+.acct-entries .entry-card p { margin-top: 6px; font-size: 11px; color: var(--ml-text-sub); line-height: 1.6; }
+.acct-entry-arrow { margin-left: auto; color: #B4C0D8; font-size: 18px; }
+.acct-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.acct-section-head .ml-card-title { margin: 0; }
+.acct-detail-link { color: var(--ml-primary); font-size: 12px; }
+.acct-detail-link span { margin-left: 8px; }
+.acct-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.acct-stat { padding: 0 28px; border-left: 1px solid var(--ml-border); }
+.acct-stat:first-child { padding-left: 0; border-left: 0; }
+.acct-stat .k { display: block; font-size: 12px; color: var(--ml-text-sub); margin-bottom: 10px; }
+.acct-stat b { display: block; font-size: 24px; line-height: 1.4; font-weight: 600; color: #0C2148; overflow-wrap: anywhere; }
+.acct-stat:last-child b { font-size: 18px; line-height: 1.85; }
+.acct-password-hint { margin-bottom: 24px; color: var(--ml-text-sub); line-height: 1.8; font-size: 13px; }
+.acct-password-form { display: grid; grid-template-columns: 1fr; gap: 20px; align-content: start; }
+.acct-password-form :deep(.ml-field) { margin: 0; min-width: 0; }
+.acct-code-field { grid-column: 1 / -1; }
+.code-row { display: flex; gap: 10px; }
+.code-row .ml-input { flex: 1; min-width: 0; }
+.code-btn { flex: 0 0 auto; white-space: nowrap; font-size: 12px; padding: 10px 14px; }
+.code-btn:disabled { opacity: .5; cursor: not-allowed; }
+#setPasswordBtn { padding: 11px 28px; font-size: 13px; border: 0; font-family: inherit; cursor: pointer; }
+.acct-ok { color: var(--ml-primary); font-size: 13px; line-height: 1.6; grid-column: 1 / -1; }
+.acct-profile-card > .acct-ok { margin-top: 16px; }
+.acct-bottom { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 4px; }
+.acct-links { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; }
+.acct-links a { color: var(--ml-text-sub); }
+.acct-links a:hover { color: var(--ml-primary); }
+.acct-bottom .btn-cart { font-size: 12px; background: transparent; padding: 9px 16px; }
+@media (max-width: 1100px) {
+  .acct-entries .entry-card { gap: 10px; padding: 20px 14px; }
+  .acct-entry-arrow { display: none; }
 }
 @media (max-width: 768px) {
-  .acct-entries {
-    grid-template-columns: 1fr;
-  }
+  .account-page > .crumbs { padding-inline: 16px; }
+  .account-dashboard { gap: 16px; }
+  .account-dashboard > .ml-card { padding: 24px; }
+  .acct-heading h1 { font-size: 23px; }
+  .acct-heading p { font-size: 12px; }
+  .acct-entries { gap: 10px; }
+  .acct-entries .entry-card { flex-direction: column; align-items: flex-start; padding: 18px 14px; gap: 12px; }
+  .acct-entries .entry-card h3 { font-size: 14px; }
+  .acct-entries .entry-card p { font-size: 11px; }
+  .acct-stat { padding-inline: 18px; }
+}
+@media (max-width: 480px) {
+  .account-dashboard > .ml-card { padding: 22px 20px; }
+  .acct-heading { align-items: flex-start; gap: 12px; }
+  .acct-shop-link { padding-top: 7px; font-size: 12px; }
+  .acct-profile { flex-wrap: wrap; gap: 14px; }
+  .acct-avatar, .acct-avatar-ph { width: 52px; height: 52px; }
+  .acct-name { font-size: 18px; }
+  .acct-profile-info { flex-basis: calc(100% - 70px); }
+  .acct-profile-actions { margin-left: 66px; gap: 20px; }
+  .acct-profile-actions .btn-cart { width: auto; flex: none; }
+  .acct-stats { gap: 12px; }
+  .acct-stat { padding-inline: 12px 0; }
+  .acct-stat b { font-size: 22px; }
+  .acct-stat:last-child b { font-size: 15px; }
+  .acct-section-head { gap: 10px; }
+  .acct-detail-link { font-size: 11px; }
+  .acct-password-form { grid-template-columns: 1fr; }
+  .acct-bottom { align-items: flex-start; }
+  .acct-links { gap: 10px; }
 }
 </style>

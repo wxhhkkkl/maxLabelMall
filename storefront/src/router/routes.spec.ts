@@ -44,6 +44,8 @@ const ALL_PATHS = [
   '/solutions',
   '/solutions/warehouse',
   '/support',
+  '/support/load-labels',
+  '/support/contact',
   '/cart',
   '/checkout',
   '/order',
@@ -66,7 +68,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 27 条路径（设计稿 6 + 功能页 14 + 信息页 6 + 行业详情 1）', () => {
+  it('声明了 29 条路径（含个人中心新增页、支持详情页、行业详情与商品评价页）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -77,10 +79,11 @@ describe('路由表', () => {
     }
     walk((realRouter as unknown as { options: { routes: never[] } }).options.routes)
     // 叶子路由。注意首页那条 path 为 ''，解析后就是 '/'，不要额外过滤掉它。
-    // 2026-10-09：个人中心整理新增 /account/after-sale 与 /account/points（23 → 26，
-    // 其中 23 之后先由行业方案加了 1 条）。
-    // 2026-10-10：商品详情改版追加 /product/:id/comments（26 → 27）。
-    expect(paths).toHaveLength(27)
+    // 2026-10-09：个人中心整理新增 /account/after-sale 与 /account/points（23 → 26）。
+    // 2026-10-10：支持文章 / 联系支持页 +2（26 → 28）。
+    // 2026-10-10：商品详情改版追加 /product/:id/comments（28 → 29）—— 与上一个 +2 是
+    //             两条并行的线，合并时一起算，别把任一边的计数覆盖掉。
+    expect(paths).toHaveLength(29)
     expect(paths).toContain('/')
   })
 

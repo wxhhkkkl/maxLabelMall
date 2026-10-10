@@ -81,22 +81,21 @@ onMounted(load)
 </script>
 
 <template>
+  <div class="account-section-page">
   <div class="crumbs">
-    <RouterLink to="/">首页</RouterLink> / <span>领券中心</span>
-  </div>
-
-  <div class="ml-page-head">
-    <h1 class="ml-page-title">领券中心</h1>
-    <p class="ml-page-sub">
-      领取后可在「我的券」查看，结算时选用。
-      <RouterLink class="cc-mine" to="/coupon/mine">我的券 ›</RouterLink>
-    </p>
+    <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> / <span>领券中心</span>
   </div>
 
   <div class="account-wrap">
     <AccountSidebar />
     <!-- 与个人中心同一套两列布局：侧栏常驻，点进子页不丢菜单 -->
-    <div class="account-main">
+    <div class="account-main account-section-main">
+      <div class="account-page-heading">
+        <div><h1>领券中心</h1><p>领取适合你的优惠，结算时轻松选用。</p></div>
+        <RouterLink class="account-heading-link" to="/coupon/mine">查看我的券 <span aria-hidden="true">→</span></RouterLink>
+      </div>
+      <div class="account-content-card account-coupon-content">
+      <div class="account-section-heading"><h2>可领取优惠</h2><span v-if="!loading && !error">{{ templates.length }} 种优惠券</span></div>
       <LoadingState v-if="loading" :count="3" />
 
       <EmptyState
@@ -116,7 +115,7 @@ onMounted(load)
         @action="router.push('/mall')"
       />
 
-      <div v-else class="grid-3 cc-grid">
+      <div v-else class="grid-3 cc-grid account-coupon-grid">
         <div v-for="t in templates" :key="t.id" class="cc-card">
           <div class="cc-amount">
             <span class="cc-num">{{ couponAmountText(t) }}</span>
@@ -139,75 +138,10 @@ onMounted(load)
           <span v-else class="cc-taken">已领取</span>
         </div>
       </div>
+      </div>
     </div>
+  </div>
   </div>
 </template>
 
-<style scoped>
-.cc-grid {
-  align-items: start;
-}
-.cc-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #ffffff;
-  border: 1px solid var(--ml-border);
-  border-radius: var(--ml-radius-card);
-  padding: 18px;
-}
-/* 面额区：底与字色取自设计令牌，与全站同一套蓝 */
-.cc-amount {
-  background: #eaf1ff;
-  border-radius: var(--ml-radius-field);
-  padding: 14px 16px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.cc-num {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2e7cd6;
-  font-variant-numeric: tabular-nums;
-}
-.cc-thresh {
-  font-size: 13px;
-  color: #2e7cd6;
-}
-.cc-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ml-text);
-}
-.cc-desc,
-.cc-valid {
-  font-size: 13px;
-  color: var(--ml-text-sub);
-  margin-top: 6px;
-}
-.cc-take {
-  align-self: flex-start;
-}
-.cc-taken {
-  align-self: flex-start;
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: #f0f4fb;
-  color: var(--ml-text-ph);
-  font-size: 14px;
-}
-.cc-mine {
-  color: var(--ml-primary);
-}
-@media (max-width: 1100px) {
-  .cc-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 768px) {
-  .cc-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
+<!-- Coupon cards use the shared account styles in store.css. -->

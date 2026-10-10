@@ -552,7 +552,26 @@ img { display: block; }
 }
 .btn-cart:hover { background: #D9E6FF; }
 .svc-line { font-size: 13px; color: #8A97B5; letter-spacing: .5px; }
-.params { padding: 0 60px 64px; display: flex; flex-direction: column; gap: 24px; }
+/**
+ * 详情页的宽栏区块（商品详情、用户评价）。
+ *
+ * ⚠️ 桌面端的**左内边距不是页面边距**，而是要与**右侧标题列**的左边缘对齐：
+ * `.pd-main` 是「页面边距 + 图片列 + 栏间距 + 信息列」，标题就落在那个交界处。
+ * 区块若只退到页面边距，就会和标题错开、看起来"挂"在最左边
+ * （2026-10-10 所有者报的正是这个）。
+ *
+ * 数值写成 **calc**，把推导显式表达出来而不是留一个魔法数字 ——
+ * `.gallery` 的宽度或 `.pd-main` 的 gap 一变，这里会跟着算，
+ * 且 `styles/product-detail-layout.spec.ts` 钉住了这个耦合。
+ *
+ * 代价：正文可用宽度做成与信息列同宽，**长图会相应变小** —— 这是所有者确认过的取舍。
+ */
+.params {
+  padding: 0 60px 64px calc(60px + 500px + 44px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 .params h2 { font-size: 22px; font-weight: 700; color: #0C2148; }
 .params-row { display: flex; gap: 32px; align-items: flex-start; }
 .param-list { flex: 1; display: flex; flex-direction: column; }
@@ -825,6 +844,9 @@ body.nav-open .mobile-nav { display: flex; }
   .price-cards { grid-template-columns: 1fr; max-width: 480px; }
   .sol-grid { grid-template-columns: repeat(3, 1fr); }
   .mall-page-main, .pd-main, .case, .feature-row, .params-row { flex-direction: column; }
+  /* 两栏已变纵向 —— 标题也回到了页面边距，上面那条"对齐标题列"的 calc 不再成立，
+     退回普通页面边距（否则会把内容推到屏幕外） */
+  .params { padding: 0 60px 64px; }
   /* ⚠️ 切成纵向后**必须重置 `align-items`**。主干规则里是 `align-items: flex-start`，
      它让子项在交叉轴上不拉伸、按内容最大宽度撑开 —— 在横向排列时没问题，
      但纵向排列时子项就直接溢出视口：`.mall-right` 实测 403px，375px 视口下

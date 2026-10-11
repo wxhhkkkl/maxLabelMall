@@ -13,6 +13,7 @@ import { useUserStore } from '@/store/user'
 import { formatYuan } from '@/utils/money'
 import { hasVisibleContent, sanitizeRichText } from '@/utils/sanitize'
 import type { ProductComment, ProductSpu, ProductSku } from '@/types'
+import '@/styles/product-detail.css'
 
 /**
  * 商品详情页 —— 按设计稿 `www/product.html` 还原，沿用其 class 名。
@@ -39,6 +40,9 @@ const loading = ref(true)
 const notFound = ref(false)
 const currentSkuId = ref<number | null>(null)
 const qty = ref(1)
+const detailTab = ref<'description' | 'specs' | 'support'>('description')
+const shownTab = computed(() => detailTab.value === 'description' && !safeDescription.value ? 'specs' : detailTab.value)
+const selectedSpecText = computed(() => currentSku.value?.properties?.map(p => `${p.propertyName}：${p.valueName}`).join(' / ') || '标准规格')
 
 const skus = computed<ProductSku[]>(() => spu.value?.skus ?? [])
 const isMultiSpec = computed(() => !!spu.value?.specType && skus.value.length > 0)
@@ -96,7 +100,7 @@ function pickSku(s: ProductSku) {
 
 function stepQty(d: number) {
   const next = qty.value + d
-  qty.value = next < 1 ? 1 : next
+  qty.value = Math.max(1, Math.min(next, Math.max(1, stock.value)))
 }
 
 /**
@@ -104,7 +108,11 @@ function stepQty(d: number) {
  * 此时必须明确提示而不是拿一个空 skuId 去加购或结算（FR-017 / FR-018）。
  */
 function requireSku(): ProductSku | null {
-  if (currentSku.value) return currentSku.value
+  if (currentSku.value) {
+    if (currentSku.value.stock <= 0) { toast.warn('当前规格暂时缺货'); return null }
+    if (qty.value > currentSku.value.stock) { toast.warn('购买数量超过可用库存'); return null }
+    return currentSku.value
+  }
   toast.warn('请先选择规格')
   return null
 }
@@ -197,6 +205,8 @@ async function load() {
     pickedPic.value = ''
     // 不 await —— 评价区不阻塞详情渲染
     void loadComments()
+    qty.value = 1
+    detailTab.value = 'description'
   } catch {
     // 已下架 / 不存在：后端返回业务异常，这里给出明确提示而非空白页（FR-007）
     notFound.value = true
@@ -211,115 +221,277 @@ watch(() => props.id, load)
 </script>
 
 <template>
-  <LoadingState v-if="loading" :count="3" />
+  <div class="product-page">
+    <LoadingState
+      v-if="loading"
+      :count="3"
+    />
 
-  <EmptyState
-    v-else-if="notFound"
-    mode="error"
-    title="商品已下架"
-    desc="该商品可能已下架或不存在，看看别的商品吧"
-    action-text="返回商城"
-    @action="$router.push('/mall')"
-  />
+    <EmptyState
+      v-else-if="notFound"
+      mode="error"
+      title="商品已下架"
+      desc="该商品可能已下架或不存在，看看别的商品吧"
+      action-text="返回商城"
+      @action="$router.push('/mall')"
+    />
 
-  <template v-else-if="spu">
-    <div class="crumbs">
-      <RouterLink to="/">首页</RouterLink> / <RouterLink to="/mall">商城</RouterLink> /
-      <span class="current">{{ spu.name }}</span>
-    </div>
-
-    <div class="pd-main">
-      <div class="gallery">
-        <div class="g-main">
-          <img v-if="mainPic" :src="mainPic" :alt="spu.name" />
-          <div v-else class="ph g-main-ph">暂无图片</div>
-        </div>
-        <div class="g-thumbs">
-          <div
-            v-for="(pic, i) in galleryPics"
-            :key="pic"
-            class="g-thumb"
-            :class="{ active: pic === mainPic }"
-            @click="pickPic(pic)"
-          >
-            <img :src="pic" :alt="`${spu.name} 图 ${i + 1}`" />
-          </div>
-        </div>
+    <template v-else-if="spu">
+      <div class="crumbs">
+        <RouterLink to="/">
+          首页
+        </RouterLink> / <RouterLink to="/mall">
+          商城
+        </RouterLink> /
+        <span class="current">{{ spu.name }}</span>
       </div>
 
-      <div class="pd-info">
-        <h1 class="pd-name">{{ spu.name }}</h1>
-        <p v-if="spu.introduction" class="pd-sub">{{ spu.introduction }}</p>
-
-        <div class="price-box">
-          <div class="price-row">
-            <span class="pd-price">{{ priceText }}</span>
-            <span v-if="marketText" class="pd-orig">{{ marketText }}</span>
+      <div class="pd-main">
+        <div class="gallery">
+          <div class="g-main">
+            <img
+              v-if="mainPic"
+              :src="mainPic"
+              :alt="spu.name"
+            >
+            <div
+              v-else
+              class="ph g-main-ph"
+            >
+              暂无图片
+            </div>
           </div>
-          <p class="ship-tip">
-            库存 {{ stock }} 件 · 已售 {{ spu.salesCount }} 件
-          </p>
+          <div class="g-thumbs">
+            <button
+              v-for="(pic, i) in galleryPics"
+              :key="pic"
+              class="g-thumb"
+              type="button"
+              :aria-label="`查看商品图片 ${i + 1}`"
+              :aria-pressed="pic === mainPic"
+              :class="{ active: pic === mainPic }"
+              @click="pickPic(pic)"
+            >
+              <img
+                :src="pic"
+                :alt="`${spu.name} 图 ${i + 1}`"
+              >
+            </button>
+          </div>
         </div>
 
-        <!--
+        <div class="pd-info">
+          <div class="product-eyebrow">
+            赋签商城 <span>·</span> {{ isMultiSpec ? '多规格可选' : '标准规格' }}
+          </div>
+          <h1 class="pd-name">
+            {{ spu.name }}
+          </h1>
+          <p
+            v-if="spu.introduction"
+            class="pd-sub"
+          >
+            {{ spu.introduction }}
+          </p>
+
+          <div class="price-box">
+            <div class="price-row">
+              <span class="pd-price">{{ priceText }}</span>
+              <span
+                v-if="marketText"
+                class="pd-orig"
+              >{{ marketText }}</span>
+            </div>
+            <p class="ship-tip">
+              库存 {{ stock }} 件 · 已售 {{ spu.salesCount }} 件
+            </p>
+          </div>
+
+          <!--
           规格选择。这里**同时承担设计稿「规格参数」表的位置**（FR-005a）：
           显示规格名与规格值，不再另做一张产品参数表。
         -->
-        <template v-if="isMultiSpec">
-          <p class="spec-label">选择规格</p>
-          <div class="spec-row">
-            <span
-              v-for="s in skus"
-              :key="s.id"
-              class="spec"
-              :class="{ active: s.id === currentSkuId, disabled: s.stock <= 0 }"
-              @click="pickSku(s)"
+          <template v-if="isMultiSpec">
+            <p class="spec-label">
+              选择规格
+            </p>
+            <div class="spec-row">
+              <button
+                v-for="s in skus"
+                :key="s.id"
+                class="spec"
+                type="button"
+                :disabled="s.stock <= 0"
+                :aria-pressed="s.id === currentSkuId"
+                :class="{ active: s.id === currentSkuId, disabled: s.stock <= 0 }"
+                @click="pickSku(s)"
+              >
+                <template
+                  v-for="p in s.properties"
+                  :key="p.valueId"
+                >
+                  {{ p.propertyName }}：{{ p.valueName }}
+                </template>
+                <em
+                  v-if="s.stock <= 0"
+                  class="spec-out"
+                >无货</em>
+              </button>
+            </div>
+          </template>
+
+          <div class="qty-row">
+            <span class="spec-label">购买数量</span>
+            <div class="qty-box">
+              <button
+                class="qty-btn"
+                type="button"
+                aria-label="减少数量"
+                :disabled="qty <= 1"
+                @click="stepQty(-1)"
+              >
+                −
+              </button>
+              <span
+                class="qty-num"
+                aria-live="polite"
+              >{{ qty }}</span>
+              <button
+                class="qty-btn plus"
+                type="button"
+                aria-label="增加数量"
+                :disabled="qty >= stock"
+                @click="stepQty(1)"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <p class="product-selection">
+            <span>已选</span>{{ selectedSpecText }} <span>／ {{ qty }} 件</span>
+          </p>
+          <div class="btn-row">
+            <button
+              class="btn-buy"
+              type="button"
+              @click="onBuyNow"
             >
-              <template v-for="p in s.properties" :key="p.valueId">{{ p.propertyName }}：{{ p.valueName }}</template>
-              <em v-if="s.stock <= 0" class="spec-out">无货</em>
-            </span>
+              立即购买
+            </button>
+            <button
+              class="btn-cart"
+              type="button"
+              @click="onAddToCart"
+            >
+              加入购物车
+            </button>
           </div>
-        </template>
 
-        <div class="qty-row">
-          <span class="spec-label">购买数量</span>
-          <div class="qty-box">
-            <span class="qty-btn" @click="stepQty(-1)">−</span>
-            <span class="qty-num">{{ qty }}</span>
-            <span class="qty-btn plus" @click="stepQty(1)">+</span>
+          <div class="product-consult">
+            <div><strong>型号或耗材不确定？</strong><p>提供设备型号与使用场景，帮你确认搭配。</p></div><RouterLink to="/support/contact">
+              咨询选型 →
+            </RouterLink>
           </div>
         </div>
-
-        <div class="btn-row">
-          <button class="btn-buy" type="button" @click="onBuyNow">立即购买</button>
-          <button class="btn-cart" type="button" @click="onAddToCart">加入购物车</button>
-        </div>
-
-        <p class="svc-line">✓ 正品保障 &nbsp;&nbsp; ✓ 极速发货 &nbsp;&nbsp; ✓ 一年质保 &nbsp;&nbsp; ✓ 7天无理由退换</p>
       </div>
-    </div>
 
-    <!--
+      <!--
       商品详情富文本。内容经 sanitizeRichText 白名单过滤（FR-005c / SC-020）；
       为空或过滤后无实际内容时整块不渲染（FR-005b）。
     -->
-    <div v-if="safeDescription" class="params">
-      <h2>商品详情</h2>
-      <div class="pd-desc" v-html="safeDescription"></div>
-    </div>
-
-    <!--
-      评价区（FR-067 / FR-069 / FR-071 / FR-072）。**异步加载**：
-      拉不到就整块不渲染 —— 这一页在支付链路上，不能为一个辅助区块白屏。
-      文案用中性的「用户评价」，**不写**「最新评价」：后端该接口没有排序（契约 §2.1）。
-    -->
-    <section v-if="comments" class="params pd-comments">
-      <h2>用户评价</h2>
-      <CommentList
-        :comments="comments"
-        :show-view-all="commentTotal > comments.length"
-        @view-all="goAllComments"
-      />
-    </section>
-  </template>
+      <section class="product-information">
+        <div
+          class="product-tabs"
+          role="tablist"
+          aria-label="商品信息"
+        >
+          <button
+            v-if="safeDescription"
+            id="product-tab-description"
+            type="button"
+            role="tab"
+            :aria-selected="shownTab === 'description'"
+            aria-controls="product-panel"
+            @click="detailTab = 'description'"
+          >
+            商品详情
+          </button><button
+            id="product-tab-specs"
+            type="button"
+            role="tab"
+            :aria-selected="shownTab === 'specs'"
+            aria-controls="product-panel"
+            @click="detailTab = 'specs'"
+          >
+            规格与库存
+          </button><button
+            id="product-tab-support"
+            type="button"
+            role="tab"
+            :aria-selected="shownTab === 'support'"
+            aria-controls="product-panel"
+            @click="detailTab = 'support'"
+          >
+            选购与服务
+          </button>
+        </div>
+        <div
+          id="product-panel"
+          role="tabpanel"
+          :aria-labelledby="`product-tab-${shownTab}`"
+        >
+          <div
+            v-if="safeDescription && shownTab === 'description'"
+            class="params"
+          >
+            <h2>商品详情</h2>
+            <div
+              class="pd-desc"
+              v-html="safeDescription"
+            />
+          </div>
+          <div
+            v-else-if="shownTab === 'specs'"
+            class="product-specifications"
+          >
+            <h2>规格与库存</h2><p>选择适合的规格，价格和库存以当前商品信息为准。</p><div class="product-spec-table">
+              <div class="product-spec-table-head">
+                <span>商品规格</span><span>售价</span><span>库存</span>
+              </div><div
+                v-for="s in skus"
+                :key="s.id"
+                class="product-spec-table-row"
+              >
+                <span>{{ s.properties?.map(p => `${p.propertyName}：${p.valueName}`).join(' / ') || '标准规格' }}</span><span>{{ formatYuan(s.price) }}</span><span>{{ s.stock > 0 ? `${s.stock} 件` : '暂时缺货' }}</span>
+              </div><p v-if="!skus.length">
+                暂无可售规格，请联系工作人员确认。
+              </p>
+            </div>
+          </div>
+          <div
+            v-else
+            class="product-service"
+          >
+            <h2>购买前，确认这三件事</h2><div><section><span>01</span><h3>确认规格</h3><p>核对尺寸、材质和设备适配情况，避免型号或耗材搭配不合适。</p></section><section><span>02</span><h3>确认数量</h3><p>批量采购或特殊应用，可先联系张经理确认需求与交付安排。</p></section><section><span>03</span><h3>获取使用帮助</h3><p>安装、装纸与打印排查，可查看服务支持或联系工作人员。</p></section></div><RouterLink to="/support/contact">
+              联系张经理 →
+            </RouterLink><RouterLink to="/support">
+              查看服务支持 →
+            </RouterLink>
+          </div>
+        </div>
+      </section>
+      <section
+        v-if="comments"
+        class="params pd-comments product-information"
+      >
+        <h2>用户评价</h2>
+        <CommentList
+          :comments="comments"
+          :show-view-all="commentTotal > comments.length"
+          @view-all="goAllComments"
+        />
+      </section>
+    </template>
+  </div>
 </template>

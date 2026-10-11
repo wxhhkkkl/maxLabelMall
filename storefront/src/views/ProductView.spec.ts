@@ -402,6 +402,24 @@ describe('ProductView —— 加入购物车（T080 / FR-017 / FR-018）', () =>
   })
 })
 
+describe('ProductView —— 选购信息', () => {
+  it('规格与服务分开展示，不编造参数', async () => {
+    const w = await mountDetail(spu())
+    await w.get('#product-tab-specs').trigger('click')
+    expect(w.find('.product-spec-table').exists()).toBe(true)
+    expect(w.find('.pd-desc').exists()).toBe(false)
+    await w.get('#product-tab-support').trigger('click')
+    expect(w.find('.product-service').exists()).toBe(true)
+    expect(w.get('.product-service a').attributes('href')).toBe('/support/contact')
+  })
+  it('数量不能超过当前规格库存', async () => {
+    const w = await mountDetail(spu({ skus: [sku(1, { stock: 2 })] }))
+    await w.get('.qty-btn.plus').trigger('click')
+    expect(w.get('.qty-num').text()).toBe('2')
+    expect(w.get('.qty-btn.plus').attributes('disabled')).toBeDefined()
+  })
+})
+
 describe('ProductView —— 立即购买（T102 / FR-024）', () => {
   it('跳到结算页并带上来源与所选规格、数量，**不经过购物车**', async () => {
     await login()

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const getCartCount = vi.fn()
+vi.mock('@/api/category', () => ({ listCategories: vi.fn().mockResolvedValue([]), buildCategoryTree: (cats: unknown[]) => cats }))
 vi.mock('@/api/cart', () => ({
   getCartCount: (...a: unknown[]) => getCartCount(...a),
   addToCart: vi.fn(),
@@ -69,6 +70,29 @@ async function mountLoggedIn() {
 }
 
 describe('SiteHeader —— 静态结构', () => {
+  it('悬停展开子菜单，离开或 Escape 收起', async () => {
+    vi.useFakeTimers()
+    const w = mountHeader()
+    const item = w.findAll('.nav-item')[3]!
+    await item.trigger('mouseenter')
+    expect(w.get('#nav-submenu-solutions').isVisible()).toBe(true)
+    expect(w.get('#nav-submenu-solutions').text()).toContain('生产制造')
+    await item.trigger('keydown', { key: 'Escape' })
+    expect(w.get('#nav-submenu-solutions').attributes('style')).toContain('display: none')
+    await item.trigger('focusin')
+    expect(w.get('#nav-submenu-solutions').isVisible()).toBe(true)
+    await item.trigger('mouseleave')
+    expect(w.get('#nav-submenu-solutions').isVisible()).toBe(true)
+    await w.get('#nav-submenu-solutions').trigger('mouseenter')
+    await vi.advanceTimersByTimeAsync(400)
+    expect(w.get('#nav-submenu-solutions').isVisible()).toBe(true)
+    await w.get('#nav-submenu-solutions').trigger('mouseleave')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(w.get('#nav-submenu-solutions').attributes('style')).toContain('display: none')
+    w.unmount()
+    vi.useRealTimers()
+  })
+
   it('渲染 logo 图片与中英文品牌名', () => {
     const w = mountHeader()
     expect(w.get('img.logo-img').attributes('src')).toBe('/assets/logo.png')
@@ -82,8 +106,8 @@ describe('SiteHeader —— 静态结构', () => {
     // 于是回退 —— 顶栏保持 5 项，那两处入口在 `AccountView` 的侧栏里
     // （相关断言见 AccountView.spec.ts）。
     const labels = mountHeader()
-      .findAll('.nav a')
-      .map((a) => a.text())
+      .findAll('.nav .nav-primary')
+      .map((a) => a.text().replace('⌄', '').trim())
     expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
   })
 
@@ -94,8 +118,13 @@ describe('SiteHeader —— 静态结构', () => {
   })
 
   it('导航项指向正确的路由（不是设计稿里的 .html）', () => {
-    const hrefs = mountHeader()
-      .findAll('.nav a')
+    const w = mountHeader()
+    expect(w.find('#nav-submenu-software').exists()).toBe(false)
+    expect(w.find('#nav-submenu-support').exists()).toBe(false)
+    expect(w.get('.mobile-nav a[href="/software"]').attributes('data-mobile-primary')).toBeDefined()
+    expect(w.get('.mobile-nav a[href="/support"]').attributes('data-mobile-primary')).toBeDefined()
+    const hrefs = w
+      .findAll('.nav .nav-primary')
       .map((a) => a.attributes('href'))
     expect(hrefs).toEqual(['/', '/mall', '/software', '/solutions', '/support'])
   })
@@ -118,8 +147,8 @@ describe('SiteHeader —— 静态结构', () => {
 
   it('移动端导航也渲染同样五项（汉堡菜单与主导航同源）', () => {
     const labels = mountHeader()
-      .findAll('.mobile-nav a[href]:not(.m-login)')
-      .map((a) => a.text())
+      .findAll('.mobile-nav [data-mobile-primary]')
+      .map((a) => a.text().replace('＋', '').trim())
     expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
   })
 

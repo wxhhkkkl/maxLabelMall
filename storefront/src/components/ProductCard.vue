@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getProductDetail } from '@/api/product'
@@ -24,6 +24,8 @@ const props = defineProps<{
   spu: ProductSpu
   /** 由 deriveBadges 派生；null 表示无角标 */
   badge?: 'hot' | 'fresh' | null
+  catalog?: boolean
+  categoryLabel?: string
 }>()
 
 const emit = defineEmits<{ add: [ProductSpu] }>()
@@ -35,6 +37,8 @@ const userStore = useUserStore()
 const toast = useToasts()
 
 const priceText = computed(() => formatYuan(props.spu.price))
+const imageFailed = ref(false)
+watch(() => props.spu.picUrl, () => { imageFailed.value = false })
 /** marketPrice 为 0 视为没有划线价 */
 const marketText = computed(() =>
   props.spu.marketPrice > 0 ? formatYuan(props.spu.marketPrice) : '',
@@ -56,6 +60,11 @@ async function onAdd(e: MouseEvent) {
   // 卡片整体是链接，加购按钮不应触发跳转
   e.preventDefault()
   e.stopPropagation()
+  if (props.catalog && props.spu.stock <= 0) return
+  if (props.catalog && props.spu.specType) {
+    await router.push(`/product/${props.spu.id}`)
+    return
+  }
 
   // ⚠️ **商城的列表接口不返回 `skus`**（`AppProductSpuRespVO` 里没有该字段），
   // 卡片手上只有 SPU。所以不能直接把 `spu.skus[0].id` 当 skuId —— 那会发出去
@@ -118,27 +127,78 @@ async function onAdd(e: MouseEvent) {
 </script>
 
 <template>
-  <RouterLink class="p-card" :to="`/product/${spu.id}`">
-    <div v-if="spu.picUrl" class="p-img-wrap">
-      <img class="p-img-real" :src="spu.picUrl" :alt="spu.name" loading="lazy" />
+  <RouterLink
+    class="p-card"
+    :class="{ 'catalog-card': catalog }"
+    :to="`/product/${spu.id}`"
+  >
+    <div
+      v-if="spu.picUrl && !imageFailed"
+      class="p-img-wrap"
+    >
+      <img
+        class="p-img-real"
+        :src="spu.picUrl"
+        :alt="spu.name"
+        loading="lazy"
+        @error="imageFailed = true"
+      >
     </div>
     <!-- 无图时沿用设计稿的占位块，而不是渲染一个会坏掉的 img -->
-    <div v-else class="ph p-img">暂无图片</div>
-
-    <div v-if="badge" class="p-tags">
-      <span class="p-tag" :class="BADGE_CLASS[badge]">{{ BADGE_TEXT[badge] }}</span>
+    <div
+      v-else
+      class="ph p-img"
+    >
+      暂无图片
     </div>
 
-    <div class="p-title">{{ spu.name }}</div>
-    <div v-if="spu.introduction" class="p-sell">{{ spu.introduction }}</div>
+    <div
+      v-if="badge"
+      class="p-tags"
+    >
+      <span
+        class="p-tag"
+        :class="BADGE_CLASS[badge]"
+      >{{ BADGE_TEXT[badge] }}</span>
+    </div>
+
+    <div class="p-title">
+      {{ spu.name }}
+    </div>
+    <div
+      v-if="spu.introduction"
+      class="p-sell"
+    >
+      {{ spu.introduction }}
+    </div>
+    <div
+      v-if="catalog"
+      class="p-catalog-meta"
+    >
+      <span v-if="categoryLabel">{{ categoryLabel }}</span><span>{{ spu.specType ? '多规格可选' : '标准规格' }}</span>
+    </div>
 
     <!-- 售价与划线价是**兄弟元素**（与详情页的 .price-row 一致），
          不是把划线价塞进 .p-price 里 -->
     <div class="p-price-row">
       <span class="p-price">{{ priceText }}</span>
-      <span v-if="marketText" class="p-orig">{{ marketText }}</span>
+      <span
+        v-if="catalog && spu.specType"
+        class="p-price-from"
+      >起</span>
+      <span
+        v-if="marketText"
+        class="p-orig"
+      >{{ marketText }}</span>
     </div>
 
-    <button class="p-btn" type="button" @click="onAdd">加入购物车</button>
+    <button
+      class="p-btn"
+      type="button"
+      :disabled="catalog && spu.stock <= 0"
+      @click="onAdd"
+    >
+      {{ catalog && spu.stock <= 0 ? '暂时缺货' : catalog && spu.specType ? '选择规格' : '加入购物车' }}
+    </button>
   </RouterLink>
 </template>

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>赋签 · 商城排版预览</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf2f8;font-family:"Microsoft YaHei",system-ui,sans-serif;color:#162c50}header{position:sticky;top:0;z-index:1;padding:20px 24px;background:#ffffffed;border-bottom:1px solid #dde5f0;backdrop-filter:blur(12px)}.top{max-width:1280px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:18px;margin:0 0 7px}p{font-size:12px;color:#8192a8;margin:0;line-height:1.8}a{color:#2e7cd6;font-size:13px;white-space:nowrap}nav{max-width:1280px;margin:16px auto 0;display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid #e2eaf5;border-radius:6px;padding:8px 13px;background:#f6f9fd;color:#6d819b;cursor:pointer}button[aria-pressed=true]{background:#2e7cd6;border-color:#2e7cd6;color:white}main{max-width:1280px;width:calc(100% - 32px);margin:24px auto 48px}img{display:block;width:100%;height:auto;border-radius:12px;box-shadow:0 8px 24px #203c6410}.mobile img{max-width:390px;margin:auto}button:focus-visible,a:focus-visible{outline:2px solid #2e7cd6;outline-offset:3px}@media(max-width:600px){header{padding:16px}.top{align-items:flex-start}h1{font-size:16px}.top p{max-width:250px}button{font-size:11px;padding:8px 10px}}
+</style>
+</head>
+<body>
+<header><div class="top"><div><h1>商城选购体验 · 排版预览</h1><p>以下为实际页面截图，使用测试商品检查布局；正式商城从后台读取商品。</p></div><a href="/mall">进入商城 →</a></div><nav aria-label="选择预览"><button type="button" data-view="home" aria-pressed="true">商城首页</button><button type="button" data-view="detail" aria-pressed="false">商品详情</button><button type="button" data-view="menu" aria-pressed="false">悬停子菜单</button><button type="button" data-view="home-mobile" aria-pressed="false">手机商城</button><button type="button" data-view="detail-mobile" aria-pressed="false">手机详情</button></nav></header>
+<main><img src="/previews/mall-layout/home.png" alt="商城首页排版预览"></main>
+<script>
+const main=document.querySelector('main'),img=main.querySelector('img');document.querySelectorAll('button[data-view]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('button[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));main.classList.toggle('mobile',button.dataset.view.endsWith('mobile'));img.src='/previews/mall-layout/'+button.dataset.view+'.png';img.alt=button.textContent+'排版预览';window.scrollTo({top:0,behavior:'smooth'})}));
+</script>
+</body>
+</html>

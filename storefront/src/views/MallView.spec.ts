@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -40,6 +40,7 @@ vi.mock('@/api/filter', () => ({
 }))
 
 const MallView = (await import('./MallView.vue')).default
+enableAutoUnmount(afterEach)
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -78,6 +79,9 @@ async function mountMall(list = [spu(1), spu(2)], total = 2) {
   listCategories.mockResolvedValue(CATS)
   const w = mount(MallView, { global: { plugins: [router, createPinia()] } })
   await flushPromises()
+  // 列表用例从商城首页进入全部商品；品类分区由 MallDepartments.spec.ts 覆盖。
+  await w.get('.cat-all').trigger('click')
+  await flushPromises()
   return w
 }
 
@@ -86,7 +90,7 @@ function lastParams() {
   return pageProducts.mock.calls.at(-1)?.[0] as Record<string, unknown>
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   setActivePinia(createPinia())
   window.localStorage.clear()
   // 横幅默认空 —— 只有专门测它的用例才覆盖
@@ -95,6 +99,7 @@ beforeEach(() => {
   // 默认"这个分类没配任何维度" —— 只有专门测筛选的用例才覆盖它
   listFilterDimensions.mockReset()
   listFilterDimensions.mockResolvedValue([])
+  await router.push('/mall')
 })
 
 describe('MallView —— 商品网格与总数', () => {
@@ -119,7 +124,7 @@ describe('MallView —— 搜索走后端全量检索（FR-003）', () => {
   it('关键词作为 keyword 参数发给后端，**不是前端过滤当前页**', async () => {
     const w = await mountMall()
     await w.get('#mallSearch').setValue('碳带')
-    await w.get('#mallSearchBtn').trigger('click')
+    await w.get('#mallSearchBox').trigger('submit')
     await flushPromises()
     expect(lastParams().keyword).toBe('碳带')
   })
@@ -130,7 +135,7 @@ describe('MallView —— 搜索走后端全量检索（FR-003）', () => {
     pageProducts.mockResolvedValue({ list: [spu(9)], total: 40 })
     await flushPromises()
     await w.get('#mallSearch').setValue('热敏')
-    await w.get('#mallSearchBtn').trigger('click')
+    await w.get('#mallSearchBox').trigger('submit')
     await flushPromises()
     expect(lastParams().pageNo).toBe(1)
   })
@@ -138,7 +143,7 @@ describe('MallView —— 搜索走后端全量检索（FR-003）', () => {
   it('搜索无结果时展示空状态，而不是空白网格', async () => {
     const w = await mountMall([], 0)
     await w.get('#mallSearch').setValue('不存在的商品')
-    await w.get('#mallSearchBtn').trigger('click')
+    await w.get('#mallSearchBox').trigger('submit')
     await flushPromises()
     pageProducts.mockResolvedValue({ list: [], total: 0 })
     expect(w.find('.empty-state').exists()).toBe(true)
@@ -169,6 +174,28 @@ describe('MallView —— 排序（FR-004）', () => {
 })
 
 describe('MallView —— 分类筛选（FR-002）', () => {
+  it('一级分类显示二级选项，二级才加载维度，返回一级清除维度选择', async () => {
+    const w = await mountMall()
+    listFilterDimensions.mockResolvedValue(DIMENSIONS)
+    await w.findAll('.cat-pills .tab')[1]!.trigger('click')
+    await flushPromises()
+    expect(w.get('[aria-label="二级分类"]').text()).toContain('三防热敏纸')
+    expect(listFilterDimensions).not.toHaveBeenCalled()
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+    await w.get('.mall-child-options button').trigger('click')
+    await flushPromises()
+    expect(listFilterDimensions).toHaveBeenLastCalledWith(11)
+    expect(w.find('.product-filter-bar').exists()).toBe(true)
+    expect(w.findAll('.cat-pills .tab')[1]!.attributes('aria-pressed')).toBe('true')
+    expect(w.get('.mall-child-options button').attributes('aria-pressed')).toBe('true')
+    await w.get('.filter-value').trigger('click')
+    await flushPromises()
+    await w.findAll('.cat-pills .tab')[1]!.trigger('click')
+    await flushPromises()
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+    expect(lastParams()).toMatchObject({ categoryId: 10, filterValueIds: [] })
+  })
+
   it('点分类胶囊按 categoryId 筛选', async () => {
     const w = await mountMall()
     const pills = w.findAll('.cat-pills .tab')
@@ -193,12 +220,11 @@ describe('MallView —— 分类筛选（FR-002）', () => {
     expect(w.text()).toContain('三防热敏纸')
   })
 
-  it('**「企业采购」标签指向落地页**（FR-048）—— 它不是一个商品分类', async () => {
+  it('企业采购咨询直接指向联系人页面', async () => {
     const w = await mountMall()
-    const pill = w.findAll('.cat-pills .tab').find((t) => t.text() === '企业采购')
-    expect(pill).toBeTruthy()
-    // 必须是指向 /enterprise 的链接，而不是一个会去按 categoryId 筛选的分类
-    expect(pill?.attributes('href')).toBe('/enterprise')
+    const link = w.get('.mall-browse-heading a')
+    expect(link.text()).toContain('企业采购咨询')
+    expect(link.attributes('href')).toBe('/support/contact')
     expect(lastParams().categoryId).toBeUndefined()
   })
 })
@@ -247,6 +273,58 @@ describe('MallView —— 请求失败要有可重试提示（FR-045）', () => 
     await flushPromises()
     // 页面仍然渲染出来（不崩）
     expect(w.find('.mall-page-main').exists()).toBe(true)
+  })
+})
+
+describe('MallView —— 选购交互', () => {
+  it('价格从高到低走后端降序', async () => {
+    const w = await mountMall()
+    await w.findAll('.sort-chip')[3]?.trigger('click')
+    await flushPromises()
+    expect(lastParams()).toMatchObject({ sortField: 'price', sortAsc: false })
+  })
+
+  it('未提交的搜索内容不改变分类查询，提交后仍可翻页', async () => {
+    const w = await mountMall([spu(1)], 40)
+    await w.get('#mallSearch').setValue('标签')
+    await w.findAll('.cat-pills .tab')[1]?.trigger('click')
+    await flushPromises()
+    expect(lastParams().keyword).toBeUndefined()
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+    await w.findAll('.pager .pg')[1]?.trigger('click')
+    await flushPromises()
+    expect(lastParams()).toMatchObject({ keyword: '标签', categoryId: 10, pageNo: 2 })
+    expect(w.find('.mall-active-filters').exists()).toBe(false)
+    expect(w.text()).not.toContain('重置筛选')
+    await w.get('#mallSearchClear').trigger('click')
+    await w.get('.cat-all').trigger('click')
+    await flushPromises()
+    expect(lastParams()).toMatchObject({ pageNo: 1, keyword: undefined, categoryId: undefined })
+  })
+
+  it('视图切换不重新请求商品', async () => {
+    const w = await mountMall()
+    const calls = pageProducts.mock.calls.length
+    await w.get('[aria-label="列表视图"]').trigger('click')
+    expect(w.get('.mall-grid').classes()).toContain('is-list')
+    expect(pageProducts.mock.calls.length).toBe(calls)
+    await w.get('[aria-label="网格视图"]').trigger('click')
+    expect(w.get('.mall-grid').classes()).not.toContain('is-list')
+  })
+
+  it('快速切换分类时，较早返回的请求不会覆盖当前结果', async () => {
+    const w = await mountMall()
+    let resolveOld!: (value: { list: ProductSpu[]; total: number }) => void
+    pageProducts.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    await w.findAll('.cat-pills .tab')[1]?.trigger('click')
+    pageProducts.mockResolvedValueOnce({ list: [spu(99)], total: 1 })
+    await w.findAll('.cat-pills .tab')[2]?.trigger('click')
+    await flushPromises()
+    resolveOld({ list: [spu(88)], total: 1 })
+    await flushPromises()
+    expect(w.text()).toContain('真实商品 99')
+    expect(w.text()).not.toContain('真实商品 88')
   })
 })
 
@@ -318,16 +396,97 @@ const DIMENSIONS = [
   ] },
 ]
 
+async function pickLabelChild(w: Awaited<ReturnType<typeof mountMall>>) {
+  await w.findAll('.cat-pills .tab')[1]!.trigger('click')
+  await flushPromises()
+  await w.get('.mall-child-options button').trigger('click')
+  await flushPromises()
+}
 /** 挂载后先切到某个分类（筛选条只在选中分类时才出现） */
 async function mountMallWithFilter(dimensions: unknown = DIMENSIONS, list = [spu(1)], total = 1) {
   const w = await mountMall(list, total)
   listFilterDimensions.mockResolvedValue(dimensions)
-  await w.findAll('.cat-pills .tab')[1].trigger('click') // 「全部」之后的第一个分类
+  await pickLabelChild(w) // 「全部」之后的第一个分类
   await flushPromises()
   return w
 }
 
 describe('MallView —— 筛选条（FR-098 ~ FR-106）', () => {
+  it('较早分类的维度后返回，不覆盖当前分类的筛选项', async () => {
+    const w = await mountMall()
+    let resolveOld!: (value: unknown) => void
+    listFilterDimensions.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    await pickLabelChild(w)
+    await flushPromises()
+    expect(w.text()).toContain('正在加载分类筛选')
+    listFilterDimensions.mockResolvedValueOnce([{ dimensionId: 99, dimensionName: '设备类型', sort: 1, values: [{ valueId: 99, name: '桌面型', sort: 1 }] }])
+    await w.findAll('.cat-pills .tab')[2]!.trigger('click')
+    await flushPromises()
+    resolveOld(DIMENSIONS)
+    await flushPromises()
+    expect(w.get('.product-filter-bar').text()).toContain('设备类型')
+    expect(w.get('.product-filter-bar').text()).not.toContain('宽度')
+    expect(lastParams().categoryId).toBe(20)
+  })
+
+  it('维度加载期间改变排序，等待新分类条件确定后再查询', async () => {
+    const w = await mountMallWithFilter()
+    await w.get('.filter-value').trigger('click')
+    await flushPromises()
+    let resolveNext!: (value: unknown) => void
+    listFilterDimensions.mockImplementationOnce(() => new Promise(resolve => { resolveNext = resolve }))
+    await w.findAll('.cat-pills .tab')[2]!.trigger('click')
+    await flushPromises()
+    const calls = pageProducts.mock.calls.length
+    await w.findAll('.sort-chip')[3]!.trigger('click')
+    await flushPromises()
+    expect(pageProducts.mock.calls.length).toBe(calls)
+    resolveNext([])
+    await flushPromises()
+    expect(lastParams()).toMatchObject({ categoryId: 20, filterValueIds: [], sortField: 'price', sortAsc: false })
+  })
+
+  it('分类请求未完成时进入全部商品，旧条件不会重新出现', async () => {
+    const w = await mountMallWithFilter()
+    let resolveOld!: (value: unknown) => void
+    listFilterDimensions.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    await w.findAll('.cat-pills .tab')[2]!.trigger('click')
+    await flushPromises()
+    await w.get('.cat-all').trigger('click')
+    await flushPromises()
+    resolveOld(DIMENSIONS)
+    await flushPromises()
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+    expect(lastParams()).toMatchObject({ categoryId: undefined, filterValueIds: [] })
+  })
+
+  it('打开登录弹层不清除搜索、分类和维度条件', async () => {
+    const w = await mountMallWithFilter()
+    await w.get('.filter-value').trigger('click')
+    await w.get('#mallSearch').setValue('碳带')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+    const calls = pageProducts.mock.calls.length
+    await router.replace({ query: { ...router.currentRoute.value.query, login: '1' } })
+    await flushPromises()
+    expect(w.get('#mallSearch').element).toHaveProperty('value', '碳带')
+    expect(w.get('.filter-value.active').text()).toBe('110')
+    expect(pageProducts.mock.calls.length).toBe(calls)
+  })
+
+  it('维度接口失败后可重试，仍能浏览商品', async () => {
+    const w = await mountMall()
+    listFilterDimensions.mockRejectedValueOnce(new Error('offline'))
+    await pickLabelChild(w)
+    await flushPromises()
+    expect(w.find('.p-card').exists()).toBe(true)
+    listFilterDimensions.mockResolvedValueOnce(DIMENSIONS)
+    await w.get('.mall-filter-status button').trigger('click')
+    await flushPromises()
+    expect(w.find('.product-filter-bar').exists()).toBe(true)
+    expect(w.find('.mall-filter-status').exists()).toBe(false)
+  })
+
   it('选中分类后按该分类拉维度，并渲染出来', async () => {
     const w = await mountMallWithFilter()
 
@@ -352,7 +511,7 @@ describe('MallView —— 筛选条（FR-098 ~ FR-106）', () => {
   it('**维度列表接口挂了不影响商品列表**（筛选条降级，FR-106）', async () => {
     const w = await mountMall([spu(1)], 1)
     listFilterDimensions.mockRejectedValue(new Error('boom'))
-    await w.findAll('.cat-pills .tab')[1].trigger('click')
+    await pickLabelChild(w)
     await flushPromises()
 
     expect(w.find('.product-filter-bar').exists()).toBe(false)
@@ -466,7 +625,7 @@ describe('MallView —— 筛选条（FR-098 ~ FR-106）', () => {
     listFilterDimensions.mockResolvedValue([
       { dimensionId: 99, dimensionName: '类型', sort: 1, values: [{ valueId: 9, name: '桌面型', sort: 1 }] },
     ])
-    await w.findAll('.cat-pills .tab')[1].trigger('click')
+    await pickLabelChild(w)
     await flushPromises()
     expect(lastParams().filterValueIds).toEqual([])
   })

@@ -69,9 +69,31 @@ beforeEach(async () => {
   await router.isReady()
 })
 
-function mountCard(props: { spu: ProductSpu; badge?: 'hot' | 'fresh' | null }) {
+function mountCard(props: { spu: ProductSpu; badge?: 'hot' | 'fresh' | null; catalog?: boolean; categoryLabel?: string }) {
   return mount(ProductCard, { props, global: { plugins: [router, createPinia()] } })
 }
+
+describe('ProductCard —— 商城选购', () => {
+  it('多规格商品引导选择规格，不直接加购', async () => {
+    const w = mountCard({ spu: spu({ specType: true, skus: [] }), catalog: true, categoryLabel: '标签耗材' })
+    expect(w.get('.p-catalog-meta').text()).toContain('标签耗材')
+    expect(w.get('.p-btn').text()).toBe('选择规格')
+    await w.get('.p-btn').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/product/7')
+    expect(getProductDetail).not.toHaveBeenCalled()
+    expect(addToCart).not.toHaveBeenCalled()
+  })
+
+  it('缺货商品禁用加购', async () => {
+    const w = mountCard({ spu: spu({ stock: 0 }), catalog: true })
+    expect(w.get('.p-btn').attributes('disabled')).toBeDefined()
+    expect(w.get('.p-btn').text()).toBe('暂时缺货')
+    await w.get('.p-btn').trigger('click')
+    expect(addToCart).not.toHaveBeenCalled()
+    expect(getProductDetail).not.toHaveBeenCalled()
+  })
+})
 
 describe('ProductCard —— 用真实商品数据渲染', () => {
   it('展示名称、主图与售价（分为单位，展示为元）', () => {
@@ -97,6 +119,15 @@ describe('ProductCard —— 用真实商品数据渲染', () => {
     const w = mountCard({ spu: spu({ picUrl: '' }), badge: null })
     expect(w.find('img').exists()).toBe(false)
     expect(w.find('.ph').exists()).toBe(true)
+  })
+
+  it('失效图片显示占位，后台更换地址后重新加载', async () => {
+    const w = mountCard({ spu: spu(), badge: null })
+    await w.get('img').trigger('error')
+    expect(w.find('img').exists()).toBe(false)
+    expect(w.text()).toContain('暂无图片')
+    await w.setProps({ spu: spu({ picUrl: 'https://example.com/new.png' }) })
+    expect(w.get('img').attributes('src')).toBe('https://example.com/new.png')
   })
 
   it('整卡可点进详情页（不是设计稿里的 .html）', () => {

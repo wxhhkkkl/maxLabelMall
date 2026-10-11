@@ -62,27 +62,40 @@ function clearRow(row: FilterDimension) {
 </script>
 
 <template>
-  <div v-if="rows.length" class="product-filter-bar">
-    <div v-for="row in rows" :key="row.dimensionId" class="filter-row">
+  <div
+    v-if="rows.length"
+    class="product-filter-bar"
+  >
+    <div
+      v-for="row in rows"
+      :key="row.dimensionId"
+      class="filter-row"
+    >
       <span class="filter-row__label">{{ row.dimensionName }}：</span>
-      <span
+      <button
         class="filter-row__all"
+        type="button"
+        :aria-label="`${row.dimensionName}：全部`"
+        :aria-pressed="!isRowActive(row)"
         :class="{ active: !isRowActive(row) }"
         @click="clearRow(row)"
       >
         全部
-      </span>
+      </button>
       <!-- 值区自己横向滚动、不折行：行数因此不随数据的多少变化（Q13） -->
       <div class="filter-row__values">
-        <span
+        <button
           v-for="value in row.values"
           :key="value.valueId"
           class="filter-value"
+          type="button"
+          :aria-label="`${row.dimensionName}：${value.name}`"
+          :aria-pressed="selected.has(value.valueId)"
           :class="{ active: selected.has(value.valueId) }"
           @click="pickValue(row, value.valueId)"
         >
           {{ value.name }}
-        </span>
+        </button>
       </div>
     </div>
   </div>
@@ -116,6 +129,8 @@ function clearRow(row: FilterDimension) {
 
 /* 「全部」固定不动，不随值区滚出去 */
 .filter-row__all {
+  border: 0;
+  font-family: inherit;
   flex: none;
   padding: 6px 14px;
   border-radius: 8px;
@@ -136,6 +151,8 @@ function clearRow(row: FilterDimension) {
 }
 
 .filter-value {
+  border: 0;
+  font-family: inherit;
   flex: none;
   padding: 6px 14px;
   border-radius: 8px;

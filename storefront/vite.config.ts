@@ -12,11 +12,13 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
-    // 不配置 server.proxy：后端 CORS 已放开所有来源（research.md R4），
-    // 浏览器直连 VITE_BASE_URL 即可。
     server: {
       port: Number(env.VITE_PORT) || 5173,
       open: true,
+      // 可在 .env.local 指定开发接口；仅开发服务器生效，生产仍使用站点自身接口。
+      proxy: env.VITE_DEV_API_TARGET ? {
+        '/app-api': { target: env.VITE_DEV_API_TARGET, changeOrigin: true },
+      } : undefined,
     },
     base: env.VITE_BASE_PATH || '/',
     build: {

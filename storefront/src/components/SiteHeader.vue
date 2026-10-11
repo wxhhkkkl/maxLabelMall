@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
+import { buildCategoryTree, listCategories } from '@/api/category'
+import { industrySolutions } from '@/data/industrySolutions'
+import type { CategoryNode } from '@/types'
+import '@/styles/navigation.css'
 
 import LoginDialog from './LoginDialog.vue'
 
@@ -47,6 +51,37 @@ const userStore = useUserStore()
 const cartStore = useCartStore()
 
 const loginOpen = ref(false)
+const openMenu = ref<string | null>(null)
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+function cancelMenuClose() {
+  clearTimeout(closeTimer)
+}
+function showMenu(name: string) {
+  cancelMenuClose()
+  openMenu.value = name
+}
+function scheduleMenuClose() {
+  cancelMenuClose()
+  closeTimer = setTimeout(() => { openMenu.value = null }, 300)
+}
+onBeforeUnmount(cancelMenuClose)
+const categories = ref<CategoryNode[]>([])
+type NavGroup = { title: string; links: { label: string; to: string }[] }
+const submenus = computed<Record<string, NavGroup[]>>(() => ({
+  mall: categories.value.length ? categories.value.map(c => ({
+    title: c.name,
+    links: (c.children?.length ? c.children : [c]).map(child => ({ label: child.name, to: `/mall?category=${child.id}` })),
+  })) : [{ title: '商城选购', links: [{ label: '全部商品', to: '/mall' }, { label: '采购与选型咨询', to: '/support/contact' }] }],
+  solutions: ['仓储与生产', '门店与消费', '专业标识'].map(group => ({ title: group, links: industrySolutions.filter(i => i.group === group).map(i => ({ label: i.name, to: `/solutions/${i.id}` })) })),
+}))
+function closeOnFocusOut(event: FocusEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) openMenu.value = null
+}
+watch(() => route.fullPath, () => {
+  cancelMenuClose()
+  openMenu.value = null
+  document.body.classList.remove('nav-open')
+})
 
 function toggleMobileNav(): void {
   document.body.classList.toggle('nav-open')
@@ -91,52 +126,136 @@ function onLoginSuccess(): void {
 // 角标数量以**后端**为准（FR-019）；未登录时不显示数字
 onMounted(() => {
   void cartStore.refreshCount()
+  void listCategories().then(cats => { categories.value = buildCategoryTree(cats) }).catch(() => undefined)
 })
 
 function isActive(name: string): boolean {
-  return route.name === name || (name === 'solutions' && route.name === 'solution-detail')
+  return route.name === name || (name === 'mall' && route.name === 'product') || (name === 'solutions' && route.name === 'solution-detail')
     || (name === 'support' && (route.name === 'support-article' || route.name === 'support-contact'))
 }
 </script>
 
 <template>
   <nav class="header">
-    <RouterLink class="logo" to="/">
-      <img class="logo-img" src="/assets/logo.png" alt="赋签 MaxLabel" />
+    <RouterLink
+      class="logo"
+      to="/"
+    >
+      <img
+        class="logo-img"
+        src="/assets/logo.png"
+        alt="赋签 MaxLabel"
+      >
       <span class="logo-cn">赋签</span>
       <span class="logo-en">MaxLabel</span>
     </RouterLink>
 
-    <div class="nav">
-      <RouterLink
+    <div
+      class="nav"
+      aria-label="主导航"
+    >
+      <div
         v-for="item in NAV"
         :key="item.name"
-        :to="item.to"
-        :class="{ active: isActive(item.name) }"
+        class="nav-item"
+        @mouseenter="showMenu(item.name)"
+        @mouseleave="scheduleMenuClose"
+        @focusin="showMenu(item.name)"
+        @focusout="closeOnFocusOut"
+        @keydown.esc.stop.prevent="openMenu = null"
       >
-        {{ item.label }}
-      </RouterLink>
+        <RouterLink
+          :to="item.to"
+          class="nav-primary"
+          :class="{ active: isActive(item.name) }"
+          :aria-expanded="submenus[item.name] ? openMenu === item.name : undefined"
+          :aria-controls="submenus[item.name] ? `nav-submenu-${item.name}` : undefined"
+        >
+          {{ item.label }}<span
+            v-if="submenus[item.name]"
+            class="nav-caret"
+            aria-hidden="true"
+          >⌄</span>
+        </RouterLink>
+        <div
+          v-if="submenus[item.name]"
+          v-show="openMenu === item.name"
+          :id="`nav-submenu-${item.name}`"
+          class="nav-submenu"
+          :class="{ 'nav-submenu-mall': item.name === 'mall' }"
+          :aria-label="`${item.label}子菜单`"
+          @mouseenter="cancelMenuClose"
+          @mouseleave="scheduleMenuClose"
+        >
+          <div class="nav-submenu-intro">
+            <span>赋签 · MaxLabel</span><h2>{{ item.label }}</h2><p>{{ item.name === 'mall' ? '从标签到设备，找到合适的搭配。' : item.name === 'solutions' ? '从你的行业出发，找到标签的应用方式。' : item.name === 'software' ? '让标签设计极致简单。' : '从开始使用，到解决打印问题。' }}</p><RouterLink :to="item.to">
+              查看全部 →
+            </RouterLink>
+          </div>
+          <div class="nav-submenu-groups">
+            <section
+              v-for="group in submenus[item.name]"
+              :key="group.title"
+              :class="{ 'nav-group-wide': item.name === 'mall' && group.links.length > 8 }"
+            >
+              <h3>{{ group.title }}</h3><div class="nav-group-links">
+                <RouterLink
+                  v-for="link in group.links"
+                  :key="link.to"
+                  :to="link.to"
+                >
+                  {{ link.label }}
+                </RouterLink>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="header-right">
       <!-- 角标数字由 T087 接入；未登录 / 为空时不显示数字（设计稿的「购物车 (2)」已移除） -->
-      <RouterLink class="cart-chip" to="/cart">
-        购物车<span v-if="cartStore.count > 0" class="cart-count">({{ cartStore.count }})</span>
+      <RouterLink
+        class="cart-chip"
+        to="/cart"
+      >
+        购物车<span
+          v-if="cartStore.count > 0"
+          class="cart-count"
+        >({{ cartStore.count }})</span>
       </RouterLink>
       <!-- 已登录：入口变为个人中心，并显示昵称或脱敏手机号（FR-016）
            未登录：点它打开登录弹层（全站唯一实例） -->
       <!-- ⚠️ 兜底文案不能省：`displayName` 在"有令牌但会员信息还没回来/拉不到"时是空的，
            没有兜底就会渲染成一个 **0×0 的空白链接** —— 用户看到的是"个人中心不见了"
            （实测过：`a` 标签、文字为空、宽高 0）。移动端那处一直有兜底，桌面端漏了。 -->
-      <RouterLink v-if="userStore.isLogin" class="login" to="/account">
+      <RouterLink
+        v-if="userStore.isLogin"
+        class="login"
+        to="/account"
+      >
         {{ userStore.displayName || '个人中心' }}
       </RouterLink>
-      <button v-else class="login login-btn" type="button" @click="openLogin">
+      <button
+        v-else
+        class="login login-btn"
+        type="button"
+        @click="openLogin"
+      >
         登录 / 注册
       </button>
-      <RouterLink class="btn-primary" to="/software">免费试用软件</RouterLink>
-      <button class="nav-toggle" aria-label="打开菜单" @click="toggleMobileNav">
-        <span></span><span></span><span></span>
+      <RouterLink
+        class="btn-primary"
+        to="/software"
+      >
+        免费试用软件
+      </RouterLink>
+      <button
+        class="nav-toggle"
+        aria-label="打开菜单"
+        @click="toggleMobileNav"
+      >
+        <span /><span /><span />
       </button>
     </div>
 
@@ -145,22 +264,62 @@ function isActive(name: string): boolean {
            设计稿有一条 `@media (max-width:768px) { .login { display:none } }`，
            而 `.login` 正是「登录入口」与「个人中心入口」的**同一个元素** ——
            少了它，手机上既登录不了、登录后也进不去个人中心（FR-016 在手机上失效）。 -->
-      <RouterLink v-if="userStore.isLogin" class="m-login" to="/account">
+      <RouterLink
+        v-if="userStore.isLogin"
+        class="m-login"
+        to="/account"
+      >
         {{ userStore.displayName || '个人中心' }}
       </RouterLink>
-      <button v-else class="m-login m-login-btn" type="button" @click="openLoginFromMobile">
+      <button
+        v-else
+        class="m-login m-login-btn"
+        type="button"
+        @click="openLoginFromMobile"
+      >
         登录 / 注册
       </button>
-      <RouterLink
+      <template
         v-for="item in NAV"
         :key="item.name"
-        :to="item.to"
-        :class="{ active: isActive(item.name) }"
       >
-        {{ item.label }}
-      </RouterLink>
+        <details
+          v-if="submenus[item.name]"
+          class="mobile-nav-group"
+        >
+          <summary
+            data-mobile-primary
+            :class="{ active: isActive(item.name) }"
+          >
+            {{ item.label }}<span aria-hidden="true">＋</span>
+          </summary>
+          <div class="mobile-nav-children">
+            <RouterLink :to="item.to">
+              查看全部{{ item.label }}
+            </RouterLink><section
+              v-for="group in submenus[item.name]"
+              :key="group.title"
+            >
+              <h3>{{ group.title }}</h3><RouterLink
+                v-for="link in group.links"
+                :key="link.to"
+                :to="link.to"
+              >
+                {{ link.label }}
+              </RouterLink>
+            </section>
+          </div>
+        </details>
+        <RouterLink
+          v-else
+          data-mobile-primary
+          :to="item.to"
+          :class="{ active: isActive(item.name) }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </template>
     </div>
-
   </nav>
 
   <!-- ⚠️ 弹层必须放在 `.header` **外面**（本组件因此是双根节点）。
@@ -172,5 +331,9 @@ function isActive(name: string): boolean {
        ⚠️ 2026-09-27 起设计稿基线已放开、`design.css` 可改 —— 但**这里不要改回去**：
        把弹层塞回 `<nav class="header">` 里，等于让弹层的按钮继续受 `.header` 下的
        后代选择器摆布，是个结构性的坑，不是靠调 CSS 能根治的。 -->
-  <LoginDialog :open="loginOpen" @close="closeLogin" @success="onLoginSuccess" />
+  <LoginDialog
+    :open="loginOpen"
+    @close="closeLogin"
+    @success="onLoginSuccess"
+  />
 </template>

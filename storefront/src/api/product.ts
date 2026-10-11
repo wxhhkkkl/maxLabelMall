@@ -22,6 +22,13 @@ export interface ProductPageParams {
   keyword?: string
   sortField?: ProductSortField
   sortAsc?: boolean
+  /**
+   * 筛选维度的可选值（特性 003）。
+   *
+   * ⚠️ **每个维度至多一个值**（前台同维度单选，Q9=B）。同一维度传多个值，
+   * 后端会**明确拒绝**（非法请求）而不是静默取一个。
+   */
+  filterValueIds?: number[]
 }
 
 /** 设计稿的三种排序 → 后端参数。综合排序不传 sortField，由后端默认排序。 */
@@ -37,6 +44,8 @@ export function toPageParams(params: ProductPageParams): Record<string, unknown>
   // 综合排序刻意不传 sortField（undefined 的键不会出现在 query 里）
   if (params.sortField) out.sortField = params.sortField
   if (params.sortAsc !== undefined) out.sortAsc = params.sortAsc
+  // 空数组 = 不施加条件（与既有 categoryIds / keyword 的处理一致）
+  if (params.filterValueIds?.length) out.filterValueIds = params.filterValueIds.join(',')
   return out
 }
 

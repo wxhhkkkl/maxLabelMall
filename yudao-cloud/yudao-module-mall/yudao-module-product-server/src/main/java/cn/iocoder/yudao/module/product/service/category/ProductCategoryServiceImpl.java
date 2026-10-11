@@ -15,9 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO.CATEGORY_LEVEL;
@@ -164,6 +166,46 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
             id = category.getParentId();
         }
         return level;
+    }
+
+    /**
+     * 向上走链的深度上限。
+     *
+     * 线上分类树只有 3 层（2026-10-11 实测 42 个分类），这里给到 32 已经**远超**真实需要，
+     * 纯粹是"数据脏了也别把服务挂死"的兜底 —— 与上面 {@link #getCategoryLevel(Long)}
+     * 用 `Byte.MAX_VALUE` 兜底是同一种考虑。
+     */
+    private static final int SCOPE_MAX_DEPTH = 32;
+
+    @Override
+    public Set<Long> scopeOf(Long categoryId) {
+        Set<Long> scope = new LinkedHashSet<>();
+        Long current = categoryId;
+        // 两道防线防"数据脏了导致 parentId 成环"：深度上限 + 下一跳是否已经走过。
+        // 任一生效都让循环停下来，绝不把服务挂死。
+        for (int i = 0; i < SCOPE_MAX_DEPTH && !Objects.equals(current, PARENT_ID_NULL); i++) {
+            ProductCategoryDO category = productCategoryMapper.selectById(current);
+            if (category == null) {
+                break; // 不存在 / 链断在半路：走到哪算哪，只收已经确认真实存在的那部分
+            }
+            scope.add(category.getId());
+            Long parentId = category.getParentId();
+            if (parentId == null || Objects.equals(parentId, PARENT_ID_NULL)) {
+                break; // 到根了
+            }
+            if (scope.contains(parentId)) {
+                break; // 成环
+            }
+            current = parentId;
+        }
+        // ⚠️ 起点本身不存在时，**仍然**把它返回，而不是返回空集。
+        //    因为调用方普遍写成 `inIfPresent(category_id, scope)`，而那个方法在集合为空时
+        //    **会跳过整个条件** —— 那就从"查不到维度"变成"查出所有维度"，是个静默的放大。
+        //    返回 {categoryId} 语义上也对：问的就是这个分类，它没有维度就是没有。
+        if (scope.isEmpty()) {
+            scope.add(categoryId);
+        }
+        return scope;
     }
 
     @Override

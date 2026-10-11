@@ -85,3 +85,62 @@ def test_子目录里的图片也按同样规则走():
     )
     assert send == ['assets/home/b.webp']
     assert skip == ['assets/solutions/a.webp']
+
+
+# ── jar 里的「IDE 编坏的 class」门禁（2026-10-11 生产事故后加的）──────────────────
+#
+# 事故：本机开着 VSCode 的 Java 语言服务器时，它按自己的 classpath 把工作区编进
+# `target/classes`，其中有带编译错误的 class（ECJ 会照样产出，只是运行到就抛
+# `Unresolved compilation problems`）。它写在 11:42:10，jar 打好在 11:42:12 —— 被卷了进去。
+# 表现是 BUILD SUCCESS、启动也正常，但一调 `ProductSpuController.getSpuDetail` 就 500。
+
+def _make_fat_jar(tmp_path, *, polluted=False):
+    """造一个最小的 Spring Boot 胖 jar：BOOT-INF/classes + 一个嵌套的 yudao-*.jar"""
+    import zipfile
+
+    jar = tmp_path / 'yudao-server.jar'
+    ok_class = b'\xca\xfe\xba\xbe' + b'normal bytecode'
+    bad_class = b'\xca\xfe\xba\xbe' + dp.ECJ_MARKER + b'...'
+
+    nested = tmp_path / 'yudao-module-product-server.jar'
+    with zipfile.ZipFile(nested, 'w') as nz:
+        nz.writestr('cn/iocoder/yudao/module/product/convert/spu/ProductSpuConvertImpl.class',
+                    bad_class if polluted else ok_class)
+        nz.writestr('cn/iocoder/yudao/module/product/service/spu/ProductSpuServiceImpl.class', ok_class)
+    # 第三方依赖不进扫描范围 —— 它不可能被 IDE 编译
+    other = tmp_path / 'guava.jar'
+    with zipfile.ZipFile(other, 'w') as oz:
+        oz.writestr('com/google/Foo.class', bad_class)
+
+    with zipfile.ZipFile(jar, 'w') as z:
+        z.writestr('BOOT-INF/classes/application.yaml', b'key: value')
+        z.writestr('BOOT-INF/classes/cn/iocoder/yudao/Application.class', ok_class)
+        z.writestr('BOOT-INF/lib/yudao-module-product-server.jar', nested.read_bytes())
+        z.writestr('BOOT-INF/lib/guava.jar', other.read_bytes())
+    return jar
+
+
+def test_scan_jar_for_ecj_detects_polluted_class(tmp_path):
+    hits = dp.scan_jar_for_ecj(_make_fat_jar(tmp_path, polluted=True))
+    assert len(hits) == 1
+    assert 'ProductSpuConvertImpl.class' in hits[0]
+    assert hits[0].startswith('BOOT-INF/lib/yudao-module-product-server.jar!')
+
+
+def test_scan_jar_for_ecj_clean_jar(tmp_path):
+    assert dp.scan_jar_for_ecj(_make_fat_jar(tmp_path, polluted=False)) == []
+
+
+def test_scan_jar_for_ecj_ignores_third_party_libs(tmp_path):
+    """第三方 jar 里就算有同样字样的类也不该报 —— 它不可能被 IDE 编译，
+    而扫全部依赖会让这个检查慢到没人愿意跑。"""
+    import zipfile
+
+    jar = tmp_path / 'yudao-server.jar'
+    other = tmp_path / 'guava.jar'
+    with zipfile.ZipFile(other, 'w') as oz:
+        oz.writestr('com/google/Foo.class', dp.ECJ_MARKER)
+    with zipfile.ZipFile(jar, 'w') as z:
+        z.writestr('BOOT-INF/lib/guava.jar', other.read_bytes())
+
+    assert dp.scan_jar_for_ecj(jar) == []

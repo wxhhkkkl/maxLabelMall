@@ -33,6 +33,12 @@ vi.mock('@/api/banner', () => ({
   listBanners: (...a: unknown[]) => listBanners(...a),
 }))
 
+// 筛选维度（特性 003 / US15）
+const listFilterDimensions = vi.fn()
+vi.mock('@/api/filter', () => ({
+  listFilterDimensions: (...a: unknown[]) => listFilterDimensions(...a),
+}))
+
 const MallView = (await import('./MallView.vue')).default
 
 const router = createRouter({
@@ -86,6 +92,9 @@ beforeEach(() => {
   // 横幅默认空 —— 只有专门测它的用例才覆盖
   listBanners.mockReset()
   listBanners.mockResolvedValue([])
+  // 默认"这个分类没配任何维度" —— 只有专门测筛选的用例才覆盖它
+  listFilterDimensions.mockReset()
+  listFilterDimensions.mockResolvedValue([])
 })
 
 describe('MallView —— 商品网格与总数', () => {
@@ -291,5 +300,174 @@ describe('MallView —— 顶部横幅', () => {
     // 商品照常渲染 —— 这才是关键：不能因为横幅失败就整页报错
     expect(w.findAll('.p-card').length).toBeGreaterThan(0)
     expect(w.text()).not.toContain('加载失败')
+  })
+})
+
+
+// ============================================================================
+// 筛选条（特性 003 / US15 / T291）
+// ============================================================================
+
+const DIMENSIONS = [
+  { dimensionId: 12, dimensionName: '宽度', sort: 1, values: [
+    { valueId: 3, name: '110', sort: 1 },
+    { valueId: 4, name: '100', sort: 2 },
+  ] },
+  { dimensionId: 13, dimensionName: '长度', sort: 2, values: [
+    { valueId: 5, name: '300m', sort: 1 },
+  ] },
+]
+
+/** 挂载后先切到某个分类（筛选条只在选中分类时才出现） */
+async function mountMallWithFilter(dimensions: unknown = DIMENSIONS, list = [spu(1)], total = 1) {
+  const w = await mountMall(list, total)
+  listFilterDimensions.mockResolvedValue(dimensions)
+  await w.findAll('.cat-pills .tab')[1].trigger('click') // 「全部」之后的第一个分类
+  await flushPromises()
+  return w
+}
+
+describe('MallView —— 筛选条（FR-098 ~ FR-106）', () => {
+  it('选中分类后按该分类拉维度，并渲染出来', async () => {
+    const w = await mountMallWithFilter()
+
+    expect(listFilterDimensions).toHaveBeenCalled()
+    expect(w.find('.product-filter-bar').exists()).toBe(true)
+    expect(w.text()).toContain('宽度')
+  })
+
+  it('该分类没配维度时，筛选条**整块不渲染**（不留空白块，FR-104）', async () => {
+    const w = await mountMallWithFilter([])
+
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+  })
+
+  it('「全部商品」（没选分类）时不渲染筛选条', async () => {
+    const w = await mountMall([spu(1)], 1)
+    listFilterDimensions.mockResolvedValue(DIMENSIONS)
+
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+  })
+
+  it('**维度列表接口挂了不影响商品列表**（筛选条降级，FR-106）', async () => {
+    const w = await mountMall([spu(1)], 1)
+    listFilterDimensions.mockRejectedValue(new Error('boom'))
+    await w.findAll('.cat-pills .tab')[1].trigger('click')
+    await flushPromises()
+
+    expect(w.find('.product-filter-bar').exists()).toBe(false)
+    // 商品照常显示
+    expect(w.text()).toContain('真实商品 1')
+  })
+
+  it('点一个值 → 请求体里的 filterValueIds **精确匹配**（不是模糊、不是空）', async () => {
+    const w = await mountMallWithFilter()
+
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+
+    // ⚠️ 这一层 pageProducts 是 mock，拿到的是**数组**（序列化成 '3' 由 api/product.spec.ts 负责）
+    expect(lastParams().filterValueIds).toEqual([3])
+  })
+
+  it('再点同行的另一个值 → **替换**（单选，Q9=B），请求体只带新的那个', async () => {
+    const w = await mountMallWithFilter()
+
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[1].trigger('click')
+    await flushPromises()
+
+    expect(lastParams().filterValueIds).toEqual([4])
+  })
+
+  it('跨维度叠加：两个维度各选一个，请求体里两个都在', async () => {
+    const w = await mountMallWithFilter()
+
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+    await w.findAll('.filter-row')[1].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+
+    expect(lastParams().filterValueIds).toEqual([3, 5])
+  })
+
+  it('点「全部」清掉该维度，且不影响另一个维度', async () => {
+    const w = await mountMallWithFilter()
+
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+    await w.findAll('.filter-row')[1].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+    await w.findAll('.filter-row')[0].find('.filter-row__all').trigger('click')
+    await flushPromises()
+
+    expect(lastParams().filterValueIds).toEqual([5])
+  })
+
+  it('筛选条件变化时回到第 1 页（FR-102）', async () => {
+    const w = await mountMallWithFilter(DIMENSIONS, [spu(1)], 100)
+
+    await w.findAll('.pager .pg')[1].trigger('click') // 翻到第 2 页
+    await flushPromises()
+    expect(lastParams().pageNo).toBe(2)
+
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+    expect(lastParams().pageNo).toBe(1)
+  })
+
+  it('**请求失败时高亮退回原值**，不留下"选中的是新值、列表是旧的"（FR-115 / Q14）', async () => {
+    const w = await mountMallWithFilter()
+
+    pageProducts.mockRejectedValueOnce(new Error('boom'))
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[1].trigger('click')
+    await flushPromises()
+
+    // 没有任何值处于选中态 —— 高亮回到了点击前
+    expect(w.findAll('.filter-value.active')).toHaveLength(0)
+    expect(w.find('.filter-row__all.active').exists()).toBe(true)
+  })
+
+  it('**快速连点时以最后一次为准**：先发出的请求后返回也不能覆盖（FR-115）', async () => {
+    const w = await mountMallWithFilter()
+
+    // 第一次点击的请求悬而不决
+    let resolveFirst: (v: unknown) => void = () => {}
+    pageProducts.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveFirst = resolve })
+    )
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click') // 选 110
+
+    // 还没回来就点了另一个
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[1].trigger('click') // 改选 100
+    await flushPromises()
+
+    // 现在第一个请求才姗姗来迟，且带着"110 的结果"
+    resolveFirst({ list: [spu(99)], total: 1 })
+    await flushPromises()
+
+    // 界面必须停在"100"上，既不能显示 110 的结果，也不能让高亮跳回 110
+    expect(w.findAll('.filter-value.active').map((el) => el.text())).toEqual(['100'])
+    expect(w.text()).not.toContain('真实商品 99')
+  })
+
+  it('切换分类时，仍适用的选择保留；不再适用的重置（FR-103 / Q10=B）', async () => {
+    const w = await mountMallWithFilter()
+    await w.findAll('.filter-row')[0].findAll('.filter-value')[0].trigger('click')
+    await flushPromises()
+    expect(lastParams().filterValueIds).toEqual([3])
+
+    // 切到另一个分类，但它继承的维度清单一样 → 选择该保留
+    // （.tab 的下标：0=全部、1=标签耗材、2=打印设备，再往后是「企业采购」链接）
+    await w.findAll('.cat-pills .tab')[2].trigger('click')
+    await flushPromises()
+    expect(lastParams().filterValueIds).toEqual([3])
+
+    // 切回一个维度**完全不同**的分类 → 原选择必须被重置
+    listFilterDimensions.mockResolvedValue([
+      { dimensionId: 99, dimensionName: '类型', sort: 1, values: [{ valueId: 9, name: '桌面型', sort: 1 }] },
+    ])
+    await w.findAll('.cat-pills .tab')[1].trigger('click')
+    await flushPromises()
+    expect(lastParams().filterValueIds).toEqual([])
   })
 })

@@ -67,8 +67,21 @@ const NEW_PAGE_VIEWS = [
   'ProductCommentListView',
 ]
 
+/**
+ * §5 点名的**组件**（不在 `views/` 下）。
+ *
+ * 特性 003 的筛选条是第一个：它是一个组件，而上面那份清单只收视图文件，
+ * 于是「色板与断点」这两条**不会**自动覆盖到它 —— 不登记就等于 FR-108 的 MUST 零覆盖。
+ *
+ * ⚠️ 组件**只适用前两条**（色板、断点）。第三条「不得自带顶栏页脚」是**页面级**约定，
+ * 组件天然不涉及（它本来就被渲染在别人的布局里）。
+ */
+const NEW_COMPONENTS = ['ProductFilterBar']
+
 const VIEWS_DIR = join(process.cwd(), 'src', 'views')
+const COMPONENTS_DIR = join(process.cwd(), 'src', 'components')
 const read = (view: string) => readFileSync(join(VIEWS_DIR, `${view}.vue`), 'utf8')
+const readComponent = (name: string) => readFileSync(join(COMPONENTS_DIR, `${name}.vue`), 'utf8')
 
 /** 只取 `<style scoped>` 里的内容 —— `<script>` 里的颜色字符串不算样式 */
 function styles(src: string): string {
@@ -87,6 +100,15 @@ describe('新页面视觉一致性 —— 颜色（§5 第 1 条 / §1.1）', ()
     const used = [...css.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => expand(m[0]))
     const offPalette = [...new Set(used)].filter((c) => !PALETTE.has(c))
     expect(offPalette, `${view} 用了表外色：${offPalette.join(', ')}`).toEqual([])
+  })
+})
+
+describe('新组件视觉一致性 —— 颜色（§5 第 1 条 / §1.1）', () => {
+  it.each(NEW_COMPONENTS)('%s 的样式里只出现 §1.1 表内色', (name) => {
+    const css = styles(readComponent(name))
+    const used = [...css.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => expand(m[0]))
+    const offPalette = [...new Set(used)].filter((c) => !PALETTE.has(c))
+    expect(offPalette, `${name} 用了表外色：${offPalette.join(', ')}`).toEqual([])
   })
 })
 
@@ -151,5 +173,14 @@ describe('新页面视觉一致性 —— 不留写死内容（FR-043）', () =>
 
     const hits = files.filter((f) => stripComments(readFileSync(f, 'utf8')).includes('购物车 (2)'))
     expect(hits).toEqual([])
+  })
+})
+
+describe('新组件视觉一致性 —— 断点（§5 第 4 条 / §1.2）', () => {
+  it.each(NEW_COMPONENTS)('%s 只用 1100 / 768 / 480 三个断点', (name) => {
+    const css = styles(readComponent(name))
+    const used = [...css.matchAll(/@media[^{]*max-width:\s*(\d+)px/g)].map((m) => Number(m[1]))
+    const extra = [...new Set(used)].filter((n) => !BREAKPOINTS.has(n))
+    expect(extra, `${name} 用了表外断点：${extra.join(', ')}`).toEqual([])
   })
 })

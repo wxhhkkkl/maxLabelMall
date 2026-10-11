@@ -23,18 +23,25 @@ CREATE TABLE IF NOT EXISTS `product_sku` (
 ) COMMENT '商品sku';
 
 CREATE TABLE IF NOT EXISTS `product_spu` (
+    -- ⚠️ 下面这几列（bar_code / unit / recommend_*）**生产库的 product_spu 里并没有**，
+    -- 也**没有对应的 DO 字段** —— 这份测试建表是从更早的上游版本抄来的，与线上 schema 不一致。
+    -- 它们原本是 NOT NULL 且无默认值，导致任何 ProductSpuDO 的 insert 都会失败
+    -- （MyBatis-Plus 只插入非 null 字段，这些列不会被带上）。
+    -- 这里**放宽为可空**，而不是删掉：删列会改动此文件的形状、影响面更大，
+    -- 而放宽之后它对本模块的测试就是无害的背景噪音。**根因是这份文件与生产不一致**，
+    -- 若将来要彻底对齐，应当整体按 `sql/mysql/mall-2026-04-18.sql` 重建它。
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品 SPU 编号，自增',
     `name` varchar(128) NOT NULL COMMENT '商品名称',
     `keyword` varchar(256) NOT NULL COMMENT '关键字',
     `introduction` varchar(256) NOT NULL COMMENT '商品简介',
     `description` text NOT NULL COMMENT '商品详情',
-    `bar_code` varchar(64) NOT NULL COMMENT '条形码',
+    `bar_code` varchar(64) DEFAULT NULL COMMENT '条形码（生产库无此列，见上方说明）',
     `category_id` bigint NOT NULL COMMENT '商品分类编号',
     `brand_id` int DEFAULT NULL COMMENT '商品品牌编号',
     `pic_url` varchar(256) NOT NULL COMMENT '商品封面图',
     `slider_pic_urls` varchar(2000)  DEFAULT '' COMMENT '商品轮播图地址\n 数组，以逗号分隔\n 最多上传15张',
     `video_url` varchar(256) DEFAULT NULL COMMENT '商品视频',
-    `unit` tinyint NOT NULL COMMENT '单位',
+    `unit` tinyint DEFAULT NULL COMMENT '单位（生产库无此列，见上方说明）',
     `sort` int NOT NULL DEFAULT '0' COMMENT '排序字段',
     `status` tinyint NOT NULL COMMENT '商品状态: 0 上架（开启） 1 下架（禁用）-1 回收',
     `spec_type` bit(1) NOT NULL COMMENT '规格类型：0 单规格 1 多规格',
@@ -42,12 +49,13 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     `market_price` int NOT NULL COMMENT '市场价，单位使用：分',
     `cost_price` int NOT NULL DEFAULT '-1' COMMENT '成本价，单位： 分',
     `stock` int NOT NULL DEFAULT '0' COMMENT '库存',
+    `delivery_types` varchar(32) NOT NULL DEFAULT '' COMMENT '配送方式数组（DO 有、生产也有，原先这份测试建表漏了它）',
     `delivery_template_id` bigint NOT NULL COMMENT '物流配置模板编号',
-    `recommend_hot` bit(1) NOT NULL COMMENT '是否热卖推荐: 0 默认 1 热卖',
-    `recommend_benefit` bit(1) NOT NULL COMMENT '是否优惠推荐: 0 默认 1 优选',
-    `recommend_best` bit(1) NOT NULL COMMENT '是否精品推荐: 0 默认 1 精品',
-    `recommend_new` bit(1) NOT NULL COMMENT '是否新品推荐: 0 默认 1 新品',
-    `recommend_good` bit(1) NOT NULL COMMENT '是否优品推荐',
+    `recommend_hot` bit(1) DEFAULT NULL COMMENT '是否热卖推荐（生产库无此列）',
+    `recommend_benefit` bit(1) DEFAULT NULL COMMENT '是否优惠推荐（生产库无此列）',
+    `recommend_best` bit(1) DEFAULT NULL COMMENT '是否精品推荐（生产库无此列）',
+    `recommend_new` bit(1) DEFAULT NULL COMMENT '是否新品推荐（生产库无此列）',
+    `recommend_good` bit(1) DEFAULT NULL COMMENT '是否优品推荐（生产库无此列）',
     `give_integral` int NOT NULL COMMENT '赠送积分',
     `give_coupon_template_ids` varchar(512)  DEFAULT '' COMMENT '赠送的优惠劵编号的数组',
     `sub_commission_type` bit(1) NOT NULL COMMENT '分销类型',
@@ -126,32 +134,84 @@ CREATE TABLE IF NOT EXISTS `product_property_value` (
     PRIMARY KEY("id")
 ) COMMENT '规格值';
 
-DROP TABLE IF EXISTS `product_comment` (
+CREATE TABLE IF NOT EXISTS `product_comment` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '评论编号，主键自增',
     `user_id` bigint DEFAULT NULL COMMENT '评价人的用户编号关联 MemberUserDO 的 id 编号',
     `user_nickname` varchar(255) DEFAULT NULL COMMENT '评价人名称',
-    `user_avatar` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '评价人头像',
+    `user_avatar` varchar(1024) DEFAULT NULL COMMENT '评价人头像',
     `anonymous` bit(1) DEFAULT NULL COMMENT '是否匿名',
     `order_id` bigint DEFAULT NULL COMMENT '交易订单编号关联 TradeOrderDO 的 id 编号',
     `order_item_id` bigint DEFAULT NULL COMMENT '交易订单项编号关联 TradeOrderItemDO 的 id 编号',
     `spu_id` bigint DEFAULT NULL COMMENT '商品 SPU 编号关联 ProductSpuDO 的 id',
     `spu_name` varchar(255) DEFAULT NULL COMMENT '商品 SPU 名称',
     `sku_id` bigint DEFAULT NULL COMMENT '商品 SKU 编号关联 ProductSkuDO 的 id 编号',
-    `visible` bit(1) DEFAULT NULL COMMENT '是否可见true:显示false:隐藏',
-    `scores` tinyint DEFAULT NULL COMMENT '评分星级1-5分',
-    `description_scores` tinyint DEFAULT NULL COMMENT '描述星级1-5 星',
-    `benefit_scores` tinyint DEFAULT NULL COMMENT '服务星级1-5 星',
-    `content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '评论内容',
+    `visible` bit(1) DEFAULT NULL COMMENT '是否可见 true:显示 false:隐藏',
+    `scores` tinyint DEFAULT NULL COMMENT '评分星级 1-5 分',
+    `description_scores` tinyint DEFAULT NULL COMMENT '描述星级 1-5 星',
+    `benefit_scores` tinyint DEFAULT NULL COMMENT '服务星级 1-5 星',
+    `content` varchar(1024) DEFAULT NULL COMMENT '评论内容',
     `pic_urls` varchar(4096) DEFAULT NULL COMMENT '评论图片地址数组',
     `reply_status` bit(1) DEFAULT NULL COMMENT '商家是否回复',
     `reply_user_id` bigint DEFAULT NULL COMMENT '回复管理员编号关联 AdminUserDO 的 id 编号',
-    `reply_content` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '商家回复内容',
+    `reply_content` varchar(1024) DEFAULT NULL COMMENT '商家回复内容',
     `reply_time` datetime DEFAULT NULL COMMENT '商家回复时间',
-    `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
-    `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
-    PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 26 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '商品评论';
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint not null default '0',
+    PRIMARY KEY("id")
+) COMMENT '商品评论';
+
+-- ---------------------------------------------------------------------------
+-- 003 新增：商品分类筛选维度（三张表）
+--
+-- ⚠️ 生产用的建表脚本是 `yudao-cloud/sql/mysql/003-product-filter-dimension.sql`；
+--    这里是**测试用**的等价物。两边 MUST 同步 —— 测试库缺表，本模块的测试直接起不来。
+--    写法沿用上面 `product_category` 的形态（业务列用反引号、BaseDO 审计列用双引号、
+--    `PRIMARY KEY("id")`、不带 ENGINE/CHARSET），因为它已被这份 H2 脚本的其余部分证明可用。
+--    生产脚本里的**二级索引刻意不在这里建**：测试只关心约束与行为，索引是性能问题。
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `product_filter_dimension` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `category_id` bigint NOT NULL COMMENT '归属的商品分类编号',
+    `name` varchar(32) NOT NULL COMMENT '维度名称',
+    `sort` int NOT NULL DEFAULT 0 COMMENT '展示顺序',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint not null default '0',
+    PRIMARY KEY("id")
+) COMMENT '商品筛选维度';
+
+CREATE TABLE IF NOT EXISTS `product_filter_value` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `dimension_id` bigint NOT NULL COMMENT '所属筛选维度编号',
+    `name` varchar(32) NOT NULL COMMENT '可选值名称',
+    `sort` int NOT NULL DEFAULT 0 COMMENT '展示顺序',
+    `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint not null default '0',
+    PRIMARY KEY("id")
+) COMMENT '商品筛选维度可选值';
+
+CREATE TABLE IF NOT EXISTS `product_spu_filter_value` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `spu_id` bigint NOT NULL COMMENT '商品 SPU 编号',
+    `filter_value_id` bigint NOT NULL COMMENT '筛选可选值编号',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint not null default '0',
+    PRIMARY KEY("id")
+) COMMENT '商品与筛选可选值的关联';

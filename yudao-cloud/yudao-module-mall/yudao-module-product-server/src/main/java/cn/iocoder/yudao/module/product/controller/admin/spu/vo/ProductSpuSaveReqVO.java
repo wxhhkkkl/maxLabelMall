@@ -87,6 +87,19 @@ public class ProductSpuSaveReqVO {
     @Schema(description = "浏览量", requiredMode = Schema.RequiredMode.REQUIRED, example = "1999")
     private Integer browseCount;
 
+    // ========== 筛选标签（特性 003） ==========
+
+    /**
+     * 商品要挂上的筛选可选值 id。
+     *
+     * ⚠️ **不是**"增量增删"，而是**全量替换**：传什么就是什么，不传=清空。
+     * 服务端会把**不属于商品分类祖先链**的值静默过滤掉（FR-095），
+     * 因此商品改分类后，旧标签会因为没被重新传入而自然消失（FR-097）。
+     * 详见 `service/filter/ProductSpuFilterTagService`。
+     */
+    @Schema(description = "筛选可选值编号数组（全量替换）", example = "[3, 7]")
+    private List<Long> filterValueIds;
+
     // ========== SKU 相关字段 =========
 
     @Schema(description = "SKU 数组")

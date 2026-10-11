@@ -41,6 +41,10 @@
           :propFormData="formData"
         />
       </el-tab-pane>
+      <!-- 筛选标签（特性 003 / US14）—— 挂在既有表单里，不新建页面（R8） -->
+      <el-tab-pane label="筛选标签" name="filterTag">
+        <FilterTagForm :is-detail="isDetail" :propFormData="formData" />
+      </el-tab-pane>
     </el-tabs>
     <el-form>
       <el-form-item style="float: right">
@@ -61,6 +65,7 @@ import DescriptionForm from './DescriptionForm.vue'
 import OtherForm from './OtherForm.vue'
 import SkuForm from './SkuForm.vue'
 import DeliveryForm from './DeliveryForm.vue'
+import FilterTagForm from './FilterTagForm.vue'
 import { convertToInteger, floatToFixed2, formatToFraction } from '@/utils'
 import { isEmpty } from '@/utils/is'
 

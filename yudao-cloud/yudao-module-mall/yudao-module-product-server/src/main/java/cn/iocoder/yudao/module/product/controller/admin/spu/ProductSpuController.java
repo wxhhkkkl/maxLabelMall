@@ -10,6 +10,8 @@ import cn.iocoder.yudao.module.product.convert.spu.ProductSpuConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
+import cn.iocoder.yudao.module.product.controller.admin.filter.vo.ProductFilterOptionRespVO;
+import cn.iocoder.yudao.module.product.service.filter.ProductSpuFilterTagService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +44,8 @@ public class ProductSpuController {
     private ProductSpuService productSpuService;
     @Resource
     private ProductSkuService productSkuService;
+    @Resource
+    private ProductSpuFilterTagService spuFilterTagService;
 
     @PostMapping("/create")
     @Operation(summary = "创建商品 SPU")
@@ -87,7 +91,34 @@ public class ProductSpuController {
         }
         // 查询商品 SKU
         List<ProductSkuDO> skus = productSkuService.getSkuListBySpuId(spu.getId());
-        return success(ProductSpuConvert.INSTANCE.convert(spu, skus));
+        ProductSpuRespVO respVO = ProductSpuConvert.INSTANCE.convert(spu, skus);
+        // 筛选标签：在 convert 之后补上，而不是去改 MapStruct 的映射 ——
+        // 那样会牵动既有的转换契约，而这里只是"加一个字段"（特性 003 / FR-096）
+        respVO.setFilterValueIds(spuFilterTagService.getFilterValueIdsBySpuId(spu.getId()));
+        return success(respVO);
+    }
+
+    @GetMapping("/filter-value-options")
+    @Operation(summary = "获得商品可挂的筛选维度与值（编辑传 spuId，新建传 categoryId）")
+    @Parameter(name = "spuId", description = "商品编号（编辑时传）", example = "1024")
+    @Parameter(name = "categoryId", description = "商品分类编号（新建时传）", example = "114")
+    @PreAuthorize("@ss.hasPermission('product:spu:query')")
+    public CommonResult<List<ProductFilterOptionRespVO>> getFilterValueOptions(
+            @RequestParam(value = "spuId", required = false) Long spuId,
+            @RequestParam(value = "categoryId", required = false) Long categoryId) {
+        // 辖域算在服务端：商品能挂哪些值取决于它所属分类的祖先链（Q10=B），
+        // 前端拿不到这条链，也不该去猜（宪法原则 III）。
+        if (spuId != null) {
+            ProductSpuDO spu = productSpuService.getSpu(spuId);
+            if (spu == null) {
+                return success(List.of());
+            }
+            categoryId = spu.getCategoryId();
+        }
+        if (categoryId == null) {
+            return success(List.of());
+        }
+        return success(spuFilterTagService.getFilterValueOptionList(categoryId));
     }
 
     @GetMapping("/list-all-simple")

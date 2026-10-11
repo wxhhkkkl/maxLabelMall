@@ -3,12 +3,16 @@ import { computed, onMounted, ref } from 'vue'
 
 import { BANNER_POSITION, listBanners } from '@/api/banner'
 import { buildCategoryTree, listCategories } from '@/api/category'
+import { listFilterDimensions } from '@/api/filter'
 import { pageProducts, SORT_FIELD } from '@/api/product'
+import type { FilterDimension } from '@/types/filter'
+import { retainApplicableSelections, sortDimensions } from '@/utils/filter'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
 import MallBanner from '@/components/MallBanner.vue'
 import ProductCard from '@/components/ProductCard.vue'
+import ProductFilterBar from '@/components/ProductFilterBar.vue'
 import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
 
@@ -32,6 +36,10 @@ const keyword = ref('')
 const categoryId = ref<number | undefined>(undefined)
 const sortKey = ref<'default' | 'sales' | 'priceAsc'>('default')
 const tree = ref<CategoryNode[]>([])
+/** 当前分类下要渲染的筛选维度。**空数组 = 整块不渲染**（FR-104） */
+const filterDimensions = ref<FilterDimension[]>([])
+/** 已选的筛选值（每个维度至多一个，Q9=B 单选） */
+const filterValueIds = ref<number[]>([])
 const flatCategories = ref<Category[]>([])
 const loading = ref(true)
 const error = ref(false)
@@ -56,7 +64,18 @@ function sortParams(): { sortField?: ProductSortField; sortAsc?: boolean } {
   return {}
 }
 
-async function load() {
+/**
+ * 加载序号：**只认最后一次请求**（FR-115 / Q14）。
+ *
+ * 顾客快速连点几个值时会并发多个请求，先发出的那个**可能后返回** ——
+ * 不挡住的话，界面会停在"高亮是 100、列表却是 110 的结果"这种自相矛盾的状态，
+ * 而且不报错。
+ */
+let loadSeq = 0
+
+/** @returns 本次请求是否成功（失败时调用方要回退乐观更新） */
+async function load(): Promise<boolean> {
+  const seq = ++loadSeq
   loading.value = true
   error.value = false
   try {
@@ -65,17 +84,22 @@ async function load() {
       pageSize: PAGE_SIZE,
       categoryId: categoryId.value,
       keyword: keyword.value || undefined,
+      filterValueIds: filterValueIds.value,
       ...sortParams(),
     })
+    if (seq !== loadSeq) return true // 已被更晚的请求取代：丢弃这次结果
     products.value = res.list
     total.value = res.total
+    return true
   } catch {
+    if (seq !== loadSeq) return true // 同上：过期请求的失败不该影响当前状态
     // 请求失败必须给出**可重试**的提示，不能白屏也不能永久停在加载态（FR-045）
     error.value = true
     products.value = []
     total.value = 0
+    return false
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -88,7 +112,47 @@ function onSearch() {
 function onPickCategory(id?: number) {
   categoryId.value = id
   pageNo.value = 1
-  load()
+  // 切换分类时：重新拉该分类的筛选维度，并把**仍适用**的选择留住（FR-103）。
+  // 维度是沿分类树向下继承的，所以兄弟分类之间同一个维度是同一条，选择理应保留；
+  // 而新分类下根本不存在的那行选择必须清掉 —— 否则会带着一个无法解释的条件去查询。
+  loadFilterDimensions(id).then(() => load())
+}
+
+/**
+ * 拉某分类的筛选维度。
+ *
+ * ⚠️ 它**只依赖分类**，所以同一个分类内只请求一次（切分类才重取）—— 这是 Q11=A
+ * 带来的简化：选项集合只由配置决定，不随关键词或已选值变化（FR-111）。
+ *
+ * 失败时**只让筛选条降级**（整块不渲染），商品列表照常（FR-106）——
+ * 筛选条是辅助区块，不该带崩这一页。
+ */
+async function loadFilterDimensions(id?: number) {
+  if (id === undefined) {
+    filterDimensions.value = []
+    filterValueIds.value = []
+    return
+  }
+  try {
+    filterDimensions.value = sortDimensions(await listFilterDimensions(id))
+  } catch {
+    filterDimensions.value = []
+  }
+  filterValueIds.value = retainApplicableSelections(filterValueIds.value, filterDimensions.value)
+}
+
+/**
+ * 点筛选条（FR-115 / Q14）：**乐观更新** —— 先把高亮移过去，再发请求；
+ * 失败则**退回原值**。中间不存在"选中态与列表不一致"的状态。
+ */
+async function onPickFilterValue(ids: number[]) {
+  const previous = filterValueIds.value
+  filterValueIds.value = ids
+  pageNo.value = 1
+  const ok = await load()
+  if (!ok) {
+    filterValueIds.value = previous
+  }
 }
 
 function onPickSort(key: (typeof SORT_CHIPS)[number]['key']) {
@@ -220,6 +284,14 @@ onMounted(async () => {
              它不是商品分类，也没有对应的后端 categoryId —— 按 FR-048 指向落地页。 -->
         <RouterLink class="tab" to="/enterprise">企业采购</RouterLink>
       </div>
+
+      <!-- 筛选条（FR-098）：只在选中分类、且该分类（或其祖先）配了维度时才出现。
+           没有配置时它自己整块不渲染，不留空白块（FR-104）。 -->
+      <ProductFilterBar
+        :dimensions="filterDimensions"
+        :selected-value-ids="filterValueIds"
+        @update:selected-value-ids="onPickFilterValue"
+      />
 
       <!-- 排序 + 总数（总数来自分页结果） -->
       <div class="sort-bar">

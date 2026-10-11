@@ -29,6 +29,7 @@
 与 `_dbtunnel.py` 同一套。
 """
 import argparse
+import io
 import re
 import subprocess
 import sys
@@ -213,11 +214,109 @@ def verify_frontend(srv):
 
 # ───────────────────────────────────── 后端 ─────────────────────────────────────
 
+def remove_polluted_classes(hits):
+    """把 jar 里那些被 IDE 编坏的 class，从对应的 `target/classes` 里删掉。
+
+    删掉之后，增量编译会发现"类文件缺失"并把它们**从源码重新生成**（这次是 javac 生成的、
+    干净的）。这比"整个 clean 重来"快得多，而且**不会再触发 IDE 的又一次全量重编**。
+
+    条目形如：
+        BOOT-INF/classes/cn/.../Foo.class                        → yudao-server/target/classes/...
+        BOOT-INF/lib/yudao-module-x-server-1.2.3.jar!cn/.../Foo.class
+                                                                → 找到该模块的 target/classes/...
+    """
+    removed = 0
+    for hit in hits:
+        if '!' in hit:
+            jar_entry, inner = hit.split('!', 1)
+            # yudao-module-member-server-2026.08-jdk25-SNAPSHOT.jar → yudao-module-member-server
+            artifact = jar_entry.rsplit('/', 1)[-1][:-len('.jar')]
+            module = artifact.rsplit('-', 3)[0]  # 去掉 -2026.08-jdk25-SNAPSHOT 这段
+            candidates = list((ROOT / 'yudao-cloud').rglob(f'{module}/target/classes/{inner}'))
+        else:
+            inner = hit[len('BOOT-INF/classes/'):]
+            candidates = [ROOT / 'yudao-cloud' / 'yudao-server' / 'target' / 'classes' / inner]
+        for path in candidates:
+            if path.is_file():
+                path.unlink()
+                removed += 1
+    return removed
+
+
 def build_backend():
-    # 必须 clean：增量编译会复用过期 target/classes，把不是当前源码的产物打进 jar
+    """打包 jar —— **并且确保里面没有 IDE 编坏的 class**。
+
+    ⚠️ 2026-10-11 生产事故：本机开着 VSCode 的 Java 语言服务器时，它按自己的 classpath
+    把工作区编进各模块的 `target/classes`，其中包含带编译错误的 class（ECJ 会照样产出，
+    只是运行到就抛 `Unresolved compilation problems`）。而 `mvn clean` 会把 target/classes
+    整个删掉，**正好触发它全量重编** —— 于是每次构建都在跟它抢同一个目录。
+    实测：坏 class 写在 11:42:10，jar 打好在 11:42:12，差 2 秒被卷进去。
+    **maven 报 BUILD SUCCESS**，只在运行时炸（`NoClassDefFoundError: Could not initialize class`）。
+
+    所以这里不能只跑一条 `mvn clean package` 就完事 —— 跑完必须**验**，脏了就就地修。
+    彻底的办法是构建时关掉 IDE 的 Java 语言服务器；这个函数是不关也能用的兜底。
+    """
+    root = ROOT / 'yudao-cloud'
     print('[构建] yudao-cloud: mvn -B -DskipTests clean package（全量，约 6 分钟）')
-    subprocess.run('mvn -B -DskipTests clean package',
-                   cwd=ROOT / 'yudao-cloud', shell=True, check=True)
+    subprocess.run('mvn -B -DskipTests clean package', cwd=root, shell=True, check=True)
+
+    for attempt in range(1, 4):
+        hits = scan_jar_for_ecj(LOCAL_JAR)
+        if not hits:
+            if attempt > 1:
+                print(f'[✓] 第 {attempt} 次打包后干净了')
+            return
+        print(f'[!] 第 {attempt} 次打包发现 {len(hits)} 个被 IDE 编坏的 class，就地修复后重新打包：')
+        for h in hits[:5]:
+            print(f'      {h}')
+        removed = remove_polluted_classes(hits)
+        if removed == 0:
+            sys.exit('这些坏 class 在 target/classes 里找不到对应文件，无法就地修复 —— '
+                     '请关掉 IDE 的 Java 语言服务器后重跑')
+        # 增量打包：不 clean（勿再触发 IDE 全量重编），跳过测试编译（它会被坏 class 连累）
+        subprocess.run('mvn -B -Dmaven.test.skip=true package',
+                       cwd=root, shell=True, check=True)
+
+    sys.exit(f'连续 3 次打包后 jar 里仍有 IDE 编坏的 class —— 请关掉 IDE 的 Java 语言服务器后重跑')
+
+
+# ECJ（Eclipse 编译器）在"源码有编译错误"时仍会产出 class，只是把错误塞进
+# 方法体里，运行到就抛 `java.lang.Error: Unresolved compilation problems`。
+# 这个串就是它的指纹。
+ECJ_MARKER = b'Unresolved compilation problems'
+
+
+def scan_jar_for_ecj(jar_path):
+    """扫 jar 里有没有被 **IDE（Eclipse/VSCode 的 Java 语言服务器）** 编坏掉的 class。
+
+    为什么需要这个（2026-10-11 生产事故）：
+        本机开着 VSCode 的 Java 语言服务器时，它会按自己的 classpath 把工作区编进各模块的
+        `target/classes`。它的 classpath 与 maven 的不一致（比如看不到刚 install 的
+        `yudao-module-product-api` 快照），于是**编出带错误的、能加载但一构造就抛错的 class**。
+        实测时间戳：坏 class 写在 `11:42:10`，jar 打好在 `11:42:12` —— 差 2 秒，
+        正好被 `maven-jar-plugin` 卷进去。javac 不会这样，所以**构建是 BUILD SUCCESS**，
+        错误只在运行时才炸：`NoClassDefFoundError: Could not initialize class ...Convert`。
+
+    只扫 `BOOT-INF/classes/` 与 `BOOT-INF/lib/yudao-*.jar`：第三方依赖不可能被 IDE 编译。
+    返回命中的 class 名列表（空 = 干净）。
+    """
+    import zipfile
+
+    def scan_bytes(data, prefix=''):
+        return [prefix] if ECJ_MARKER in data else []
+
+    hits = []
+    with zipfile.ZipFile(jar_path) as jar:
+        for name in jar.namelist():
+            if name.startswith('BOOT-INF/classes/') and name.endswith('.class'):
+                if ECJ_MARKER in jar.read(name):
+                    hits.append(name)
+            elif name.startswith('BOOT-INF/lib/yudao-') and name.endswith('.jar'):
+                with zipfile.ZipFile(io.BytesIO(jar.read(name))) as nested:
+                    for inner in nested.namelist():
+                        if inner.endswith('.class') and ECJ_MARKER in nested.read(inner):
+                            hits.append(f'{name}!{inner}')
+    return hits
 
 
 def deploy_backend(*, skip_build, dry_run):
@@ -229,6 +328,18 @@ def deploy_backend(*, skip_build, dry_run):
 
     mb = LOCAL_JAR.stat().st_size / 1024 / 1024
     print(f'[产物] {LOCAL_JAR.name} {mb:.1f} MB')
+
+    # ⚠️ 上传前先验一遍：IDE 的语言服务器可能刚把它编坏的 class 覆盖进 target/classes，
+    #    而那是 BUILD SUCCESS、看不出来的（见 scan_jar_for_ecj 的说明）。
+    hits = scan_jar_for_ecj(LOCAL_JAR)
+    if hits:
+        print(f'[✗] jar 里有 {len(hits)} 个被 IDE 编坏的 class（含 "Unresolved compilation problems"）：')
+        for h in hits[:10]:
+            print(f'      {h}')
+        sys.exit('拒绝发布这个 jar —— 重新跑一次构建（关掉 IDE 的 Java 语言服务器更稳），'
+                 '或直接重试：这是它与 maven 的竞态，重跑一次通常就干净了')
+    print('[✓] jar 里没有 IDE 编坏的 class')
+
     if dry_run:
         print('[dry-run] 到此为止，什么都没传、没重启。')
         return

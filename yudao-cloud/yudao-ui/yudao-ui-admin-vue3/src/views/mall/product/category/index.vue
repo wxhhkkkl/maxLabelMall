@@ -69,6 +69,14 @@
           <el-button
             link
             type="primary"
+            @click="handleFilterDimension(scope.row)"
+            v-hasPermi="['product:filter-dimension:query']"
+          >
+            筛选维度
+          </el-button>
+          <el-button
+            link
+            type="primary"
             v-if="scope.row.parentId > 0"
             @click="handleViewSpu(scope.row.id)"
             v-hasPermi="['product:spu:query']"
@@ -90,6 +98,13 @@
 
   <!-- 表单弹窗：添加/修改 -->
   <CategoryForm ref="formRef" @success="getList" />
+
+  <!-- 筛选维度配置（特性 003 / US13）—— 维度是分类私有的配置，所以入口放在这里 -->
+  <FilterDimensionDrawer
+    v-model="filterDimensionDrawerVisible"
+    :category-id="filterDimensionCategoryId"
+    :category-name="filterDimensionCategoryName"
+  />
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
@@ -97,6 +112,7 @@ import { handleTree } from '@/utils/tree'
 import { dateFormatter } from '@/utils/formatTime'
 import * as ProductCategoryApi from '@/api/mall/product/category'
 import CategoryForm from './CategoryForm.vue'
+import FilterDimensionDrawer from './FilterDimensionDrawer.vue'
 
 defineOptions({ name: 'ProductCategory' })
 
@@ -149,6 +165,16 @@ const handleDelete = async (id: number) => {
     // 刷新列表
     await getList()
   } catch {}
+}
+
+/** 筛选维度：打开抽屉配置该分类的维度（含从父分类继承来的，那段只读） */
+const filterDimensionDrawerVisible = ref(false)
+const filterDimensionCategoryId = ref<number>()
+const filterDimensionCategoryName = ref<string>()
+const handleFilterDimension = (row: any) => {
+  filterDimensionCategoryId.value = row.id
+  filterDimensionCategoryName.value = row.name
+  filterDimensionDrawerVisible.value = true
 }
 
 /** 查看商品操作 */

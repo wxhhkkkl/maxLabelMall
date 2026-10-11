@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 商品分类 Service 接口
@@ -59,6 +60,23 @@ public interface ProductCategoryService {
      * @return 商品分类的层级
      */
     Integer getCategoryLevel(Long id);
+
+    /**
+     * 获得商品分类的**辖域**：它自己 + 它的全部祖先分类。
+     *
+     * 这是「分类级筛选维度」的地基（特性 003，决策 Q10=B）：维度只存一个归属分类，
+     * 「向下继承到子分类」不是存储结构，而是在**查询时**由这个方法把祖先链一起算出来。
+     * 三处都用它：后台查重名（FR-091）、商品可挂的辖域（FR-095）、前台要渲染哪些维度（FR-098）。
+     *
+     * 容错约定（都有单测钉住，见 `ProductCategoryScopeTest`）：
+     * - 分类不存在 / 链断在半路 → 走到哪算哪，**不抛异常**（调用方据此得到"没配维度"，是正确的默认值）
+     * - 数据异常导致 `parentId` 成环 → **不死循环**，有深度上限兜底
+     * - 根分类的 `parentId` 是 0，**不会**把 0 这个编号带进结果
+     *
+     * @param categoryId 分类编号
+     * @return 辖域内的分类编号集合，**包含** `categoryId` 自身
+     */
+    Set<Long> scopeOf(Long categoryId);
 
     /**
      * 获得商品分类列表

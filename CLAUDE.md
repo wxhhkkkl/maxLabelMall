@@ -4,16 +4,21 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/002-product-detail-reviews-banner/plan.md
+specs/003-product-filter-dimensions/plan.md
 
 Supporting artifacts for the active feature:
-- specs/002-product-detail-reviews-banner/spec.md — 功能规格（含 4 项已确认决策）
-- specs/002-product-detail-reviews-banner/research.md — 技术决策与被否决方案
-- specs/002-product-detail-reviews-banner/data-model.md — 实体映射、派生数据、展示状态
-- specs/002-product-detail-reviews-banner/contracts/app-api.md — 消费的 app-api 契约（含"校验由谁承担"）
-- specs/002-product-detail-reviews-banner/quickstart.md — 手工验证清单与显式不验证项
+- specs/003-product-filter-dimensions/spec.md — 功能规格（含 6 项已确认决策 Q9~Q14）
+- specs/003-product-filter-dimensions/research.md — 技术决策与被否决方案（R1~R14）
+- specs/003-product-filter-dimensions/data-model.md — 3 个新实体、映射、派生查询口径
+- specs/003-product-filter-dimensions/contracts/app-api.md — C 端消费与改动的契约
+- specs/003-product-filter-dimensions/contracts/admin-api.md — 管理端新增能力（本仓库首份 admin-api 契约）
+- specs/003-product-filter-dimensions/quickstart.md — 手工验证清单与显式不验证项
 
-上一个特性（门面站与后台打通 —— 仍是本仓库的规格基线，编号 FR/SC/US 由它起算）：
+上一个特性（商品详情 / 评价 / 商城页 banner）：
+- specs/002-product-detail-reviews-banner/{spec,plan,data-model,research,quickstart,tasks}.md
+- specs/002-product-detail-reviews-banner/contracts/app-api.md
+
+更早的特性（门面站与后台打通 —— 仍是本仓库的规格基线，编号 FR/SC/US 由它起算）：
 - specs/001-mall-storefront-integration/{spec,plan,data-model,research,quickstart,tasks}.md
 - specs/001-mall-storefront-integration/contracts/app-api.md
 <!-- SPECKIT END -->

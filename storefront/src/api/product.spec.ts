@@ -135,3 +135,42 @@ describe('listProductsByIds', () => {
     expect(list).toHaveLength(2)
   })
 })
+
+describe('pageProducts —— 筛选维度（FR-101 / Q9=B 单选）', () => {
+  it('filterValueIds 用逗号拼接，与既有 categoryIds 形态一致', async () => {
+    await pageProducts({ filterValueIds: [3, 7] })
+
+    expect(get).toHaveBeenCalledWith('/product/spu/page', expect.objectContaining({
+      filterValueIds: '3,7',
+    }))
+  })
+
+  it('只有一个值时也照样传（不能因为"只有一个"就省掉）', async () => {
+    await pageProducts({ filterValueIds: [3] })
+
+    expect(get).toHaveBeenCalledWith('/product/spu/page', expect.objectContaining({
+      filterValueIds: '3',
+    }))
+  })
+
+  it('不传 / 空数组时，query 里**不出现**这个键 —— 既有调用方的行为逐字不变', async () => {
+    await pageProducts({})
+    expect(get.mock.calls[0][1]).not.toHaveProperty('filterValueIds')
+
+    get.mockReset()
+    await pageProducts({ filterValueIds: [] })
+    expect(get.mock.calls[0][1]).not.toHaveProperty('filterValueIds')
+  })
+
+  it('筛选与关键词、分类、排序可以同时传（三者互不覆盖，FR-100）', async () => {
+    await pageProducts({ categoryId: 114, keyword: '碳带', filterValueIds: [3], sortField: 'price', sortAsc: true })
+
+    expect(get).toHaveBeenCalledWith('/product/spu/page', {
+      categoryId: 114,
+      keyword: '碳带',
+      filterValueIds: '3',
+      sortField: 'price',
+      sortAsc: true,
+    })
+  })
+})

@@ -5,3 +5,6 @@ DELETE FROM "product_brand";
 DELETE FROM "product_property";
 DELETE FROM "product_property_value";
 DELETE FROM "product_comment";
+DELETE FROM "product_spu_filter_value";
+DELETE FROM "product_filter_value";
+DELETE FROM "product_filter_dimension";

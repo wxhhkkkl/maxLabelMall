@@ -39,6 +39,18 @@ public class AppProductSpuPageReqVO extends PageParam {
     @Schema(description = "排序方式", example = "true")
     private Boolean sortAsc;
 
+    /**
+     * 筛选维度的可选值编号数组（特性 003）。
+     *
+     * ⚠️ **每个维度至多一个值**（决策 Q9=B：前台同维度单选）。同一维度传多个值是**非法请求**，
+     * 服务端会明确拒绝而不是静默取一个（见 `ProductSpuServiceImpl#getSpuPage`）——
+     * 静默取一个的话，前端的单选 bug 会表现为"筛选结果莫名其妙"，无从排查。
+     *
+     * 不传 = 不施加任何维度条件，既有行为**逐字不变**。
+     */
+    @Schema(description = "筛选可选值编号数组（每维度至多一个）", example = "3,7")
+    private List<Long> filterValueIds;
+
     @AssertTrue(message = "排序字段不合法")
     @JsonIgnore
     public boolean isSortFieldValid() {

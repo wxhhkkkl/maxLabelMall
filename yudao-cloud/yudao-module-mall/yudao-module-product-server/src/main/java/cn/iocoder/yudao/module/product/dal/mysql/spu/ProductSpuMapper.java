@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.dal.mysql.spu;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
@@ -74,6 +75,21 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
+
+        // 筛选维度（特性 003 / FR-101）：
+        // **每个已选值一条等值 EXISTS**，多条之间自然就是 AND。
+        // Q9=B 是单选 —— 一个维度至多一个值，所以"每个值一条"等价于"每个已选维度一条"。
+        // 不传时一条都不追加：这个接口是全站商品列表共用的，多的条件可能波及别处。
+        //
+        // ⚠️ 子查询是**裸 SQL**，MyBatis-Plus 的逻辑删除**不会**自动注入，
+        //    所以必须自己写 `pfv.deleted = 0`。
+        if (CollUtil.isNotEmpty(pageReqVO.getFilterValueIds())) {
+            for (Long filterValueId : pageReqVO.getFilterValueIds()) {
+                query.exists("SELECT 1 FROM product_spu_filter_value pfv"
+                        + " WHERE pfv.spu_id = product_spu.id"
+                        + " AND pfv.filter_value_id = {0} AND pfv.deleted = 0", filterValueId);
+            }
+        }
 
         // 排序逻辑
         if (Objects.equals(pageReqVO.getSortField(), AppProductSpuPageReqVO.SORT_FIELD_SALES_COUNT)) {

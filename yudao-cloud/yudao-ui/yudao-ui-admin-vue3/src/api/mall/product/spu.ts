@@ -58,11 +58,39 @@ export interface Spu {
   stock?: number // 商品库存
   createTime?: Date // 商品创建时间
   status?: number // 商品状态
+  /**
+   * 筛选可选值编号数组（特性 003）。
+   *
+   * ⚠️ 保存时是**全量替换**语义：传什么就是什么，不传 = 清空。
+   * 服务端会把不属于该商品分类祖先链的值静默过滤掉（FR-095）——
+   * 所以改分类后旧标签会消失，前端要拿保存前后的差异把这件事**说出来**
+   * （见 `@/utils/filterTag`）。
+   */
+  filterValueIds?: number[]
 }
 
 // 获得 Spu 列表
 export const getSpuPage = (params: PageParam) => {
   return request.get({ url: '/product/spu/page', params })
+}
+
+/**
+ * 商品可挂的一个筛选维度及其可选值（特性 003）。
+ *
+ * `fromCategoryName` 是**这个维度挂在哪个分类上** —— 后台要显示成「（来自「碳带」）」。
+ * 维度沿分类树向下继承（Q10=B），不标来源的话运营不知道改它会影响谁。
+ */
+export interface FilterValueOptionVO {
+  dimensionId: number
+  dimensionName: string
+  fromCategoryName?: string
+  values: { valueId: number; name: string }[]
+}
+
+// 获得商品可挂的筛选维度与值（编辑传 spuId，新建传 categoryId）
+// 辖域由服务端算（该分类自身 + 全部祖先），前端只渲染
+export const getSpuFilterValueOptions = (params: { spuId?: number; categoryId?: number }) => {
+  return request.get({ url: '/product/spu/filter-value-options', params })
 }
 
 // 获得 Spu 列表 tabsCount（支持按 name/categoryId/createTime 筛选）

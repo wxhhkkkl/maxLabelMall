@@ -123,4 +123,14 @@ public class ProductSpuRespVO {
     @ExcelProperty("商品点击量")
     private Integer browseCount;
 
+    // ========== 筛选标签（特性 003） =========
+
+    /**
+     * 该商品当前挂着的筛选可选值 id。
+     *
+     * ⚠️ 前端 MUST 容忍它缺失（`?? []`）—— 旧版后端不会返回这个字段。
+     */
+    @Schema(description = "筛选可选值编号数组", example = "[3, 7]")
+    private List<Long> filterValueIds;
+
 }

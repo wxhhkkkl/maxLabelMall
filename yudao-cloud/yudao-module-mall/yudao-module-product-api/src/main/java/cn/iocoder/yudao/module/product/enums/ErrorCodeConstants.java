@@ -53,4 +53,24 @@ public interface ErrorCodeConstants {
     ErrorCode FAVORITE_EXISTS = new ErrorCode(1_008_008_000, "该商品已经被收藏");
     ErrorCode FAVORITE_NOT_EXISTS = new ErrorCode(1_008_008_001, "商品收藏不存在");
 
+    // ========== 商品 筛选维度 1-008-009-000 ==========
+    ErrorCode FILTER_DIMENSION_NOT_EXISTS = new ErrorCode(1_008_009_000, "商品筛选维度不存在");
+    /**
+     * ⚠️ 消息里**必须带上分类名**：重名检测查的是**整条分类祖先链**（Q10=B），
+     * 所以运营看到"维度【宽度】已存在"会找不到该去哪改 —— 得告诉他是**哪个分类上的**那个。
+     */
+    ErrorCode FILTER_DIMENSION_NAME_DUPLICATE = new ErrorCode(1_008_009_001, "分类【{}】下已存在筛选维度【{}】");
+    ErrorCode FILTER_VALUE_NOT_EXISTS = new ErrorCode(1_008_009_002, "筛选维度可选值不存在");
+    ErrorCode FILTER_VALUE_NAME_DUPLICATE = new ErrorCode(1_008_009_003, "筛选维度【{}】下已存在可选值【{}】");
+    /** 名称不能只有空白 —— VO 上的 @NotEmpty 拦不住 " " 这种 */
+    ErrorCode FILTER_DIMENSION_NAME_EMPTY = new ErrorCode(1_008_009_004, "筛选维度名称不能为空白");
+    ErrorCode FILTER_VALUE_NAME_EMPTY = new ErrorCode(1_008_009_005, "可选值名称不能为空白");
+    /**
+     * 同一维度传了多个值。
+     *
+     * 前台是**单选**（Q9=B），所以这条请求不合法。**必须明确拒绝**，
+     * 不能静默取一个 —— 前端一旦有 bug，静默取值的表现是"筛选结果莫名其妙"，无从排查。
+     */
+    ErrorCode FILTER_VALUE_MULTI_IN_DIMENSION = new ErrorCode(1_008_009_006, "筛选维度【{}】下只能选择 1 个值");
+
 }

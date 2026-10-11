@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
+import cn.iocoder.yudao.module.product.service.filter.ProductSpuFilterTagService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import com.google.common.collect.Maps;
 import jakarta.annotation.Resource;
@@ -52,6 +53,14 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     private ProductBrandService brandService;
     @Resource
     private ProductCategoryService categoryService;
+    /**
+     * 筛选标签的辖域规则（特性 003）。
+     *
+     * 抽成独立 Service 而不是写在这里，是因为本类已经有 4 个依赖且与分类 Service 存在循环，
+     * 再塞进来会让保存链路没法在 H2 上独立测试。详见 ProductSpuFilterTagService。
+     */
+    @Resource
+    private ProductSpuFilterTagService spuFilterTagService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,6 +79,9 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSpuMapper.insert(spu);
         // 插入 SKU
         productSkuService.createSkuList(spu.getId(), skuSaveReqList);
+        // 保存筛选标签（全量替换；辖域外的会被静默丢弃，FR-095）
+        spuFilterTagService.saveSpuFilterValues(spu.getId(), spu.getCategoryId(),
+                createReqVO.getFilterValueIds());
         // 返回
         return spu.getId();
     }
@@ -92,6 +104,11 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSpuMapper.updateById(updateObj);
         // 批量更新 SKU
         productSkuService.updateSkuList(updateObj.getId(), updateReqVO.getSkus());
+        // 保存筛选标签：同样是**全量替换**。
+        // 这一条同时实现了 FR-097 —— 商品改了分类后，原本挂着、但已不在新分类祖先链上的
+        // 标签，因为这次替换没再带上它们而自然消失，不会留下"看不见却还挂着"的孤儿关联。
+        spuFilterTagService.saveSpuFilterValues(updateObj.getId(), updateReqVO.getCategoryId(),
+                updateReqVO.getFilterValueIds());
     }
 
     /**
@@ -219,6 +236,11 @@ public class ProductSpuServiceImpl implements ProductSpuService {
 
     @Override
     public PageResult<ProductSpuDO> getSpuPage(AppProductSpuPageReqVO pageReqVO) {
+        // 筛选维度（特性 003）：先校验"每个维度至多一个值"（前台单选，Q9=B）。
+        // 传多个是**非法请求**，明确拒绝而不是静默取一个 —— 静默取值会把前端的 bug
+        // 变成"筛选结果莫名其妙"，无从排查。
+        spuFilterTagService.validateSingleValuePerDimension(pageReqVO.getFilterValueIds());
+
         // 查找时，如果查找某个分类编号，则包含它的子分类。因为顶级分类不包含商品
         Set<Long> categoryIds = new HashSet<>();
         if (pageReqVO.getCategoryId() != null && pageReqVO.getCategoryId() > 0) {

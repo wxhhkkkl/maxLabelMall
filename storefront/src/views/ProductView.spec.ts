@@ -227,6 +227,67 @@ describe('ProductView —— 主图与图集（FR-005）', () => {
   })
 })
 
+describe('ProductView —— 切规格换主图', () => {
+  /** 三个规格各自带图；注意第 3 个无货 */
+  function spuWithSpecPics() {
+    return spu({
+      skus: [
+        sku(1, { picUrl: 'http://x/sku-1.png' }),
+        sku(2, { picUrl: 'http://x/sku-2.png', price: 94900 }),
+        sku(3, { picUrl: 'http://x/sku-3.png', stock: 0 }),
+      ],
+    })
+  }
+
+  it('多规格默认主图用**当前预选规格**的图，而不是封面', async () => {
+    const w = await mountDetail(spuWithSpecPics())
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/sku-1.png')
+  })
+
+  it('切规格时主图跟着换', async () => {
+    const w = await mountDetail(spuWithSpecPics())
+    await w.findAll('.spec')[1].trigger('click')
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/sku-2.png')
+  })
+
+  it('**点过缩略图之后切规格，主图回到新规格的图**（手动翻图不该压过规格）', async () => {
+    const w = await mountDetail(spuWithSpecPics())
+    // 按 src 找那张轮播图，不按索引 —— 图集里现在还有规格图，索引会变
+    const thumbs = w.findAll('.g-thumb')
+    const i = thumbs.findIndex((t) => t.find('img').attributes('src') === 'http://x/1.png')
+    await thumbs[i].trigger('click')
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/1.png')
+
+    await w.findAll('.spec')[1].trigger('click')
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/sku-2.png')
+  })
+
+  it('当前规格的图会出现在图集里，能点回去', async () => {
+    const w = await mountDetail(spuWithSpecPics())
+    const srcs = w.findAll('.g-thumb img').map((i) => i.attributes('src'))
+    expect(srcs).toContain('http://x/sku-1.png')
+  })
+
+  it('**单规格商品不受影响**：SKU 图不去顶封面', async () => {
+    // 线上 282 个单规格商品的 SKU 图都是全站占位图 /assets/logo.png。
+    // 若单规格也走"规格图优先"，这些商品的封面会被占位图顶掉 —— 那是真回退。
+    const w = await mountDetail(spu({
+      specType: false,
+      skus: [sku(1, { picUrl: 'http://x/placeholder.png' })],
+    }))
+    expect(w.get('.g-main img').attributes('src')).toBe('http://x/main.png')
+  })
+
+  it('规格图与封面/轮播图重复时照样去重', async () => {
+    const w = await mountDetail(spu({
+      picUrl: 'http://x/sku-1.png',
+      skus: [sku(1, { picUrl: 'http://x/sku-1.png' }), sku(2)],
+    }))
+    const srcs = w.findAll('.g-thumb img').map((i) => i.attributes('src'))
+    expect(srcs).toEqual(['http://x/sku-1.png', 'http://x/1.png', 'http://x/2.png'])
+  })
+})
+
 describe('ProductView —— 富文本详情（FR-005b / FR-005c / SC-020）', () => {
   it('渲染后台配置的富文本', async () => {
     const w = await mountDetail(spu())

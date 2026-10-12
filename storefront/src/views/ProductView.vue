@@ -54,18 +54,28 @@ const currentSku = computed<ProductSku | null>(() => {
 })
 
 /**
- * 图集 = 封面 + 轮播图，**去重**。
+ * 当前规格的图。**只在多规格时生效**。
+ *
+ * 单规格不能走这条：线上 282 个单规格商品的 SKU 图都是全站占位图
+ * （`/assets/logo.png`，首轮导入时统一填的），让 SKU 图优先会把商品封面顶掉。
+ * 多规格的 SKU 图则来自旧商城的规格图（已传到 OSS），是真的。
+ */
+const specPic = computed(() => (isMultiSpec.value ? currentSku.value?.picUrl || '' : ''))
+
+/**
+ * 图集 = 封面 + **当前规格图** + 轮播图，**去重**。
  * 后端把封面放在 `picUrl`、轮播图放在 `sliderPicUrls`，两者**可能重复**
  * （实测的示例商品就是两张同一张图），不去重会出现两个一模一样的缩略图。
+ * 规格图放进去是为了让用户点走之后还能点回来。
  */
 const galleryPics = computed<string[]>(() => {
-  const list = [spu.value?.picUrl, ...(spu.value?.sliderPicUrls ?? [])]
+  const list = [spu.value?.picUrl, specPic.value, ...(spu.value?.sliderPicUrls ?? [])]
   return [...new Set(list.filter((p): p is string => !!p))]
 })
 
-/** 用户点过的图；为空表示还没点过，主图回落到图集第一张 */
+/** 用户点过的图；为空表示还没点过，主图按 规格图 → 图集第一张 回落 */
 const pickedPic = ref('')
-const mainPic = computed(() => pickedPic.value || galleryPics.value[0] || '')
+const mainPic = computed(() => pickedPic.value || specPic.value || galleryPics.value[0] || '')
 
 function pickPic(pic: string): void {
   pickedPic.value = pic
@@ -96,6 +106,8 @@ function pickSku(s: ProductSku) {
   if (s.stock <= 0) return
   currentSkuId.value = s.id
   qty.value = 1
+  // 清掉"用户点过的那张图"，让新规格的图接管主图；否则翻了图再切规格会看不到变化
+  pickedPic.value = ''
 }
 
 function stepQty(d: number) {

@@ -1,0 +1,117 @@
+.mall-page .mall-home { padding-bottom: 64px; }
+.mall-page .mall-home .mall-home-all { display: flex; align-items: center; justify-content: flex-start; gap: 14px; background: #2e7cd6; color: #fff; border-radius: 5px; padding: 14px 18px; font-size: 14px; font-weight: 600; }
+.mall-icon { width: 22px; height: 22px; flex: none; vertical-align: middle; }
+.mall-home-hero { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 300px auto; gap: 12px; margin-bottom: 44px; }
+.mall-home-directory { grid-row: span 2; display: grid; grid-template-rows: 48px repeat(var(--category-count), minmax(0, 1fr)); min-height: 0; border: 1px solid #e0e8f2; border-radius: 5px; background: #fff; overflow-y: auto; }
+.mall-home-directory button { display: flex; gap: 8px; align-items: center; min-width: 0; width: 100%; padding: 5px 12px; background: transparent; border: 0; text-align: left; color: #72839b; cursor: pointer; }
+.mall-home-directory button:hover { background: #f0f6ff; color: #2e7cd6; }
+.mall-page .mall-home-directory .mall-home-all { border-radius: 4px 4px 0 0; color: white; }
+.mall-home-directory strong { font-size: 13px; color: #263d5a; font-weight: 500; }
+.mall-directory-icon { width: 21px; height: 21px; color: #385473; margin-right: 5px; }
+.mall-directory-chevron { width: 14px; height: 14px; margin-left: auto; color: #8194ad; }
+.mall-home-banner-area { min-width: 0; }
+.mall-home .mall-home-banner-area .mall-banner, .mall-home-banner { height: 300px; border-radius: 5px; overflow: hidden; }
+.mall-home-banner { position: relative; isolation: isolate; background: #e9f3fc; }
+.mall-home-banner > img { position: absolute; right: 0; top: 0; width: 86%; height: 100%; object-fit: contain; object-position: right center; z-index: -2; }
+.mall-home-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #e9f3fc 29%, #e9f3fc00 55%); z-index: -1; }
+.mall-home-banner-copy { padding: 52px 40px; position: relative; }
+.mall-banner-eyebrow { display: block; color: #6283a4; font-size: 11px; letter-spacing: 2px; margin-bottom: 9px; }
+.mall-home-banner-copy h2 { margin: 0 0 14px; font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; letter-spacing: 1px; line-height: 1.25; color: #123661; }
+.mall-home-banner-copy p { margin: 0 0 18px; color: #426385; font-size: 15px; }
+.mall-home-banner-copy button { background: #2e7cd6; border: 0; border-radius: 5px; padding: 10px 18px; color: #fff; font-size: 12px; cursor: pointer; }
+.mall-home-banner-copy button .mall-icon { margin-left: 14px; width: 13px; height: 13px; }
+.mall-purchase-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; margin: 0; padding: 16px 24px; background: #f0f4fa; border-radius: 5px; }
+.mall-purchase-steps li { display: flex; align-items: center; gap: 12px; color: #344e70; font-size: 12px; }
+.mall-purchase-steps li > .mall-icon:first-child { color: #28476e; width: 26px; height: 26px; }
+.mall-purchase-steps .mall-step-arrow { margin-left: auto; margin-right: 20px; color: #8ba1bc; width: 13px; height: 13px; }
+.mall-home .mall-departments { gap: 40px; }
+.mall-home .mall-department-head { justify-content: flex-start; padding: 0 0 14px; margin-bottom: 18px; border-bottom: 1px solid #dce8f6; gap: 24px; }
+.mall-home .mall-floor-number { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #398ff1, #1265cd); width: 44px; height: 36px; padding: 0; color: white; font-size: 23px; font-weight: 600; line-height: 1; border-radius: 4px; }
+.mall-home .mall-department-head h2 { font-size: 20px; }
+.mall-floor-tabs { display: flex; flex: 1; gap: 12px 18px; min-width: 0; flex-wrap: wrap; }
+.mall-home .mall-floor-tabs button { color: #7d8ca2; white-space: nowrap; }
+.mall-home .mall-department-head > button { margin-left: auto; white-space: nowrap; }
+.mall-floor-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.mall-floor-promo { position: relative; isolation: isolate; overflow: hidden; border: 0; border-radius: 5px; padding: 0; min-height: 360px; background: var(--promo-color); cursor: pointer; text-align: left; }
+.mall-floor-promo > img { position: absolute; bottom: 0; left: 0; width: 100%; height: auto; z-index: -1; mask-image: linear-gradient(to bottom, transparent, #000 24%); transition: transform .25s ease; }
+.mall-floor-promo:hover > img { transform: scale(1.025); }
+.mall-floor-promo-copy { display: block; position: absolute; top: 24px; left: 22px; right: 22px; color: #17364d; }
+.mall-floor-promo-copy strong { display: block; font-size: 20px; line-height: 1.65; letter-spacing: .5px; font-weight: 600; text-wrap: balance; }
+.mall-floor-promo-copy small { display: block; margin-top: 10px; font-size: 11px; line-height: 1.8; color: #415b70; }
+.mall-floor-promo-action { display: inline-flex; align-items: center; gap: 8px; padding-bottom: 4px; margin-top: 18px; border-bottom: 1px solid #6a849f66; font-size: 12px; }
+.mall-floor-promo-note { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; color: #344b76; font-size: 10px; }
+.mall-floor-promo.is-software > img { filter: blur(1.5px); }
+.mall-floor-body > .mall-department-empty { min-height: 360px; }
+.mall-page .mall-home .mall-department-grid { gap: 18px; }
+.mall-page .mall-home .mall-floor-card { padding: 18px; border-radius: 5px; }
+.mall-page .mall-floor-card .p-img-wrap, .mall-page .mall-floor-card .p-img { border-radius: 4px; margin-bottom: 18px; background: #fbfcfe; }
+.mall-page .mall-floor-card .p-img-real { padding: 10px; }
+.mall-page .mall-floor-card .p-title { font-size: 13px; font-weight: 600; min-height: 39px; margin-bottom: 8px; }
+.mall-page .mall-floor-card .p-sell { font-size: 11px; line-height: 1.7; min-height: 37px; margin-bottom: 12px; }
+.mall-page .mall-floor-card .p-catalog-meta { margin-bottom: 12px; }
+.mall-page .mall-floor-card .p-catalog-meta span:first-child { display: none; }
+.mall-page .mall-floor-card .p-price { font-size: 20px; }
+.mall-page .mall-floor-card .p-price-row { margin-bottom: 16px; }
+.p-purchase-row { width: 100%; }
+.mall-floor-card .p-purchase-row { display: flex; gap: 8px; align-items: center; }
+.p-quantity { display: flex; flex: 0 0 76px; align-items: center; height: 30px; border: 1px solid #dce5f0; border-radius: 3px; overflow: hidden; }
+.p-quantity button { width: 22px; height: 100%; padding: 0; background: #fff; color: #6b809b; border: 0; cursor: pointer; }
+.p-quantity button:disabled { color: #c2cbd7; cursor: default; }
+.p-quantity input { width: 30px; min-width: 0; height: 100%; padding: 0; text-align: center; border: 0; border-inline: 1px solid #edf1f7; color: #344d6a; font-size: 11px; appearance: textfield; -moz-appearance: textfield; }
+.p-quantity input::-webkit-inner-spin-button, .p-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.mall-page .mall-home .mall-floor-card .p-btn { flex: 1; min-width: 0; padding: 7px 2px; height: 30px; border-radius: 3px; font-size: 11px; background: white; border-color: #b7d4fa; white-space: nowrap; }
+.mall-page .mall-home .mall-floor-card .p-btn:hover { color: #fff; background: #2e7cd6; }
+.mall-consult-icon { width: 36px; height: 36px; color: #2e7cd6; }
+.mall-home-consult { display: flex; align-items: center; gap: 28px; padding: 24px 28px; margin-top: 28px; background: #eaf3ff; border-radius: 5px; }
+.mall-home-consult h2 { font-size: 16px; margin: 0 0 8px; }
+.mall-home-consult p { font-size: 12px; color: #7d90aa; margin: 0; }
+.mall-home-consult > a { flex: none; color: #fff; background: #2e7cd6; font-size: 12px; padding: 10px 18px; border-radius: 4px; }
+.mall-home-contact { display: grid; gap: 10px; font-size: 12px; color: #627b9b; margin-left: auto; white-space: nowrap; }
+@media (max-width: 1200px) {
+  .mall-floor-body { grid-template-columns: 190px minmax(0, 1fr); gap: 16px; }
+  .mall-floor-promo-copy { left: 18px; right: 18px; }
+  .mall-floor-promo-copy strong { font-size: 18px; }
+  .mall-page .mall-home .mall-floor-card { padding: 12px; }
+  .mall-floor-card .p-purchase-row { flex-wrap: wrap; }
+  .mall-page .mall-home .mall-floor-card .p-btn { flex-basis: 100%; }
+}
+@media (max-width: 900px) {
+  .mall-home-hero { grid-template-columns: 180px minmax(0, 1fr); }
+  .mall-home-banner-copy { padding: 48px 22px; }
+  .mall-home-banner-copy h2 { max-width: 220px; }
+  .mall-floor-body { grid-template-columns: 190px minmax(0, 1fr); }
+  .mall-page .mall-home .mall-department-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mall-home-consult { flex-wrap: wrap; }
+  .mall-home-contact { margin-left: 0; }
+  .mall-floor-tabs { display: none; }
+  .mall-purchase-steps { padding: 16px 14px; }
+  .mall-purchase-steps li { gap: 8px; font-size: 11px; }
+  .mall-purchase-steps .mall-step-arrow { margin-right: 8px; }
+}
+@media (max-width: 600px) {
+  .mall-home-hero { grid-template-columns: 1fr; grid-template-rows: 280px auto; }
+  .mall-home .mall-home-banner-area .mall-banner, .mall-home-banner { height: 280px; }
+  .mall-home-directory { display: none; }
+  .mall-home-banner-copy { padding: 24px 20px; }
+  .mall-home-banner-copy h2 { font-size: 26px; max-width: 220px; }
+  .mall-home-banner-copy p { font-size: 12px; }
+  .mall-home-banner::after { background: linear-gradient(90deg, #e9f3fc 10%, #e9f3fcbb 40%, transparent 65%); }
+  .mall-home-banner > img { width: 100%; height: 150px; top: auto; bottom: 0; object-position: right bottom; mask-image: linear-gradient(to bottom, transparent, #000 18%); }
+  .mall-purchase-steps { padding: 14px 10px; }
+  .mall-purchase-steps li { flex-direction: column; gap: 6px; font-size: 10px; }
+  .mall-purchase-steps .mall-step-arrow { display: none; }
+  .mall-home .mall-department-head { gap: 10px; }
+  .mall-home .mall-department-head h2 { font-size: 17px; }
+  .mall-floor-body { display: block; }
+  .mall-floor-promo { display: block; width: 100%; min-height: 180px; margin-bottom: 14px; }
+  .mall-floor-promo > img { width: 160px; left: auto; right: 0; bottom: -15px; mask-image: linear-gradient(to right, transparent, #000 28%); }
+  .mall-floor-promo-copy { top: 18px; left: 18px; right: 140px; }
+  .mall-floor-promo-copy strong { font-size: 17px; line-height: 1.5; }
+  .mall-floor-promo-copy small { font-size: 10px; margin-top: 6px; }
+  .mall-floor-promo-action { font-size: 11px; margin-top: 12px; }
+  .mall-floor-promo-note { left: auto; right: 8px; font-size: 9px; }
+  .mall-floor-body > .mall-department-empty { min-height: 180px; }
+  .mall-page .mall-home .mall-department-grid { gap: 12px; }
+  .mall-home-consult { padding: 20px; gap: 18px; }
+  .mall-home-consult h2 { line-height: 1.8; font-size: 14px; }
+}

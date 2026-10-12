@@ -69,7 +69,7 @@ beforeEach(async () => {
   await router.isReady()
 })
 
-function mountCard(props: { spu: ProductSpu; badge?: 'hot' | 'fresh' | null; catalog?: boolean; categoryLabel?: string }) {
+function mountCard(props: { spu: ProductSpu; badge?: 'hot' | 'fresh' | null; catalog?: boolean; floor?: boolean; categoryLabel?: string }) {
   return mount(ProductCard, { props, global: { plugins: [router, createPinia()] } })
 }
 
@@ -119,6 +119,14 @@ describe('ProductCard —— 用真实商品数据渲染', () => {
     const w = mountCard({ spu: spu({ picUrl: '' }), badge: null })
     expect(w.find('img').exists()).toBe(false)
     expect(w.find('.ph').exists()).toBe(true)
+  })
+
+  it('主图失效时使用后台提供的备用图片', async () => {
+    const w = mountCard({ spu: spu({ sliderPicUrls: ['https://example.com/alternate.png'] }), badge: null })
+    await w.get('img').trigger('error')
+    expect(w.get('img').attributes('src')).toBe('https://example.com/alternate.png')
+    await w.get('img').trigger('error')
+    expect(w.find('img').exists()).toBe(false)
   })
 
   it('失效图片显示占位，后台更换地址后重新加载', async () => {
@@ -172,6 +180,22 @@ describe('FR-026h —— 卡片上不得出现促销活动标签', () => {
 })
 
 describe('加购入口（随 US3 接线）', () => {
+  it('楼层商品按选择数量加购，输入超库存数量时限制在现有库存内', async () => {
+    const { setTokens } = await import('@/utils/auth')
+    setTokens('at-1', 'rt-1')
+    const w = mountCard({ spu: spu({ specType: false, stock: 5, skus: [sku(100)] }), catalog: true, floor: true })
+    await w.get('[aria-label="增加购买数量"]').trigger('click')
+    await w.get('.p-btn').trigger('click')
+    await flushPromises()
+    expect(addToCart).toHaveBeenLastCalledWith(100, 2)
+    await w.get('.p-quantity input').setValue(50)
+    await w.get('.p-quantity input').trigger('change')
+    await w.get('.p-btn').trigger('click')
+    await flushPromises()
+    expect(addToCart).toHaveBeenLastCalledWith(100, 5)
+    expect(w.get('[aria-label="增加购买数量"]').attributes('disabled')).toBeDefined()
+  })
+
   it('已登录时点加购会真正发请求', async () => {
     const { setTokens } = await import('@/utils/auth')
     setTokens('at-1', 'rt-1')

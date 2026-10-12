@@ -14,7 +14,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
 import ProductCard from '@/components/ProductCard.vue'
-import MallDepartments from '@/components/MallDepartments.vue'
+import MallHome from '@/components/MallHome.vue'
 import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
 import '@/styles/mall.css'
@@ -314,12 +314,22 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
       </form>
     </div>
 
+    <MallHome
+      v-if="showDepartments"
+      :categories="tree"
+      :banners="banners"
+      @select="onPickCategory"
+    />
     <MallBanner
+      v-else
       :banners="banners"
       class="mall-container"
     />
 
-    <div class="mall-container mall-page-main">
+    <div
+      v-if="!showDepartments"
+      class="mall-container mall-page-main"
+    >
       <aside
         class="sidebar mall-categories"
         aria-label="商品分类"
@@ -578,13 +588,8 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
           </div>
         </div>
 
-        <MallDepartments
-          v-if="showDepartments"
-          :categories="tree"
-          @select="onPickCategory"
-        />
         <LoadingState
-          v-else-if="loading"
+          v-if="loading"
           class="mall-loading"
           variant="grid"
           :count="6"

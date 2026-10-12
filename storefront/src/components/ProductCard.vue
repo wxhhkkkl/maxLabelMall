@@ -25,6 +25,7 @@ const props = defineProps<{
   /** 由 deriveBadges 派生；null 表示无角标 */
   badge?: 'hot' | 'fresh' | null
   catalog?: boolean
+  floor?: boolean
   categoryLabel?: string
 }>()
 
@@ -37,8 +38,16 @@ const userStore = useUserStore()
 const toast = useToasts()
 
 const priceText = computed(() => formatYuan(props.spu.price))
-const imageFailed = ref(false)
-watch(() => props.spu.picUrl, () => { imageFailed.value = false })
+const imageIndex = ref(0)
+const imageSources = computed(() => [...new Set([props.spu.picUrl, ...(props.spu.sliderPicUrls ?? [])].filter(Boolean))])
+const imageSource = computed(() => imageSources.value[imageIndex.value])
+const quantity = ref(1)
+function normalizeQuantity() {
+  const number = Number(quantity.value)
+  quantity.value = Math.min(Math.max(1, Math.trunc(Number.isFinite(number) ? number : 1)), Math.max(1, props.spu.stock))
+}
+watch(() => props.spu.id, () => { quantity.value = 1 })
+watch(() => props.spu.picUrl, () => { imageIndex.value = 0 })
 /** marketPrice 为 0 视为没有划线价 */
 const marketText = computed(() =>
   props.spu.marketPrice > 0 ? formatYuan(props.spu.marketPrice) : '',
@@ -61,6 +70,7 @@ async function onAdd(e: MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
   if (props.catalog && props.spu.stock <= 0) return
+  normalizeQuantity()
   if (props.catalog && props.spu.specType) {
     await router.push(`/product/${props.spu.id}`)
     return
@@ -104,7 +114,7 @@ async function onAdd(e: MouseEvent) {
     // 暂存意图 + 打开登录弹层（沿用全站唯一的入口）。
     // cartStore.add 在未登录时**不发请求**，只把意图记下来；登录成功后由
     // LoginDialog 调 flushPendingIntent() 自动补上（FR-015）。
-    await cartStore.add(skuId, 1)
+    await cartStore.add(skuId, props.floor ? quantity.value : 1)
     toast.warn('登录后将自动加入购物车')
     // 显式带 path：只给 query 时 router 会去匹配"当前位置"，在未匹配的页面上会抛错。
     // 另外导航失败（重复导航、被守卫中止）不该变成未处理的拒绝。
@@ -116,7 +126,7 @@ async function onAdd(e: MouseEvent) {
 
   // 已登录：真正加购，并刷新顶栏角标（角标数量来自后端 get-count，不是本地累加）
   try {
-    await cartStore.add(skuId, 1)
+    await cartStore.add(skuId, props.floor ? quantity.value : 1)
     toast.success('已加入购物车')
   } catch (e) {
     toast.error((e as { message?: string })?.message || '加入购物车失败，请重试')
@@ -129,19 +139,19 @@ async function onAdd(e: MouseEvent) {
 <template>
   <RouterLink
     class="p-card"
-    :class="{ 'catalog-card': catalog }"
+    :class="{ 'catalog-card': catalog, 'mall-floor-card': floor }"
     :to="`/product/${spu.id}`"
   >
     <div
-      v-if="spu.picUrl && !imageFailed"
+      v-if="imageSource"
       class="p-img-wrap"
     >
       <img
         class="p-img-real"
-        :src="spu.picUrl"
+        :src="imageSource"
         :alt="spu.name"
         loading="lazy"
-        @error="imageFailed = true"
+        @error="imageIndex++"
       >
     </div>
     <!-- 无图时沿用设计稿的占位块，而不是渲染一个会坏掉的 img -->
@@ -192,13 +202,50 @@ async function onAdd(e: MouseEvent) {
       >{{ marketText }}</span>
     </div>
 
-    <button
-      class="p-btn"
-      type="button"
-      :disabled="catalog && spu.stock <= 0"
-      @click="onAdd"
+    <div
+      class="p-purchase-row"
+      :style="{ display: floor ? 'flex' : 'contents' }"
     >
-      {{ catalog && spu.stock <= 0 ? '暂时缺货' : catalog && spu.specType ? '选择规格' : '加入购物车' }}
-    </button>
+      <div
+        v-if="floor && !spu.specType && spu.stock > 0"
+        class="p-quantity"
+        @click.stop
+        @keydown.stop
+      >
+        <button
+          type="button"
+          :disabled="quantity <= 1"
+          aria-label="减少购买数量"
+          @click.prevent="quantity--; normalizeQuantity()"
+        >
+          −
+        </button>
+        <input
+          v-model.number="quantity"
+          type="number"
+          :min="1"
+          :max="spu.stock"
+          step="1"
+          :aria-label="`${spu.name}购买数量`"
+          @change="normalizeQuantity"
+        >
+        <button
+          type="button"
+          :disabled="quantity >= spu.stock"
+          aria-label="增加购买数量"
+          @click.prevent="quantity++; normalizeQuantity()"
+        >
+          ＋
+        </button>
+      </div>
+      <button
+        class="p-btn"
+        type="button"
+        :disabled="catalog && spu.stock <= 0"
+        @click="onAdd"
+      >
+        {{ catalog && spu.stock <= 0 ? '暂时缺货' : catalog && spu.specType ? '选择规格' : '加入购物车' }}
+      </button>
+    </div>
   </RouterLink>
 </template>

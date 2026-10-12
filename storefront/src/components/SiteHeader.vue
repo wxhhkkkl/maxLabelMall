@@ -10,6 +10,7 @@ import type { CategoryNode } from '@/types'
 import '@/styles/navigation.css'
 
 import LoginDialog from './LoginDialog.vue'
+import HeaderCart from './HeaderCart.vue'
 
 /**
  * 顶栏 —— 按设计稿 `www/*.html` 的 `.header` 结构还原，沿用其 class 名
@@ -214,16 +215,7 @@ function isActive(name: string): boolean {
     </div>
 
     <div class="header-right">
-      <!-- 角标数字由 T087 接入；未登录 / 为空时不显示数字（设计稿的「购物车 (2)」已移除） -->
-      <RouterLink
-        class="cart-chip"
-        to="/cart"
-      >
-        购物车<span
-          v-if="cartStore.count > 0"
-          class="cart-count"
-        >({{ cartStore.count }})</span>
-      </RouterLink>
+      <HeaderCart />
       <!-- 已登录：入口变为个人中心，并显示昵称或脱敏手机号（FR-016）
            未登录：点它打开登录弹层（全站唯一实例） -->
       <!-- ⚠️ 兜底文案不能省：`displayName` 在"有令牌但会员信息还没回来/拉不到"时是空的，

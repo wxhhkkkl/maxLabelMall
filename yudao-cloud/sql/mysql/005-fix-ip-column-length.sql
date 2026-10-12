@@ -1,5 +1,5 @@
 -- ============================================================================
--- 005 —— 修两处「按 IPv4 长度建的 IP 列」，IPv6 客户会写不进去
+-- 005 —— 修三处「按 IPv4 长度建的 IP 列」，IPv6 客户会写不进去
 --
 -- ⚠️ 与 002/003/004 不同：那几份是**建新东西**，只在首次上线跑一次；
 --    本文件是**修官方建表脚本里的坑**，所以重建库时也要补跑一遍。
@@ -34,15 +34,22 @@
 --   `pay_order.user_ip` 等）统一是 `varchar(50)`，够放 IPv6 及其 IPv4-mapped 写法。
 --   这里跟齐，不另立标准。
 --
--- 还没改但同一类的（本次刻意不动，等真出事再说）
+-- 同一个坑的第三处（修完前两处之后，才轮得到它报错）
 -- ----------------------------------------------------------------------------
---   `member_user.register_ip` 是 `varchar(32)`，39 > 32，IPv6 注册一样会挂。
---   目前日志里没有命中，先留着不动。
+--   `member_user.register_ip` 是 `varchar(32)`，39 > 32。它落在**同一个页面**的
+--   下一个动作上：`MemberAuthServiceImpl.smsLogin`（登录弹层的"未注册的手机号验证后
+--   将自动创建账号"）会走 `createUserIfAbsent` → `MemberUserServiceImpl.createUser`
+--   里的 `setRegisterIp(...)`。
+--   所以对 IPv6 客户，只修前两处的话报错点会从"获取验证码"平移到"登录"——
+--   **新号仍然进不来**，只是换了个按钮报同一个 500。号码已注册的老客户不走建号分支。
+--
+--   生产库 2026-10-12 做过全库扫描：`COLUMN_NAME REGEXP '(^|_)ip(_|$)'` 共 15 个列，
+--   改完下面三处后**没有第四处**（其余 12 列都是 varchar(50) 或 255）。
 --
 -- 幂等 / 回滚
 -- ----------------------------------------------------------------------------
 --   幂等：MODIFY 到同一个定义重复执行不改语义，可安全重跑。
---   回滚：把 varchar(50) 改回 varchar(15) / varchar(30) 即可 ——
+--   回滚：把 varchar(50) 改回 varchar(15) / varchar(30) / varchar(32) 即可 ——
 --         但**只有在表里还没有超过原长度的值时才可行**，一旦落进一条 IPv6 就会截断报错。
 --         本次故障是写在 INSERT 阶段失败的，**没有脏数据落库**，所以现在还能回滚。
 -- ============================================================================
@@ -59,3 +66,10 @@ ALTER TABLE `system_sms_code`
 ALTER TABLE `trade_order`
     MODIFY COLUMN `user_ip` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
         NOT NULL DEFAULT '' COMMENT '用户 IP';
+
+-- 3. 会员注册 IP：新号自动建号时记录来源（修完 1、2 之后才会暴露出来的那一处）
+--    线上现为 varchar(32) NOT NULL，无默认值。注意该列上的排序规则是
+--    utf8mb4_general_ci —— 与库/表默认未必一致，显式照抄，别让 MODIFY 顺手改掉
+ALTER TABLE `member_user`
+    MODIFY COLUMN `register_ip` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci
+        NOT NULL COMMENT '注册 IP';

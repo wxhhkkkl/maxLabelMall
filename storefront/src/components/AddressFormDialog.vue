@@ -8,6 +8,7 @@ import MlField from '@/components/base/MlField.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import { useToasts } from '@/components/base/useToasts'
 import type { Address, Area } from '@/types'
+import { parseAddress } from '@/utils/address-parse'
 
 /**
  * 新增 / 编辑收货地址的弹层（C1 + C4 + C3）。
@@ -47,6 +48,108 @@ const saving = ref(false)
 const lv1 = ref<number | null>(null)
 const lv2 = ref<number | null>(null)
 const lv3 = ref<number | null>(null)
+
+/** 「粘贴整段地址」输入框的内容 */
+const pasteText = ref('')
+
+/**
+ * 地区树没到位时**不给识别**（R13）：没有解析依据，点了只会得到一次误导性的"未识别"。
+ * 树加载失败与树还没回来这两种情况都算。
+ */
+const canParse = computed(() => tree.value.length > 0 && !treeError.value)
+
+/** 识别的反馈文案：空框 / 认不出 / 认了一半。客户一动粘贴框就清掉，免得留着一句过期的提示 */
+const parseHint = ref('')
+
+/**
+ * 识别前的快照，用于「撤销识别」（FR-123）。
+ *
+ * **只装识别会碰的那 4 个字段** —— 把整张表单快照进去，撤销就会顺带回退客户手打的
+ * 收件人和手机号，那不是"撤销识别"而是"撤销一切"。
+ * 每次识别**覆盖**上一次快照：撤销的语义是"退回最近一次识别前"。
+ */
+const parseSnapshot = ref<{
+  lv1: number | null
+  lv2: number | null
+  lv3: number | null
+  detail: string
+} | null>(null)
+
+const LEVEL_LABELS: Record<'province' | 'city' | 'district', string> = {
+  province: '省份',
+  city: '城市',
+  district: '区县',
+}
+
+/** 粘贴框下面那行字：有反馈就显示反馈，否则显示例子 / 地区数据的状态 */
+const pasteHint = computed(
+  () =>
+    parseHint.value ||
+    (canParse.value ? '例如：浙江省杭州市余杭区文一西路969号' : treeError.value || '地区数据加载中…'),
+)
+
+/**
+ * 点「自动识别」：把粘贴进来的一整段地址解析成省 / 市 / 区，写进三级联动与详细地址。
+ *
+ * 写回规则（Q15=A / Q16=A / Q17=A / FR-120 / FR-121）：
+ *
+ * - **`matchedLevels === 0` → 一个字段都不改**，也不回填详细地址（FR-121 / Q18=A）
+ * - 识别到的层级一定写
+ * - 未识别到的层级：**上级没变就保持客户原值**；**上级变了必须清空** ——
+ *   否则三级联动会指向一条不存在的路径（省换成了浙江、区还留着北京的朝阳区，
+ *   而 `pickedAreaId` 取的是最小层级，会把那个朝阳区存进去）
+ */
+function onParse() {
+  // ① 空框与"认不出"必须分成两句：对着一个空框说"未识别到行政区划"，
+  //    客户会以为是自己粘错了内容
+  if (!pasteText.value.trim()) {
+    parseHint.value = '请先粘贴地址'
+    return
+  }
+
+  const r = parseAddress(pasteText.value, tree.value)
+  if (r.matchedLevels === 0) {
+    parseHint.value = '未识别到行政区划，请手动选择'
+    return
+  }
+
+  // 真的要写入了，先把"识别前"存下来 —— 快照只保留最近一次，于是撤销退回的永远是最近一次
+  parseSnapshot.value = {
+    lv1: lv1.value,
+    lv2: lv2.value,
+    lv3: lv3.value,
+    detail: form.value.detailAddress,
+  }
+
+  if (r.province && lv1.value !== r.province.id) {
+    lv2.value = null
+    lv3.value = null
+  }
+  if (r.province) lv1.value = r.province.id
+
+  if (r.city && lv2.value !== r.city.id) lv3.value = null
+  if (r.city) lv2.value = r.city.id
+
+  if (r.district) lv3.value = r.district.id
+  if (r.detail) form.value.detailAddress = r.detail
+
+  // ③ 认了一半要说清是**哪一级**没认出来
+  parseHint.value = r.missing.length
+    ? `未识别到${r.missing.map((k) => LEVEL_LABELS[k]).join('、')}，请手动补选`
+    : ''
+}
+
+/** 撤销识别：整体退回识别前（FR-123）。识别从没成功过时按钮不显示，故这里无需兜底 */
+function onUndoParse() {
+  const snap = parseSnapshot.value
+  if (!snap) return
+  lv1.value = snap.lv1
+  lv2.value = snap.lv2
+  lv3.value = snap.lv3
+  form.value.detailAddress = snap.detail
+  parseSnapshot.value = null
+  parseHint.value = ''
+}
 
 const cities = computed(() => tree.value.find((a) => a.id === lv1.value)?.children ?? [])
 const districts = computed(() => cities.value.find((a) => a.id === lv2.value)?.children ?? [])
@@ -93,6 +196,9 @@ function reset() {
   lv1.value = null
   lv2.value = null
   lv3.value = null
+  pasteText.value = ''
+  parseHint.value = ''
+  parseSnapshot.value = null
 }
 
 /** 地区树到位后再回显（否则树还没加载，找不到路径） */
@@ -168,6 +274,45 @@ async function save() {
     :title="address ? '编辑收货地址' : '新增收货地址'"
     @close="emit('close')"
   >
+    <!--
+      「粘贴整段地址 + 自动识别」（Q15=A）。
+
+      ⚠️ 这个入口是**显式**的：识别只在点按钮时发生。MUST NOT 在「详细地址」的
+      input / paste 事件里调用解析 —— 客户常常只想手打详细地址，自动改写会让他措手不及。
+    -->
+    <MlField
+      label="粘贴整段地址"
+      :hint="pasteHint"
+    >
+      <div class="paste-row">
+        <input
+          id="addrPaste"
+          v-model="pasteText"
+          class="ml-input"
+          placeholder="把整段地址粘到这里，再点右侧识别"
+          @input="parseHint = ''"
+        >
+        <button
+          id="addrParseBtn"
+          class="btn-cart paste-btn"
+          type="button"
+          :disabled="!canParse"
+          @click="onParse"
+        >
+          自动识别
+        </button>
+        <button
+          v-if="parseSnapshot"
+          id="addrParseUndo"
+          class="parse-undo"
+          type="button"
+          @click="onUndoParse"
+        >
+          撤销识别
+        </button>
+      </div>
+    </MlField>
+
     <MlField label="收件人" required>
       <input id="addrName" v-model.trim="form.name" class="ml-input" placeholder="请填写收件人姓名" />
     </MlField>
@@ -234,6 +379,38 @@ async function save() {
 </template>
 
 <style scoped>
+/* 粘贴框 + 识别按钮同行。样式骨架照 LoginDialog 的 .code-row / .code-btn */
+.paste-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.paste-row .ml-input {
+  flex: 1;
+}
+.paste-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 12px 18px;
+  font-size: 14px;
+}
+.paste-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* 撤销是"反悔"动作，做成低调的文字按钮，不跟「自动识别」抢注意力 */
+.parse-undo {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--ml-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .area-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -57,4 +57,8 @@ public interface ErrorCodeConstants {
     ErrorCode GROUP_NOT_EXISTS = new ErrorCode(1_004_012_000, "用户分组不存在");
     ErrorCode GROUP_HAS_USER = new ErrorCode(1_004_012_001, "用户分组下存在用户，无法删除");
 
+    //========== 微信扫码登录 1-004-013-000 ==========
+    ErrorCode WECHAT_LOGIN_TICKET_NOT_EXISTS = new ErrorCode(1_004_013_000, "本次登录已过期，请重新扫码");
+    ErrorCode WECHAT_LOGIN_TICKET_STATUS_INVALID = new ErrorCode(1_004_013_001, "登录状态不正确，请重新扫码");
+
 }

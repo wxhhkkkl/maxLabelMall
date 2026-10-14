@@ -132,4 +132,55 @@ public class AppAuthController {
         return success(AuthConvert.INSTANCE.convert(signature));
     }
 
+    // ========== 微信扫码登录（specs/005-wechat-scan-login） ==========
+
+    @PostMapping("/wechat/scan/create")
+    @Operation(summary = "微信扫码登录：签发登录票据",
+            description = "电脑端点「微信登录」时调。返回票据号与二维码内容（微信授权页地址，已带上本次的 state）")
+    @PermitAll
+    public CommonResult<AppAuthWechatScanCreateRespVO> createWechatScanTicket(
+            @RequestBody @Valid AppAuthWechatScanCreateReqVO reqVO) {
+        return success(authService.createWechatScanTicket(reqVO.getRedirectUri()));
+    }
+
+    @PostMapping("/wechat/callback")
+    @Operation(summary = "微信扫码登录：手机侧授权完成的回调",
+            description = "客户在手机微信里点完「允许」后，回跳页面（跑在手机上）把 code + state 发到这里。"
+                    + "**这一步只识别身份，不建会员、不发令牌**")
+    @PermitAll
+    public CommonResult<Boolean> wechatScanCallback(@RequestBody @Valid AppAuthWechatCallbackReqVO reqVO) {
+        authService.handleWechatCallback(reqVO);
+        return success(true);
+    }
+
+    @PostMapping("/wechat/complete")
+    @Operation(summary = "微信扫码登录：提交补全页",
+            description = "**这一步才建号（或绑到既有会员）、才发令牌**。令牌不从这里返回 —— "
+                    + "电脑端继续轮询 scan/query 取")
+    @PermitAll
+    public CommonResult<Boolean> completeWechatScan(@RequestBody @Valid AppAuthWechatCompleteReqVO reqVO) {
+        authService.completeWechatScan(reqVO);
+        return success(true);
+    }
+
+    @PostMapping("/wechat/abandon")
+    @Operation(summary = "微信扫码登录：放弃本次登录",
+            description = "客户关掉补全页时调。让这次扫码**彻底作废**：不建会员、不建绑定、不留登录态。幂等")
+    @PermitAll
+    public CommonResult<Boolean> abandonWechatScan(@RequestBody @Valid AppAuthWechatAbandonReqVO reqVO) {
+        authService.abandonWechatScanTicket(reqVO.getTicket());
+        return success(true);
+    }
+
+    @GetMapping("/wechat/scan/query")
+    @Operation(summary = "微信扫码登录：电脑端轮询",
+            description = "状态取值 `待扫 / 待补全 / 已完成 / 已过期 / 已作废`。"
+                    + "`已完成` 返回令牌的同时票据即被取走（一次性）")
+    @Parameter(name = "ticket", description = "票据号", required = true)
+    @PermitAll
+    public CommonResult<AppAuthWechatScanQueryRespVO> queryWechatScanTicket(
+            @RequestParam("ticket") String ticket) {
+        return success(authService.queryWechatScanTicket(ticket));
+    }
+
 }

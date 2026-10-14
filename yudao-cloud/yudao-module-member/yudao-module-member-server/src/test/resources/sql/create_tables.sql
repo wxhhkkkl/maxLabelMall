@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS "member_user"
     mark          varchar(255) null comment '用户备注',
     point         int                   default 0 null comment '积分',
     "avatar"      varchar(255) NOT NULL DEFAULT '' COMMENT '头像',
+    company       varchar(64)  null comment '公司名称（微信扫码登录补全时采集，选填）',
     "status"      tinyint      NOT NULL COMMENT '状态',
     "mobile"      varchar(11)  NOT NULL COMMENT '手机号',
     "email"       varchar(50)  NULL COMMENT '邮箱',

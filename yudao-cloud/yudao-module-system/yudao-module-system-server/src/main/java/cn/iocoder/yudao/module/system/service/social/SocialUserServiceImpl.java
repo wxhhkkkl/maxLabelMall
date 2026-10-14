@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Assert;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.user.SocialUserPageReqVO;
@@ -22,11 +23,14 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_MEMBER_BOUND_OTHER;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_NOT_FOUND;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_OPENID_BOUND_OTHER;
 
 /**
  * 社交用户 Service 实现类
@@ -77,6 +81,44 @@ public class SocialUserServiceImpl implements SocialUserService {
                 .userId(reqDTO.getUserId()).userType(reqDTO.getUserType())
                 .socialUserId(socialUser.getId()).socialType(socialUser.getType()).build();
         socialUserBindMapper.insert(socialUserBind);
+        return socialUser.getOpenid();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String bindSocialUserByOpenid(SocialUserBindByOpenidReqDTO reqDTO) {
+        // 1. openid 必须是"已经认识的"身份：扫码回调那一步已经用 getSocialUserByCode 把它落过库了
+        SocialUserDO socialUser = socialUserMapper.selectByTypeAndOpenid(reqDTO.getSocialType(), reqDTO.getOpenid());
+        if (socialUser == null) {
+            throw exception(SOCIAL_USER_NOT_FOUND);
+        }
+
+        // 2. 该会员不许已经绑过**同类型的另一个**社交账号（Q21=C / FR-146）
+        //
+        //    ⚠️ 这里与上面的 bindSocialUser 刻意不同 —— 它内部是"先删后插"的**无条件解绑**：
+        //       复用它会静默把先绑的那个微信号解绑，让那个人从此登不进去，
+        //       而且**不抛任何异常、数据看着全对**，只有当事人会发现问题。这一条是本方法存在的理由。
+        SocialUserBindDO current = socialUserBindMapper.selectByUserIdAndUserTypeAndSocialType(
+                reqDTO.getUserId(), reqDTO.getUserType(), reqDTO.getSocialType());
+        if (current != null) {
+            if (!Objects.equals(current.getSocialUserId(), socialUser.getId())) {
+                throw exception(SOCIAL_USER_MEMBER_BOUND_OTHER);
+            }
+            // 绑的就是它 —— 幂等返回，不新增行
+            return socialUser.getOpenid();
+        }
+
+        // 3. 反过来也要挡：该 openid 不许已经属于**另一个会员**（一个微信只能属于一个账号）
+        SocialUserBindDO boundOther = socialUserBindMapper.selectByUserTypeAndSocialUserId(
+                reqDTO.getUserType(), socialUser.getId());
+        if (boundOther != null && !Objects.equals(boundOther.getUserId(), reqDTO.getUserId())) {
+            throw exception(SOCIAL_USER_OPENID_BOUND_OTHER);
+        }
+
+        // 4. 插入绑定 —— 注意**没有**任何 delete 语句
+        socialUserBindMapper.insert(SocialUserBindDO.builder()
+                .userId(reqDTO.getUserId()).userType(reqDTO.getUserType())
+                .socialUserId(socialUser.getId()).socialType(socialUser.getType()).build());
         return socialUser.getOpenid();
     }
 

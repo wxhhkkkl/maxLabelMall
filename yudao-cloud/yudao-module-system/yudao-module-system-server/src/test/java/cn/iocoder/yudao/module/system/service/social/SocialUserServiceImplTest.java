@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.social;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.user.SocialUserPageReqVO;
@@ -29,8 +30,11 @@ import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEq
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomString;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_MEMBER_BOUND_OTHER;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_NOT_FOUND;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.SOCIAL_USER_OPENID_BOUND_OTHER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 
@@ -283,6 +287,106 @@ public class SocialUserServiceImplTest extends BaseDbUnitTest {
         assertEquals(1, pageResult.getTotal());
         assertEquals(1, pageResult.getList().size());
         assertPojoEquals(dbSocialUser, pageResult.getList().get(0));
+    }
+
+    // ========== 按 openid 绑定（T341 / 微信扫码登录 Q21=C / FR-146 / SC-053） ==========
+
+    @Test
+    public void testBindSocialUserByOpenid_success() {
+        // 准备参数
+        Long userId = randomLong();
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.GITEE.getType();
+        String openid = "test_openid";
+        // mock 数据：**已经认识的**社交身份 —— 扫码那一刻就落库了（q26：绑定推迟到提交补全页）
+        SocialUserDO socialUser = randomPojo(SocialUserDO.class).setType(type).setOpenid(openid);
+        socialUserMapper.insert(socialUser);
+
+        // 调用
+        String result = socialUserService.bindSocialUserByOpenid(
+                new SocialUserBindByOpenidReqDTO(userId, userType, type, openid));
+
+        // 断言：返回 openid，并且真的插了一条绑定
+        assertEquals(openid, result);
+        SocialUserBindDO bind = socialUserBindMapper.selectByUserIdAndUserTypeAndSocialType(userId, userType, type);
+        assertNotNull(bind);
+        assertEquals(socialUser.getId(), bind.getSocialUserId());
+    }
+
+    @Test
+    public void testBindSocialUserByOpenid_memberAlreadyBoundOther_throwsAndKeepsOldBinding() {
+        // 准备参数：该会员**已经绑过另一个微信**
+        Long userId = randomLong();
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.GITEE.getType();
+        SocialUserDO boundOne = randomPojo(SocialUserDO.class).setType(type).setOpenid("openid-bound");
+        socialUserMapper.insert(boundOne);
+        SocialUserDO newOne = randomPojo(SocialUserDO.class).setType(type).setOpenid("openid-new");
+        socialUserMapper.insert(newOne);
+        SocialUserBindDO oldBind = randomPojo(SocialUserBindDO.class).setUserType(userType)
+                .setUserId(userId).setSocialType(type).setSocialUserId(boundOne.getId());
+        socialUserBindMapper.insert(oldBind);
+
+        // 调用，断言：被拒绝
+        assertServiceException(
+                () -> socialUserService.bindSocialUserByOpenid(
+                        new SocialUserBindByOpenidReqDTO(userId, userType, type, "openid-new")),
+                SOCIAL_USER_MEMBER_BOUND_OTHER);
+
+        // ⚠️ 本用例的**核心**：先绑的那条必须**一个字段都没被改**（SC-053）
+        //    既有的 bindSocialUser 会在这里静默解绑再绑新的 —— 那正是 Q21=C 禁止的行为，
+        //    而且它**不抛任何异常**，只有"先绑的微信从此登不进去"这一个症状
+        assertEquals(1, socialUserBindMapper.selectCount(null).intValue(), "不该多出第二条绑定");
+        SocialUserBindDO still = socialUserBindMapper.selectByUserIdAndUserTypeAndSocialType(userId, userType, type);
+        assertNotNull(still, "先绑的那条被解绑了");
+        assertEquals(oldBind.getId(), still.getId(), "先绑的那条被换成了别的行");
+        assertEquals(boundOne.getId(), still.getSocialUserId(), "先绑的那条被改指到别的微信了");
+    }
+
+    @Test
+    public void testBindSocialUserByOpenid_idempotent_whenSameOpenid() {
+        // 准备参数：会员绑的**就是这一个** openid
+        Long userId = randomLong();
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.GITEE.getType();
+        SocialUserDO socialUser = randomPojo(SocialUserDO.class).setType(type).setOpenid("openid-same");
+        socialUserMapper.insert(socialUser);
+        SocialUserBindDO bind = randomPojo(SocialUserBindDO.class).setUserType(userType)
+                .setUserId(userId).setSocialType(type).setSocialUserId(socialUser.getId());
+        socialUserBindMapper.insert(bind);
+
+        // 调用：不报错，也不新增
+        String result = socialUserService.bindSocialUserByOpenid(
+                new SocialUserBindByOpenidReqDTO(userId, userType, type, "openid-same"));
+
+        assertEquals("openid-same", result);
+        assertEquals(1, socialUserBindMapper.selectCount(null).intValue());
+    }
+
+    @Test
+    public void testBindSocialUserByOpenid_openidBelongsToOtherMember_throws() {
+        // 准备参数：这个 openid 已经属于**另一个会员**
+        Integer userType = UserTypeEnum.ADMIN.getValue();
+        Integer type = SocialTypeEnum.GITEE.getType();
+        SocialUserDO socialUser = randomPojo(SocialUserDO.class).setType(type).setOpenid("openid-taken");
+        socialUserMapper.insert(socialUser);
+        socialUserBindMapper.insert(randomPojo(SocialUserBindDO.class).setUserType(userType)
+                .setUserId(randomLong()).setSocialType(type).setSocialUserId(socialUser.getId()));
+
+        // 调用，断言：拒绝 —— 一个微信只能属于一个账号
+        assertServiceException(
+                () -> socialUserService.bindSocialUserByOpenid(
+                        new SocialUserBindByOpenidReqDTO(randomLong(), userType, type, "openid-taken")),
+                SOCIAL_USER_OPENID_BOUND_OTHER);
+    }
+
+    @Test
+    public void testBindSocialUserByOpenid_unknownOpenid_throwsNotFound() {
+        assertServiceException(
+                () -> socialUserService.bindSocialUserByOpenid(
+                        new SocialUserBindByOpenidReqDTO(randomLong(), UserTypeEnum.ADMIN.getValue(),
+                                SocialTypeEnum.GITEE.getType(), "openid-never-seen")),
+                SOCIAL_USER_NOT_FOUND);
     }
 
 }

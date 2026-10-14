@@ -214,6 +214,13 @@ async function onLogout() {
               {{ userStore.displayName || '未登录' }}
             </p>
             <p class="acct-mobile">{{ userStore.member?.mobile }}</p>
+            <!-- 公司名称：选填，微信首次登录时采集，之后在这里可看可改（Q24） -->
+            <p
+              v-if="userStore.member?.company"
+              class="acct-company"
+            >
+              {{ userStore.member.company }}
+            </p>
             <p v-if="!userStore.member?.nickname" class="ml-hint">
               尚未设置昵称，当前展示脱敏手机号
             </p>
@@ -376,6 +383,11 @@ async function onLogout() {
 .acct-avatar-ph svg { width: 32px; height: 32px; }
 .acct-profile-info { flex: 1; min-width: 0; }
 .acct-name { font-size: 22px; font-weight: 600; color: var(--ml-text); overflow-wrap: anywhere; }
+.acct-company {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ml-text-sub);
+}
 .acct-mobile { margin-top: 6px; font-size: 13px; color: var(--ml-text-sub); }
 .acct-profile-info .ml-hint { margin-top: 8px; line-height: 1.6; }
 .acct-profile .btn-cart { background: #FFFFFF; white-space: nowrap; padding: 10px 18px; font-size: 13px; }

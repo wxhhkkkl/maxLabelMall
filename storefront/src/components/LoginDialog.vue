@@ -10,11 +10,16 @@ import {
   smsLogin,
   SMS_SCENE_MEMBER_LOGIN,
   SMS_SCENE_RESET_PASSWORD,
+  updateProfile,
 } from '@/api/member'
+import { uploadFile } from '@/api/upload'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
+import { setTokens } from '@/utils/auth'
 
 import CaptchaSlider from './CaptchaSlider.vue'
+import ProfileCompletionDialog from './ProfileCompletionDialog.vue'
+import WechatQrPanel from './WechatQrPanel.vue'
 import MlCheck from './base/MlCheck.vue'
 import MlField from './base/MlField.vue'
 import MlModal from './base/MlModal.vue'
@@ -48,7 +53,7 @@ const route = useRoute()
 const userStore = useUserStore()
 const cartStore = useCartStore()
 
-type Method = 'sms' | 'password' | 'reset'
+type Method = 'sms' | 'password' | 'reset' | 'wechat'
 
 const method = ref<Method>('sms')
 const mobile = ref('')
@@ -62,6 +67,15 @@ const submitting = ref(false)
 const countdown = ref(0)
 /** 滑块弹层开关（发短信前的那道闸门） */
 const captchaOpen = ref(false)
+
+/** 扫到「待补全」时拿到的票据与微信侧资料，交给补全页（US17 / T356）用 */
+const wechatTicket = ref('')
+const wechatNickname = ref('')
+const wechatAvatar = ref('')
+/** 补全页打开中 */
+const completionOpen = ref(false)
+/** 补全页里客户自选的头像 —— **要等登录成功之后才上传**（FR-151） */
+const pendingAvatar = ref<File | null>(null)
 
 const MOBILE_RE = /^1[3-9]\d{9}$/
 const mobileValid = computed(() => MOBILE_RE.test(mobile.value))
@@ -215,6 +229,65 @@ async function onSubmit() {
   }
 }
 
+/**
+ * 微信扫码登录成功。
+ *
+ * 令牌是面板轮询拿到的，**不经 `api/member` 那条路**，所以这里自己调 `setTokens`；
+ * 之后与 `onSubmit` 成功时**一模一样**：同步登录态 → 补发被中断的加购 → 通知上层 → 回原页。
+ */
+async function onWechatLoggedIn(accessToken: string, refreshToken: string) {
+  if (!accessToken) {
+    error.value = '登录失败，请重新扫码'
+    return
+  }
+  error.value = ''
+  setTokens(accessToken, refreshToken)
+  await userStore.syncAfterLogin()
+  // 到这里才是"已登录" —— 补全页里选的头像此刻才传得上去（FR-151）
+  await flushPendingAvatar()
+  await cartStore.flushPendingIntent()
+  emit('success')
+  redirectBack()
+}
+
+/**
+ * 扫码成功，但该会员还没有手机号 → 该走**补全页**（US17 / `ProfileCompletionDialog`）。
+ *
+ * ⚠️ 补全页在 T356 才做。在那之前这里是**断头路** —— 计划里已经写明
+ * **US16 单独上线是坏的**（新客户会被永远卡住），所以本特性不能只发到这一步。
+ */
+function onWechatNeedProfile(ticket: string, wxNickname?: string, wxAvatar?: string) {
+  wechatTicket.value = ticket
+  wechatNickname.value = wxNickname ?? ''
+  wechatAvatar.value = wxAvatar ?? ''
+  error.value = ''
+  completionOpen.value = true
+}
+
+/** 补全页提交成功：先记下自选头像，等**登录成功之后**再传（FR-151） */
+function onWechatProfileCompleted(avatarFile: File | null) {
+  pendingAvatar.value = avatarFile
+  completionOpen.value = false
+}
+
+/**
+ * 把补全页里选的头像传上去。
+ *
+ * ⚠️ **只有登录成功之后才调得到** —— 上传接口要求登录，而补全页出现时客户还没登录。
+ * 传失败**不抛**：客户已经登录成功了，不该因为一张头像把这件好事吃掉；到个人资料里再传就是了。
+ */
+async function flushPendingAvatar() {
+  const file = pendingAvatar.value
+  pendingAvatar.value = null
+  if (!file) return
+  try {
+    const url = await uploadFile(file)
+    await updateProfile({ avatar: url })
+  } catch {
+    /* 见上：失败不打断登录 */
+  }
+}
+
 /** 登录后回到登录前的页面继续操作（FR-010 / FR-015） */
 function redirectBack() {
   const redirect = route.query.redirect
@@ -242,9 +315,40 @@ function redirectBack() {
       >
         密码登录
       </span>
+      <span
+        class="switch-tab"
+        :class="{ active: method === 'wechat' }"
+        @click="switchMethod('wechat')"
+      >
+        微信登录
+      </span>
     </div>
 
-    <MlField label="手机号" required>
+    <!--
+      微信扫码登录。**它与下面那套表单是并列关系** —— 令牌由面板轮询拿到，
+      不经过手机号/验证码/密码任何一条。
+
+      ⚠️ 协议门禁一样管着它（`switchMethod` 会清掉同意状态）：这条路最终会收集手机号，
+      所以「同意必须发生在手机号被收集之前」这条闸门对它一视同仁。
+    -->
+    <WechatQrPanel
+      v-if="method === 'wechat' && agreed"
+      :open="open"
+      @logged-in="onWechatLoggedIn"
+      @need-profile="onWechatNeedProfile"
+    />
+    <p
+      v-else-if="method === 'wechat'"
+      class="wx-need-agree"
+    >
+      请先勾选下方的《用户协议》与《隐私政策》
+    </p>
+
+    <MlField
+      v-else
+      label="手机号"
+      required
+    >
       <input
         id="loginMobile"
         v-model.trim="mobile"
@@ -296,7 +400,8 @@ function redirectBack() {
     </template>
 
     <!-- 忘记密码：同一张弹层里的第三种形态（不新增路由） -->
-    <template v-else>
+    <!-- ⚠️ 必须是 `v-else-if` 而不是 `v-else`：否则「微信登录」也会掉进这条分支 -->
+    <template v-else-if="method === 'reset'">
       <MlField label="短信验证码" required>
         <div class="code-row">
           <input
@@ -347,7 +452,11 @@ function redirectBack() {
       </span>
     </MlCheck>
 
-    <template #foot>
+    <!-- 微信登录没有"提交"这个动作 —— 扫码确认即登录，所以整条底栏都不出现 -->
+    <template
+      v-if="method !== 'wechat'"
+      #foot
+    >
       <button
         id="loginSubmit"
         class="btn-primary login-submit"
@@ -359,16 +468,42 @@ function redirectBack() {
       </button>
     </template>
 
-    <p class="login-tip">
+    <p
+      v-if="method !== 'wechat'"
+      class="login-tip"
+    >
       {{ method === 'reset' ? '重置后可用新密码登录；重置需要该手机号已注册' : '未注册的手机号验证后将自动创建账号' }}
     </p>
   </MlModal>
 
   <!-- 发短信前的图形验证码闸门。开关由服务端决定，关着时它根本不会被打开 -->
-  <CaptchaSlider :open="captchaOpen" @close="captchaOpen = false" @success="onCaptchaPassed" />
+  <CaptchaSlider
+    :open="captchaOpen"
+    @close="captchaOpen = false"
+    @success="onCaptchaPassed"
+  />
+
+  <!--
+    首次微信登录的补全页（US17）。它出现在**二维码面板轮询到「待补全」之后** ——
+    客户在**同一台电脑**上填完提交，后面板继续轮询把令牌取回来（那条轮询此时不能停）。
+  -->
+  <ProfileCompletionDialog
+    :open="completionOpen"
+    :ticket="wechatTicket"
+    :wx-nickname="wechatNickname"
+    :wx-avatar="wechatAvatar"
+    @close="completionOpen = false"
+    @completed="onWechatProfileCompleted"
+  />
 </template>
 
 <style scoped>
+/* 微信登录页签下、协议还没勾时的提示 */
+.wx-need-agree {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--ml-text-sub);
+}
 .switch-tabs {
   display: flex;
   gap: 20px;

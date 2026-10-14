@@ -4,17 +4,24 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/003-product-filter-dimensions/plan.md
+specs/005-wechat-scan-login/plan.md
 
 Supporting artifacts for the active feature:
-- specs/003-product-filter-dimensions/spec.md — 功能规格（含 6 项已确认决策 Q9~Q14）
-- specs/003-product-filter-dimensions/research.md — 技术决策与被否决方案（R1~R14）
-- specs/003-product-filter-dimensions/data-model.md — 3 个新实体、映射、派生查询口径
-- specs/003-product-filter-dimensions/contracts/app-api.md — C 端消费与改动的契约
-- specs/003-product-filter-dimensions/contracts/admin-api.md — 管理端新增能力（本仓库首份 admin-api 契约）
-- specs/003-product-filter-dimensions/quickstart.md — 手工验证清单与显式不验证项
+- specs/005-wechat-scan-login/spec.md — 功能规格（含 8 项已确认决策 Q19~Q26）
+- specs/005-wechat-scan-login/research.md — 技术决策与被否决方案（R15~R24）
+- specs/005-wechat-scan-login/data-model.md — 票据状态机、会员加列、绑定唯一性
+- specs/005-wechat-scan-login/contracts/app-api.md — C 端新增/改动接口
+- specs/005-wechat-scan-login/contracts/admin-api.md — 管理端展示 + **前置配置阻塞**
+- specs/005-wechat-scan-login/quickstart.md — 手工验证清单与显式不验证项
+  ⚠️ 计划开头有一条**前置阻塞**：C 端当前指向微信**测试号**，配置不修则真实客户用不了（见 plan.md / quickstart §零）
 
-上一个特性（商品详情 / 评价 / 商城页 banner）：
+上一个特性（收货地址自动解析）：
+- specs/004-address-auto-parse/{spec,plan,research,data-model,quickstart,tasks}.md
+- specs/004-address-auto-parse/contracts/address-parse.md — 客户端模块契约（无接口变更）
+
+更早的特性（商品分类筛选维度 / 商品详情 / 评价 / 商城页 banner）：
+- specs/003-product-filter-dimensions/{spec,plan,data-model,research,quickstart,tasks}.md
+- specs/003-product-filter-dimensions/contracts/{app-api,admin-api}.md — admin-api 是本仓库首份
 - specs/002-product-detail-reviews-banner/{spec,plan,data-model,research,quickstart,tasks}.md
 - specs/002-product-detail-reviews-banner/contracts/app-api.md
 

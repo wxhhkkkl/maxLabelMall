@@ -24,7 +24,7 @@ import MlModal from './base/MlModal.vue'
 const props = defineProps<{ open: boolean; member: MemberUser | null }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 
-const form = ref<ProfileForm>({ nickname: '', avatar: '', email: '', sex: undefined })
+const form = ref<ProfileForm>({ nickname: '', avatar: '', email: '', sex: undefined, company: '' })
 const error = ref('')
 const saving = ref(false)
 
@@ -44,6 +44,7 @@ watch(
       avatar: m?.avatar ?? '',
       email: m?.email ?? '',
       sex: m?.sex,
+      company: m?.company ?? '',
     }
     error.value = ''
     saving.value = false
@@ -99,6 +100,19 @@ async function save() {
 
     <MlField label="手机号" hint="手机号是登录账号，如需更换请联系客服">
       <input class="ml-input" :value="member?.mobile ?? ''" disabled />
+    </MlField>
+
+    <MlField
+      label="公司名称"
+      hint="选填"
+    >
+      <input
+        id="profileCompany"
+        v-model.trim="form.company"
+        class="ml-input"
+        maxlength="64"
+        placeholder="选填"
+      >
     </MlField>
 
     <MlField label="邮箱" hint="可留空">

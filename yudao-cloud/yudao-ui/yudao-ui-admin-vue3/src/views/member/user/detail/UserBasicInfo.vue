@@ -27,6 +27,12 @@
             </template>
             {{ user.mobile }}
           </el-descriptions-item>
+          <el-descriptions-item label="公司名称">
+            <template #label>
+              <descriptions-item-label icon="ep:office-building" label="公司名称" />
+            </template>
+            {{ user.company || '—' }}
+          </el-descriptions-item>
           <el-descriptions-item>
             <template #label>
               <descriptions-item-label icon="ep:message" label="邮箱" />

@@ -25,6 +25,10 @@ export interface MemberUser {
   nickname: string
   mobile: string
   avatar?: string
+  /**
+   * 公司名称。**选填**，可能是 null —— 微信扫码登录首次补全时采集，之后可在个人资料里改（Q24）
+   */
+  company?: string
   email?: string
   /** 性别：`0 未知 / 1 男 / 2 女`（后端共享枚举 `SexEnum`；该字段**没有**枚举校验） */
   sex?: number
@@ -50,6 +54,8 @@ export interface ProfileUpdateReq {
   nickname?: string
   /** 头像 URL（后端带 `@URL` 校验，必须先经上传拿到 URL） */
   avatar?: string
+  /** 公司名称（后端 ≤64 校验）；**清空要发空串**，省略是清不掉的 */
+  company?: string
   /** 邮箱（后端带 `@Email` + `≤50` 校验） */
   email?: string
   sex?: number

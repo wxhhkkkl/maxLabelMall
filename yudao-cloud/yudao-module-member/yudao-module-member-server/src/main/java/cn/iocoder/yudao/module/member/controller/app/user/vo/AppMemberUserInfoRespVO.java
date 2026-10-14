@@ -20,6 +20,12 @@ public class AppMemberUserInfoRespVO {
     @Schema(description = "用户头像", requiredMode = Schema.RequiredMode.REQUIRED, example = "https://www.iocoder.cn/xxx.png")
     private String avatar;
 
+    /**
+     * 公司名称。**选填**，可能是 null —— 它在「个人资料」里可看可改（Q24）
+     */
+    @Schema(description = "公司名称", example = "某某印刷厂")
+    private String company;
+
     @Schema(description = "用户手机号", requiredMode = Schema.RequiredMode.REQUIRED, example = "15601691300")
     private String mobile;
 

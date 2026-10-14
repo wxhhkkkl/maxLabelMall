@@ -96,7 +96,7 @@ function whenBridgeReady(cb: () => void): void {
   document.addEventListener('WeixinJSBridgeReady', () => cb(), { once: true })
 }
 
-export interface WxPayHooks {
+export interface WxBridgeHooks {
   bridge?: WxBridge
   whenReady?: WxBridgeReady
 }
@@ -104,7 +104,7 @@ export interface WxPayHooks {
 /**
  * 唤起微信收银台。返回的是**收银台上的操作结果**，不是订单是否已支付。
  */
-export function invokeWxPay(p: WxJsapiParams, hooks: WxPayHooks = {}): Promise<WxPayOutcome> {
+export function invokeWxPay(p: WxJsapiParams, hooks: WxBridgeHooks = {}): Promise<WxPayOutcome> {
   return new Promise((resolve, reject) => {
     const ready = hooks.whenReady ?? whenBridgeReady
     ready(() => {
@@ -141,6 +141,39 @@ export function invokeWxPay(p: WxJsapiParams, hooks: WxPayHooks = {}): Promise<W
  */
 export function redirectTo(url: string): void {
   window.location.href = url
+}
+
+/**
+ * 关掉微信内置浏览器的**当前网页**。调用点是扫码登录的授权回跳页 ——
+ * 客户在手机上确认完，这一页就该自己退掉，不必再点左上角回微信。
+ *
+ * ⚠️ 与 {@link invokeWxPay} 不同，这里拿不到 bridge 时**返回 false 而不是抛**：
+ * 关不掉不是客户要处理的故障，页面上那句「回到电脑上继续」就是兜底；
+ * 抛出去只会在控制台留一条没人看的 rejection。
+ *
+ * ⚠️ `closeWindow` 不是微信文档化的 bridge 方法（文档化的是 JSSDK 的 `wx.closeWindow`，
+ * 那要先 `config()` 签名 + 后台配 JS 安全域名），**个别微信版本会忽略它** ——
+ * 所以返回值只是「已发起」，不等于「真的关上了」，真机行为得两端各验一次。
+ */
+export function closeWeixinWindow(hooks: WxBridgeHooks = {}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ready = hooks.whenReady ?? whenBridgeReady
+    ready(() => {
+      const bridge = hooks.bridge ?? globalBridge()
+      if (!bridge) {
+        resolve(false)
+        return
+      }
+      try {
+        // 回调基本不会触发（页面自己就没了），留着只为符合 bridge 的签名
+        bridge.invoke('closeWindow', {}, () => {})
+      } catch {
+        resolve(false)
+        return
+      }
+      resolve(true)
+    })
+  })
 }
 
 // ========== 待续跑标记 ==========

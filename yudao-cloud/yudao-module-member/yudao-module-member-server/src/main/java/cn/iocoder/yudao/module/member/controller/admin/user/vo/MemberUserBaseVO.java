@@ -44,6 +44,13 @@ public class MemberUserBaseVO {
     @Schema(description = "用户昵称", example = "李四")
     private String name;
 
+    /**
+     * 公司名称。**选填**，可能是 null —— 客户在微信扫码登录的补全页填的，之后自己也能改（Q24）
+     */
+    @Schema(description = "公司名称", example = "某某印刷厂")
+    @Size(max = 64, message = "公司名称长度不能超过 64 个字符")
+    private String company;
+
     @Schema(description = "用户性别", example = "1")
     private Integer sex;
 

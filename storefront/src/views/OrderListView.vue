@@ -9,8 +9,9 @@ import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
-import type { OrderPageItem } from '@/types'
+import type { InvoiceStatusValue, OrderPageItem } from '@/types'
 import { OrderStatus } from '@/types'
+import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan } from '@/utils/money'
 import { canCommentOrder, orderStatusFilters } from '@/utils/orderStatus'
 import { formatDateTime } from '@/utils/time'
@@ -157,6 +158,8 @@ onMounted(load)
           <div class="oc-head">
             <span class="oc-no">订单号 {{ o.no }}</span>
             <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
+            <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null） -->
+            <span v-if="o.invoiceStatus != null" class="oc-invoice">发票·{{ invoiceStatusName(o.invoiceStatus as InvoiceStatusValue) }}</span>
             <MlPill :status="o.status" />
           </div>
 
@@ -281,6 +284,12 @@ onMounted(load)
   font-size: 13px;
   color: var(--ml-text-ph);
   flex: 1;
+}
+/* 开票状态（006 / FR-178）：比订单状态淡一档，它是次要信息 */
+.oc-invoice {
+  font-size: 12px;
+  color: var(--ml-text-sub);
+  white-space: nowrap;
 }
 .oc-item {
   display: grid;

@@ -81,6 +81,7 @@ const router = createRouter({
         },
         { path: 'account', name: 'account', meta: { requiresAuth: true }, component: () => import('@/views/AccountView.vue') },
         { path: 'account/address', name: 'address', meta: { requiresAuth: true }, component: () => import('@/views/AddressView.vue') },
+        { path: 'account/invoice', name: 'account-invoice', meta: { requiresAuth: true }, component: () => import('@/views/InvoiceTitleView.vue') },
         {
           path: 'account/after-sale',
           name: 'after-sale',

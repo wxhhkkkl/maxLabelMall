@@ -52,6 +52,7 @@ const NEW_PAGE_VIEWS = [
   'OrderDetailView',
   'AccountView',
   'AddressView',
+  'InvoiceTitleView',
   'CouponCenterView',
   'MyCouponView',
   'AgreementView',
@@ -76,7 +77,7 @@ const NEW_PAGE_VIEWS = [
  * ⚠️ 组件**只适用前两条**（色板、断点）。第三条「不得自带顶栏页脚」是**页面级**约定，
  * 组件天然不涉及（它本来就被渲染在别人的布局里）。
  */
-const NEW_COMPONENTS = ['ProductFilterBar']
+const NEW_COMPONENTS = ['ProductFilterBar', 'InvoiceFieldsForm', 'CheckoutInvoiceCard']
 
 const VIEWS_DIR = join(process.cwd(), 'src', 'views')
 const COMPONENTS_DIR = join(process.cwd(), 'src', 'components')

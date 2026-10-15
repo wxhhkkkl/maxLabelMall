@@ -66,10 +66,11 @@ const ALL_PATHS = [
   '/contact',
   '/jobs',
   '/wechat/callback',
+  '/account/invoice',
 ]
 
 describe('路由表', () => {
-  it('声明了 30 条路径（含个人中心新增页、支持详情页、行业详情、商品评价页与微信回跳页）', () => {
+  it('声明了 31 条路径（含个人中心新增页、支持详情页、行业详情、商品评价页与微信回跳页）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -86,7 +87,8 @@ describe('路由表', () => {
     //             两条并行的线，合并时一起算，别把任一边的计数覆盖掉。
     // 2026-10-14：微信扫码登录追加 /wechat/callback（29 → 30）—— 那是**微信授权的回跳页**，
     //             跑在手机上、由微信把浏览器跳过去，不标 requiresAuth（那时还没有登录态）。
-    expect(paths).toHaveLength(30)
+    // 2026-10-15：订单开票追加 /account/invoice（个人中心 · 发票抬头）（30 → 31）
+    expect(paths).toHaveLength(31)
     expect(paths).toContain('/')
   })
 

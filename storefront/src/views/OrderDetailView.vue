@@ -8,6 +8,7 @@ import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/s
 import AccountSidebar from '@/components/AccountSidebar.vue'
 import CommentCreateDialog from '@/components/CommentCreateDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import InvoiceApplyDialog from '@/components/InvoiceApplyDialog.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
 import MlModal from '@/components/base/MlModal.vue'
@@ -15,9 +16,10 @@ import MlPill from '@/components/base/MlPill.vue'
 import QrPayDialog from '@/components/QrPayDialog.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
 import type { OrderDetail } from '@/types'
-import { OrderStatus, PayOrderStatus } from '@/types'
+import { InvoiceStatus, OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
+import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan, reconcile } from '@/utils/money'
 import { canCommentItem, orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
@@ -129,6 +131,43 @@ const selectedChannel = ref('')
 
 const statusText = computed(() => (order.value ? orderStatusText(order.value.status) : ''))
 const isUnpaid = computed(() => order.value?.status === OrderStatus.UNPAID)
+
+/**
+ * 补开票弹层（US20 / FR-163）。
+ *
+ * 入口条件：**已支付 + 未取消 + 尚无申请** —— 三条缺一不可，
+ * 与后端 `createInvoiceByMember` 的校验一一对应（后端仍是权威，这里只是不显示"点了必被拒"的按钮）。
+ */
+const invoiceApplyOpen = ref(false)
+const canApplyInvoice = computed(() => {
+  const o = order.value
+  if (!o || o.invoice) return false
+  // 与后端 `createInvoiceByMember` 的四条校验一一对应（后端仍是权威，这里只是不显示"点了必被拒"的按钮）：
+  // 未支付 / 已取消 / 实付 0 元，三种情况都不给入口
+  return o.status !== OrderStatus.UNPAID
+    && o.status !== OrderStatus.CANCELED
+    && o.payPrice > 0
+})
+
+/** 补开成功：**重新拉一次详情**，而不是本地把状态改掉 —— 状态一律以后端为准（FR-039） */
+async function onInvoiceApplied() {
+  await load()
+}
+
+/** 发票状态的说明文案（FR-176：每种状态都要如实说清现在能做什么） */
+const invoiceStatusHint = computed(() => {
+  const o = order.value
+  const status = o?.invoice?.status
+  if (status === InvoiceStatus.WAITING) {
+    // 申请已提交但订单还没付款 —— 这时说"开具中"是骗人的（后台不会给未支付的订单开票）
+    return o?.status === OrderStatus.UNPAID
+      ? '订单付款后开具，开出后可在这里下载。'
+      : '发票正在开具中，开出后可在这里下载。'
+  }
+  if (status === InvoiceStatus.ISSUED) return '发票已开出。'
+  if (status === InvoiceStatus.CANCELED) return '订单已退款或取消，该开票申请已作废。'
+  return ''
+})
 /**
  * 全额抵扣（`payPrice === 0`）的订单后端**不创建支付单**，`payOrderId` 为 null ——
  * 此时没有任何 id 可以提交支付，所以不给支付入口（FR-037）。
@@ -588,6 +627,47 @@ onMounted(async () => {
           </button>
         </div>
 
+        <!--
+          发票（006）。四态见 FR-176：未支付 / 已取消且没申请 → 整块不渲染；
+          已支付未申请 → 给申请入口；待开票 → 只显示状态、**不给下载入口**；已开票 → 信息 + 下载。
+        -->
+        <div v-if="order.invoice" class="ml-card invoice-card">
+          <div class="ml-card-title">发票</div>
+          <p class="od-text">状态：{{ invoiceStatusName(order.invoice.status) }}</p>
+          <!--
+            ⚠️ **已作废（订单退款 / 取消）时不再展示任何发票内容**（2026-10-15 所有者口径：
+            退款了票就要撤回）—— 只说明状态，抬头 / 金额 / 税号一律不露面。
+          -->
+          <template v-if="order.invoice.status !== InvoiceStatus.CANCELED">
+            <p class="od-text">类型：{{ order.invoice.typeName }}</p>
+            <p class="od-text">抬头：{{ order.invoice.titleName }}</p>
+            <p class="od-text">金额：{{ formatYuan(order.invoice.amount) }}</p>
+          </template>
+          <p class="ml-hint">{{ invoiceStatusHint }}</p>
+          <!--
+            已开票才有下载入口。**入口旁常驻求助路径**（R10 的缓解措施）——
+            那个文件域没有 CORS 头，前端读不到请求结果，所以"当场告知文件失效"做不到，
+            只能保证"不静默、有地方问"。别把这行当成冗余删掉。
+          -->
+          <template v-if="order.invoice.status === InvoiceStatus.ISSUED && order.invoice.fileUrl">
+            <a
+              id="downloadInvoice"
+              class="btn-cart"
+              :href="order.invoice.fileUrl"
+              target="_blank"
+              rel="noopener"
+            >下载发票</a>
+            <p class="ml-hint">
+              文件打不开？可能是已失效，请<RouterLink to="/support/contact">联系我们</RouterLink>或致电 010-88613986。
+            </p>
+          </template>
+        </div>
+        <div v-else-if="canApplyInvoice" class="ml-card">
+          <div class="ml-card-title">发票</div>
+          <p class="od-text">这笔订单还没有申请开票。需要发票可以现在提交，开出后在这里下载。</p>
+          <button id="applyInvoice" class="btn-cart" type="button" @click="invoiceApplyOpen = true">申请开票</button>
+        </div>
+
         <!-- 收货信息 -->
         <div class="ml-card">
           <div class="ml-card-title">收货信息</div>
@@ -702,6 +782,9 @@ onMounted(async () => {
       </template>
     </div>
   </div>
+
+  <!-- 补开票弹层（US20）：`v-if` 兜住订单未加载时的渲染 -->
+  <InvoiceApplyDialog v-if="order" :open="invoiceApplyOpen" :order-id="order.id" @close="invoiceApplyOpen = false" @submitted="onInvoiceApplied" />
 
   <MlModal :open="cancelOpen" title="取消订单" @close="cancelOpen = false">
     <p class="ml-hint">

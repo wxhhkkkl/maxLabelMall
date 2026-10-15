@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { listAddress } from '@/api/address'
 import { listCart } from '@/api/cart'
 import { createOrder, settlement, type TradeOrderInput } from '@/api/order'
+import CheckoutInvoiceCard from '@/components/CheckoutInvoiceCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
@@ -14,7 +15,9 @@ import AddressFormDialog from '@/components/AddressFormDialog.vue'
 import { useToasts } from '@/components/base/useToasts'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
-import type { Address, CartItem, SettlementCoupon, SettlementResp } from '@/types'
+import type { Address, CartItem, InvoiceApplyForm, SettlementCoupon, SettlementResp } from '@/types'
+import { InvoiceType } from '@/types'
+import { invoiceFieldError } from '@/utils/invoice'
 import { reconcile } from '@/utils/money'
 
 /**
@@ -63,6 +66,22 @@ const submitting = ref(false)
 const submitError = ref('')
 /** 价格变动待确认：置为 true 后按钮变为「确认并提交」 */
 const priceChangePending = ref(false)
+
+/**
+ * 发票（006 / US19）。默认**不开票** —— 不勾选时下单请求里没有 `invoice` 字段。
+ *
+ * ⚠️ 抬头是**下单那一刻的快照**（FR-158），所以提交后改抬头簿不会影响这笔订单；
+ * 客户要复用，得在自己的抬头簿里存一条（US23）。
+ */
+const invoiceEnabled = ref(false)
+const invoiceForm = ref<InvoiceApplyForm>({
+  type: InvoiceType.NORMAL,
+  titleName: '',
+  taxNo: '',
+  titleAddress: '',
+  titlePhone: '',
+  bankName: '',
+})
 
 const price = computed(() => data.value?.price ?? null)
 const amountConsistent = computed(() => (price.value ? reconcile(price.value) : true))
@@ -153,10 +172,24 @@ async function onSubmit() {
     return
   }
 
+  // 开票必填项：与卡片上的实时提示**同一个纯函数**（utils/invoice.ts），两处不会各说各话（FR-156）
+  if (invoiceEnabled.value) {
+    const invoiceError = invoiceFieldError(invoiceForm.value, invoiceForm.value.type)
+    if (invoiceError) {
+      submitError.value = invoiceError
+      return
+    }
+  }
+
   submitting.value = true
   submitError.value = ''
   try {
-    const res = await createOrder(buildInput())
+    // 开票信息只在**下单**时带上（结算不需要它）。不勾选时是 `undefined` ——
+    // **不是 `null` / 空对象**：后端把"有对象"当成"要开票"（FR-159 / contracts §3.1）
+    const res = await createOrder({
+      ...buildInput(),
+      invoice: invoiceEnabled.value ? { ...invoiceForm.value } : undefined,
+    })
 
     // 下单成功后同步角标（FR-031 / FR-019）。已结算条目的**删除由后端完成**，
     // 前端不再删一次 —— 见 store/cart.ts 的 onOrderPlaced。
@@ -295,6 +328,16 @@ watch(
             <span class="arrow">›</span>
           </button>
         </div>
+
+        <!--
+          发票（006 / FR-153）。**实付 0 元时整块不渲染** —— 全额券抵扣的订单没有可开票金额
+          （spec 的 Edge Case）。金额判断放在这里而不是卡片里：卡片不该自己去算钱。
+        -->
+        <CheckoutInvoiceCard
+          v-if="(price?.payPrice ?? 0) > 0"
+          v-model:enabled="invoiceEnabled"
+          v-model:form="invoiceForm"
+        />
       </div>
 
       <!-- 金额明细：逐行可核对 -->

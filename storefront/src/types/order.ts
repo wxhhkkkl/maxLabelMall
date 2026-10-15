@@ -1,5 +1,6 @@
 import type { Address } from './address'
 import type { SettlementCoupon } from './coupon'
+import type { InvoiceApplyForm, OrderInvoice } from './invoice'
 
 /**
  * 订单状态 —— 与后端 TradeOrderStatusEnum **一一对应，不得归并或自定义命名**（FR-041a）。
@@ -77,6 +78,11 @@ export interface OrderPageItem {
    */
   commentStatus?: boolean
   /**
+   * 开票状态（006 / FR-178）：**没申请开票时为 `null`** —— 列表上什么都不显示。
+   * 取值同订单详情：0 待开票 / 10 已开票 / 20 已作废。
+   */
+  invoiceStatus?: number | null
+  /**
    * 订单项。**名称 / 规格 / 单价 / 数量都是下单时的快照** —— 商品后续改名、
    * 换规格、调价都不应让历史订单跟着变。
    */
@@ -138,6 +144,11 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
   couponPrice: number
   pointPrice: number
   vipPrice: number
+  /**
+   * 开票信息（006）。**没申请开票时为 `null`**（不是空对象）——
+   * 订单详情的发票区块四态靠它区分（FR-176）。
+   */
+  invoice?: OrderInvoice | null
 }
 
 /**
@@ -152,6 +163,16 @@ export interface OrderCreateReq {
   /** 本期固定按快递（FR-027a） */
   deliveryType?: number
   remark?: string
+  /**
+   * 开票信息（006 / FR-153~156）。**不传 = 不开票**。
+   *
+   * ⚠️ MUST 用 `undefined` 而不是 `null` / 空对象：后端把"有对象"当成"要开票"，
+   * 空对象会落一条字段全空的申请（并被校验拒掉，报的是"缺哪一项"）。
+   *
+   * ⚠️ 它与订单**同一事务**落库（Q32）：缺项 / 税号非法会**拒绝整单**，
+   * 客户改完再提交（这与"开票失败不该挡下单"不冲突 —— 那是输入错误，不是系统故障）。
+   */
+  invoice?: InvoiceApplyForm
 }
 
 /** 下单响应。**payPrice 为 0 的订单 `payOrderId` 是 null**，前端必须处理。 */

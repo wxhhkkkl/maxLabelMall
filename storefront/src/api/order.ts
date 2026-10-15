@@ -98,6 +98,9 @@ export function createOrder(req: TradeOrderInput): Promise<OrderCreateResp> {
     pointStatus: req.pointStatus === true,
     deliveryType: req.deliveryType ?? DELIVERY_TYPE_EXPRESS,
     remark: req.remark,
+    // 开票信息（006）：**不传 = 不开票**。只在 createOrder 里带上 ——
+    // settlement 不需要它（开票不影响任何金额），它的 query 是逐字段手工拼的
+    invoice: req.invoice,
   })
 }
 

@@ -241,3 +241,26 @@ describe('OrderListView —— 去评价入口', () => {
     expect(w.find('.oc-comment').exists()).toBe(false)
   })
 })
+
+describe('OrderListView —— 开票状态（006 / FR-178）', () => {
+  it('申请了开票 → 卡片上显示状态（用词与后端枚举一致）', async () => {
+    const w = await mountList([
+      order(1, { invoiceStatus: 0 }),
+      order(2, { invoiceStatus: 10 }),
+      order(3, { invoiceStatus: 20 }),
+    ])
+
+    expect(w.text()).toContain('发票·待开票')
+    expect(w.text()).toContain('发票·已开票')
+    expect(w.text()).toContain('发票·已作废')
+  })
+
+  it('**没申请开票（null / 缺字段）→ 什么都不显示**，不是"未申请"三个字', async () => {
+    const w = await mountList([order(1, { invoiceStatus: null }), order(2)])
+
+    // ⚠️ 只断言**卡片头部**：个人中心侧栏本身就有「发票抬头」这个入口，
+    //    对整个页面断言 not.toContain('发票') 会永远失败
+    expect(w.findAll('.oc-head').map(h => h.text()).join(' ')).not.toContain('发票')
+    expect(w.findAll('.oc-invoice')).toHaveLength(0)
+  })
+})

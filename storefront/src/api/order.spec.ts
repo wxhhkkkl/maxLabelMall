@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { InvoiceApplyForm } from '@/types/invoice'
+
 const get = vi.fn()
 const post = vi.fn()
 const del = vi.fn()
@@ -129,6 +131,24 @@ describe('下单', () => {
     const body = post.mock.calls[0]?.[1] as Record<string, unknown>
     expect(body.pointStatus).toBe(false)
     expect(body.addressId).toBe(7)
+  })
+
+  it('带开票信息时原样透传（不做任何加工，票据由后端校验）', async () => {
+    post.mockResolvedValue({ id: 1, payOrderId: 2 })
+    const invoice: InvoiceApplyForm = { type: 2, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' }
+    await createOrder({ items: [{ skuId: 11, count: 1 }], addressId: 7, invoice })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.invoice).toEqual(invoice)
+  })
+
+  it('**不开票时 `invoice` 是 undefined，JSON 序列化后不出现在请求体里**（FR-159）', async () => {
+    // 这条钉的是"默认行为与改动前逐字一致"：多一个 `"invoice":null` 都是语义漂移
+    // （后端会把 null 当成"没传"吗？——不赌这个，干脆不上线）
+    post.mockResolvedValue({ id: 1, payOrderId: 2 })
+    await createOrder({ items: [{ skuId: 11, count: 1 }] })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.invoice).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('invoice')
   })
 
   it('下单响应里的 payOrderId 可能是 null（全额券抵扣的订单没有支付单）', async () => {

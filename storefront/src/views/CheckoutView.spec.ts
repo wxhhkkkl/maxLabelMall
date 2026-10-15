@@ -456,3 +456,67 @@ describe('CheckoutView —— 价格变动需用户确认（FR-030）', () => {
     expect(router.currentRoute.value.path).toBe('/checkout')
   })
 })
+
+describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR-159）', () => {
+  /** 最后一次下单请求的**入参**（`createOrder` 被 mock 掉了，看到的是页面交给 api 层的东西） */
+  const lastInput = () => createOrder.mock.calls.at(-1)?.[0] as Record<string, unknown>
+  const invoiceBox = (w: Awaited<ReturnType<typeof mountCheckout>>) =>
+    w.get('.invoice-card input[type="checkbox"]')
+
+  async function submit(w: Awaited<ReturnType<typeof mountCheckout>>) {
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+  }
+
+  it('默认不开票：请求里没有 invoice（不是 null、也不是空对象）', async () => {
+    const w = await mountCheckout()
+    await submit(w)
+
+    expect(createOrder).toHaveBeenCalled()
+    expect(lastInput().invoice).toBeUndefined()
+  })
+
+  it('勾选并填好抬头后，invoice **逐字段**进请求体', async () => {
+    // 本项目吃过"表单填了但没提交出去"的亏（只断言 UI、不断言请求体）——这条专门钉它
+    const w = await mountCheckout()
+    await invoiceBox(w).setValue(true)
+    await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await submit(w)
+
+    expect(lastInput().invoice).toEqual({
+      type: 1,
+      titleName: '南京路桥机械有限公司',
+      taxNo: '',
+      titleAddress: '',
+      titlePhone: '',
+      bankName: '',
+    })
+  })
+
+  it('勾了开票但抬头没填全 → **不提交**，并指明缺哪一项（FR-156）', async () => {
+    const w = await mountCheckout()
+    await invoiceBox(w).setValue(true)
+    await submit(w)
+
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(w.text()).toContain('请填写抬头名称')
+  })
+
+  it('实付 0 元的订单：整张发票卡片不渲染（全额券抵扣没有可开票金额）', async () => {
+    const w = await mountCheckout(
+      settlementResp({
+        price: {
+          totalPrice: 10000,
+          discountPrice: 0,
+          deliveryPrice: 0,
+          couponPrice: 10000,
+          pointPrice: 0,
+          vipPrice: 0,
+          payPrice: 0,
+        },
+      }),
+    )
+
+    expect(w.find('.invoice-card').exists()).toBe(false)
+  })
+})

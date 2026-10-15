@@ -79,7 +79,7 @@ description: "Task list for 订单开票（下单申请 · 后台开具上传 ·
 ### 测试（先写、先失败）
 
 - [x] T378 [US19] 服务端 `InvoiceValidatorTest`（`trade-server/src/test/java/.../service/invoice/`）：
-      **票种字段矩阵** —— 普票只填名称**必须通过**、专票只填名称**必须被拒**、专票五项全填通过；
+      **必填矩阵**（**Q37**）—— 名称+税号**必须通过**、缺任一项**必须被拒**、地址/电话/开户行选填；
       税号 15/18/20 位通过、其它长度与非法字符被拒；trim 后为空视为未填（FR-155 / Q/data-model §4）
 - [x] T379 [US19] 服务端 `trade-server/src/test/java/cn/iocoder/yudao/module/trade/service/invoice/TradeOrderInvoiceServiceImplTest.java`：
       下单创建申请（1:1）；**同一订单第二次创建被拒**（FR-160，唯一索引 + 服务层判断）；

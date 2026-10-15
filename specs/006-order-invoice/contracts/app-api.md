@@ -29,7 +29,8 @@ C 端（`storefront`）本期新增与改动的接口。所有路径以 `/app-ap
 
 ```jsonc
 // 请求（`titleName` 必填，其余选填 —— 抬头可以不完整，缺项在选专票时才被拒，见 data-model §4）
-// `type` 必填（1 普票 / 2 专票，Q36）；普票抬头只要名称，专票抬头五项全填
+// `type` 必填（1 普票 / 2 专票，Q36）；**必填只有「抬头名称 + 税号」两项**（Q37），
+// 地址 / 电话 / 开户行及账号选填（普票的界面不显示那三栏）
 { "type": 1, "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…", "defaultStatus": false }
 // 响应：新抬头的 id
 { "code": 0, "data": 4, "msg": "" }

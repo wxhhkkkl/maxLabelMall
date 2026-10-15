@@ -114,6 +114,7 @@ const router = createRouter({
         { path: 'templates', name: 'templates', component: () => import('@/views/TemplateCenterView.vue') },
         { path: 'changelog', name: 'changelog', component: () => import('@/views/ChangelogView.vue') },
         { path: 'about', name: 'about', component: () => import('@/views/AboutView.vue') },
+        { path: 'after-sales-policy', name: 'after-sales-policy', component: () => import('@/views/AfterSalesPolicyView.vue') },
         { path: 'news', name: 'news', component: () => import('@/views/NewsView.vue') },
         { path: 'contact', name: 'contact', component: () => import('@/views/ContactView.vue') },
         {

@@ -22,21 +22,24 @@ import '@/styles/mall.css'
 // 分类、搜索、排序及分页均由后端处理；展示方式只改变当前商品的布局。
 
 const PAGE_SIZE = 12
+const route = useRoute()
+const router = useRouter()
+const initialCategoryId = Number(route.query.category)
 
 const products = ref<ProductSpu[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const keyword = ref('')
 const searchInput = ref('')
-const categoryId = ref<number | undefined>(undefined)
+const categoryId = ref<number | undefined>(Number.isSafeInteger(initialCategoryId) && initialCategoryId > 0 ? initialCategoryId : undefined)
 const sortKey = ref<'default' | 'sales' | 'priceAsc' | 'priceDesc'>('default')
 const viewMode = ref<'grid' | 'list'>('grid')
 const categoriesOpen = ref(false)
 const categoryError = ref(false)
-const route = useRoute()
-const router = useRouter()
-const browsingAll = ref(false)
-const showDepartments = computed(() => !loading.value && !error.value && !browsingAll.value && categoryId.value === undefined && !keyword.value && sortKey.value === 'default' && viewMode.value === 'grid' && !filterValueIds.value.length && tree.value.length > 0)
+const browsingAll = ref(route.query.view === 'all')
+const categoriesLoading = ref(true)
+// 页面布局由选购状态决定，不能随商品请求的 loading/error 来回切换。
+const showDepartments = computed(() => !categoryError.value && !browsingAll.value && categoryId.value === undefined && !keyword.value && sortKey.value === 'default' && viewMode.value === 'grid' && !filterValueIds.value.length)
 const selectedCategory = computed(() => flatCategories.value.find(c => c.id === categoryId.value))
 const categoryName = (id: number) => flatCategories.value.find(c => c.id === id)?.name ?? ''
 const tree = ref<CategoryNode[]>([])
@@ -158,7 +161,10 @@ async function refreshCategory(id?: number) {
   ++loadSeq // 分类刚切换就让旧商品请求失效，不等新的维度请求结束。
   loading.value = true
   error.value = false
-  if (await loadFilterDimensions(id)) await load()
+  if (await loadFilterDimensions(id)) {
+    if (showDepartments.value) loading.value = false
+    else await load()
+  }
 }
 
 /**
@@ -216,6 +222,7 @@ function browseAllProducts() {
 }
 
 async function loadCategories() {
+  categoriesLoading.value = true
   categoryError.value = false
   // 分类请求也要在同一处兜错：失败时给出可重试提示，而不是抛出未处理的拒绝
   try {
@@ -224,6 +231,8 @@ async function loadCategories() {
     tree.value = buildCategoryTree(cats)
   } catch {
     categoryError.value = true
+  } finally {
+    categoriesLoading.value = false
   }
 }
 
@@ -245,7 +254,8 @@ onMounted(async () => {
   if (Number.isSafeInteger(queryId) && queryId > 0) categoryId.value = queryId
   await loadCategories()
   await loadFilterDimensions(categoryId.value)
-  await load()
+  if (showDepartments.value) loading.value = false
+  else await load()
 })
 watch([() => route.query.category, () => route.query.view], ([value, view]) => {
   const id = Number(value)
@@ -314,8 +324,14 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
       </form>
     </div>
 
+    <LoadingState
+      v-if="showDepartments && categoriesLoading"
+      class="mall-container mall-home-loading"
+      variant="grid"
+      :count="4"
+    />
     <MallHome
-      v-if="showDepartments"
+      v-else-if="showDepartments"
       :categories="tree"
       :banners="banners"
       @select="onPickCategory"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import type { Banner, CategoryNode } from '@/types'
 import MallBanner from './MallBanner.vue'
 import MallDepartments from './MallDepartments.vue'
@@ -8,28 +8,22 @@ import '@/styles/mall-home.css'
 
 const props = defineProps<{ categories: CategoryNode[]; banners: Banner[] }>()
 const emit = defineEmits<{ select: [id?: number] }>()
-const steps = [{ title: '选购商品', icon: 'cart' }, { title: '确认订单', icon: 'order' }, { title: '完成支付', icon: 'payment' }, { title: '等待收货', icon: 'truck' }]
-
-/**
- * 二级分类浮层：悬停（或键盘聚焦）一级分类时在目录右侧展开。
- *
- * 浮层**不能放在 `nav` 里** —— 目录是 `overflow-y: auto` 的，放进去会被裁掉；
- * 它与目录同级，挂在外层的 `-wrap` 上（那里是相对定位的锚点）。
- * `top` 需要跟着悬停的那一行走，而目录的行高是均分出来的，CSS 里算不出，只能用
- * 按钮的 `offsetTop` 减去目录自身的滚动量。
- */
-const navEl = ref<HTMLElement | null>(null)
-const activeId = ref<number | null>(null)
-const activeTop = ref(0)
-const activeCategory = computed(() => props.categories.find(c => c.id === activeId.value && c.children.length) ?? null)
-function hoverCategory(category: CategoryNode, event: Event) {
-  if (!category.children.length) {
-    activeId.value = null
-    return
-  }
-  activeId.value = category.id
-  activeTop.value = (event.currentTarget as HTMLElement).offsetTop - (navEl.value?.scrollTop ?? 0)
+const openCategoryId = ref<number>()
+const openCategory = computed(() => props.categories.find(category => category.id === openCategoryId.value && category.children?.length))
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+function cancelClose() { clearTimeout(closeTimer) }
+function showCategory(category: CategoryNode) {
+  cancelClose()
+  openCategoryId.value = category.children?.length ? category.id : undefined
 }
+function closeCategory() { cancelClose(); openCategoryId.value = undefined }
+function scheduleClose() { cancelClose(); closeTimer = setTimeout(closeCategory, 300) }
+function pickCategory(id?: number) { closeCategory(); emit('select', id) }
+function closeOnFocusOut(event: FocusEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) closeCategory()
+}
+onBeforeUnmount(cancelClose)
+const steps = [{ title: '选购商品', icon: 'cart' }, { title: '确认订单', icon: 'order' }, { title: '完成支付', icon: 'payment' }, { title: '等待收货', icon: 'truck' }]
 function categoryIcon(name: string) {
   if (/RFID/i.test(name)) return 'rfid'
   if (/A4|平张/.test(name)) return 'sheet'
@@ -43,33 +37,39 @@ function categoryIcon(name: string) {
 
 <template>
   <div class="mall-container mall-home">
-    <div class="mall-home-hero">
-      <div
-        class="mall-home-directory-wrap"
-        @mouseleave="activeId = null"
+    <div
+      class="mall-home-hero"
+      @focusout="closeOnFocusOut"
+      @keydown.esc.stop.prevent="closeCategory"
+    >
+      <nav
+        class="mall-home-directory"
+        aria-label="商品分类"
+        :style="{ '--category-count': categories.length }"
+        @mouseleave="scheduleClose"
       >
-        <nav
-          ref="navEl"
-          class="mall-home-directory"
-          aria-label="商品分类"
-          :style="{ '--category-count': categories.length }"
+        <button
+          class="cat-all mall-home-all"
+          type="button"
+          @click="emit('select')"
+          @mouseenter="closeCategory"
+          @focus="closeCategory"
+        >
+          <MallIcon name="menu" /> 全部商品分类
+        </button>
+        <div
+          v-for="category in categories"
+          :key="category.id"
+          class="mall-directory-item"
+          @mouseenter="showCategory(category)"
         >
           <button
-            class="cat-all mall-home-all"
             type="button"
-            @mouseenter="activeId = null"
-            @click="emit('select')"
-          >
-            <MallIcon name="menu" /> 全部商品分类
-          </button>
-          <button
-            v-for="category in categories"
-            :key="category.id"
-            type="button"
-            :class="{ 'is-active': activeId === category.id }"
-            @mouseenter="hoverCategory(category, $event)"
-            @focus="hoverCategory(category, $event)"
-            @click="emit('select', category.id)"
+            :class="{ 'is-open': openCategoryId === category.id }"
+            :aria-expanded="category.children?.length ? openCategoryId === category.id : undefined"
+            :aria-controls="category.children?.length ? 'mall-category-flyout' : undefined"
+            @focus="showCategory(category)"
+            @click="pickCategory(category.id)"
           >
             <MallIcon
               class="mall-directory-icon"
@@ -80,27 +80,29 @@ function categoryIcon(name: string) {
               name="chevron"
             />
           </button>
-        </nav>
-        <div
-          v-if="activeCategory"
-          class="mall-home-submenu"
-          role="group"
-          :aria-label="`${activeCategory.name}的二级分类`"
-          :style="{ top: `${activeTop}px` }"
-        >
-          <p class="mall-home-submenu-title">
-            {{ activeCategory.name }}
-          </p>
-          <div class="mall-home-submenu-list">
-            <button
-              v-for="child in activeCategory.children"
-              :key="child.id"
-              type="button"
-              @click="emit('select', child.id)"
-            >
-              {{ child.name }}
-            </button>
-          </div>
+        </div>
+      </nav>
+      <div
+        v-if="openCategory"
+        id="mall-category-flyout"
+        class="mall-category-flyout"
+        :aria-label="`${openCategory.name}二级分类`"
+        @mouseenter="cancelClose"
+        @mouseleave="scheduleClose"
+        @focusin="cancelClose"
+      >
+        <div class="mall-category-flyout-heading">
+          <MallIcon :name="categoryIcon(openCategory.name)" /><h2>{{ openCategory.name }}</h2><span>按分类选购</span>
+        </div>
+        <div class="mall-category-flyout-links">
+          <button
+            v-for="child in openCategory.children"
+            :key="child.id"
+            type="button"
+            @click="pickCategory(child.id)"
+          >
+            {{ child.name }}<MallIcon name="chevron" />
+          </button>
         </div>
       </div>
       <div class="mall-home-banner-area">

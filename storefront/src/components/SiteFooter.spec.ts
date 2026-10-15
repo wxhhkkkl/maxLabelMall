@@ -41,6 +41,8 @@ describe('SiteFooter destination maintenance', () => {
     expect(links.get('驱动安装指南')).toBe('/support/driver-install')
     expect(links.get('用户协议')).toBe('/agreement/user')
     expect(links.get('隐私政策')).toBe('/agreement/privacy')
+    expect(links.get('售后政策')).toBe('/after-sales-policy')
+    expect(links.has('个人中心')).toBe(false)
     expect(w.text()).toContain(supportContact.phone)
     expect(w.text()).toContain(supportContact.wechat)
     expect(w.text()).not.toMatch(/软件订阅|客服热线待填写|XXXXXXXX|增值电信业务经营许可证/)

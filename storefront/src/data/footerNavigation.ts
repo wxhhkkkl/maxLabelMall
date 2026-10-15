@@ -34,7 +34,7 @@ export const footerNavigation = [
       { label: '公司介绍', to: '/about' },
       { label: '联系我们', to: '/support/contact' },
       { label: '服务与支持', to: '/support' },
-      { label: '个人中心', to: '/account' },
+      { label: '售后政策', to: '/after-sales-policy' },
     ],
   },
 ] as const

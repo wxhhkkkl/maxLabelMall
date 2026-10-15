@@ -172,7 +172,7 @@ describe('ProductView —— 多规格联动（FR-006）', () => {
 
   it('数量步进器最低为 1', async () => {
     const w = await mountDetail(spu())
-    expect(w.get('.qty-num').text()).toBe('1')
+    expect((w.get('.qty-num').element as HTMLInputElement).value).toBe('1')
   })
 })
 
@@ -436,6 +436,24 @@ describe('ProductView —— 加入购物车（T080 / FR-017 / FR-018）', () =>
     expect(useToasts().items.value.map((t) => t.text).join()).toContain('已加入购物车')
   })
 
+  it('可直接输入购买数量，加购时提交输入值', async () => {
+    await login()
+    const w = await mountDetail(spu())
+    await w.get('.qty-num').setValue('7')
+    await w.get('.btn-cart').trigger('click')
+    await flushPromises()
+    expect(addToCart).toHaveBeenCalledWith(1, 7)
+  })
+
+  it('输入数量在失焦后规范为库存范围内的正整数', async () => {
+    const w = await mountDetail(spu({ skus: [sku(1, { stock: 5 })] }))
+    for (const [input, expected] of [['', '1'], ['0', '1'], ['-2', '1'], ['2.9', '2'], ['999', '5']]) {
+      await w.get('.qty-num').setValue(input)
+      await w.get('.qty-num').trigger('blur')
+      expect((w.get('.qty-num').element as HTMLInputElement).value).toBe(expected)
+    }
+  })
+
   it('数量按步进器的当前值一起提交', async () => {
     await login()
     const w = await mountDetail(spu())
@@ -476,7 +494,7 @@ describe('ProductView —— 选购信息', () => {
   it('数量不能超过当前规格库存', async () => {
     const w = await mountDetail(spu({ skus: [sku(1, { stock: 2 })] }))
     await w.get('.qty-btn.plus').trigger('click')
-    expect(w.get('.qty-num').text()).toBe('2')
+    expect((w.get('.qty-num').element as HTMLInputElement).value).toBe('2')
     expect(w.get('.qty-btn.plus').attributes('disabled')).toBeDefined()
   })
 })

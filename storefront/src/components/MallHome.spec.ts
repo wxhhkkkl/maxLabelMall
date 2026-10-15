@@ -1,59 +1,45 @@
-import { enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
-import type { CategoryNode } from '@/types'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import MallHome from './MallHome.vue'
 
 enableAutoUnmount(afterEach)
-// 品类分区自己发商品请求，与左侧目录无关 —— 桩掉（它有自己的用例）
-const global = { stubs: { MallBanner: true, MallDepartments: true, RouterLink: { template: '<a><slot /></a>' } } }
-const categories: CategoryNode[] = [{ id: 101, parentId: 0, name: '卷筒标签', picUrl: '', children: [{ id: 102, parentId: 101, name: '经济热敏', picUrl: '', children: [] }, { id: 103, parentId: 101, name: '优等热敏', picUrl: '', children: [] }] }, { id: 113, parentId: 0, name: '碳带', picUrl: '', children: [] }]
-
+afterEach(() => vi.useRealTimers())
 function mountHome() {
-  return mount(MallHome, { props: { categories, banners: [] }, global })
+  return mount(MallHome, { props: { banners: [], categories: [
+    { id: 1, parentId: 0, name: '卷筒标签', picUrl: '', children: [{ id: 2, parentId: 1, name: '热敏标签', picUrl: '', children: [] }, { id: 3, parentId: 1, name: '铜版标签', picUrl: '', children: [] }] },
+    { id: 4, parentId: 0, name: '打印机', picUrl: '', children: [] },
+  ] }, global: { stubs: { MallDepartments: true, MallBanner: true, RouterLink: { template: '<a><slot /></a>' } } } })
 }
-/** 目录里第 index 个一级分类按钮（第 0 个是「全部商品分类」，不属于 category） */
-function rootButton(w: ReturnType<typeof mountHome>, index: number) {
-  return w.findAll('.mall-home-directory > button')[index + 1]!
-}
-function submenuItems(w: ReturnType<typeof mountHome>) {
-  return w.get('.mall-home-submenu').findAll('button')
-}
-
-describe('商城首页左侧分类目录', () => {
-  it('悬停一级分类展开它的二级分类，点击二级分类进入该分类', async () => {
+describe('商城首页分类悬停', () => {
+  it('显示关联二级分类，点击传出二级分类 ID 并收起面板', async () => {
     const w = mountHome()
-    expect(w.find('.mall-home-submenu').exists()).toBe(false)
-    await rootButton(w, 0).trigger('mouseenter')
-    expect(submenuItems(w).map(b => b.text())).toEqual(['经济热敏', '优等热敏'])
-    await submenuItems(w)[1]!.trigger('click')
-    expect(w.emitted('select')?.[0]).toEqual([103])
+    await w.findAll('.mall-directory-item')[0]!.trigger('mouseenter')
+    expect(w.get('.mall-category-flyout').text()).toContain('热敏标签')
+    expect(w.get('.mall-category-flyout').text()).not.toContain('全部卷筒标签')
+    await w.findAll('.mall-category-flyout-links button')[1]!.trigger('click')
+    expect(w.emitted('select')?.[0]).toEqual([3])
+    expect(w.find('.mall-category-flyout').exists()).toBe(false)
   })
-
-  it('悬停到没有二级分类的一级分类上，浮层收起（不留上一个分类的内容）', async () => {
+  it('鼠标从分类移入面板不会关闭，离开后延迟收起', async () => {
+    vi.useFakeTimers()
     const w = mountHome()
-    await rootButton(w, 0).trigger('mouseenter')
-    await rootButton(w, 1).trigger('mouseenter')
-    expect(w.find('.mall-home-submenu').exists()).toBe(false)
+    await w.findAll('.mall-directory-item')[0]!.trigger('mouseenter')
+    await w.get('.mall-home-directory').trigger('mouseleave')
+    await vi.advanceTimersByTimeAsync(200)
+    await w.get('.mall-category-flyout').trigger('mouseenter')
+    await vi.advanceTimersByTimeAsync(400)
+    expect(w.find('.mall-category-flyout').exists()).toBe(true)
+    await w.get('.mall-category-flyout').trigger('mouseleave')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(w.find('.mall-category-flyout').exists()).toBe(false)
   })
-
-  it('鼠标移出目录区后浮层收起', async () => {
+  it('支持键盘打开和 Esc 关闭，无子分类时不显示空面板', async () => {
     const w = mountHome()
-    await rootButton(w, 0).trigger('mouseenter')
-    expect(w.find('.mall-home-submenu').exists()).toBe(true)
-    await w.get('.mall-home-directory-wrap').trigger('mouseleave')
-    expect(w.find('.mall-home-submenu').exists()).toBe(false)
-  })
-
-  it('键盘聚焦一级分类同样能展开并进入二级分类', async () => {
-    const w = mountHome()
-    await rootButton(w, 0).trigger('focus')
-    await submenuItems(w)[0]!.trigger('click')
-    expect(w.emitted('select')?.[0]).toEqual([102])
-  })
-
-  it('点击一级分类本身仍进入该一级分类', async () => {
-    const w = mountHome()
-    await rootButton(w, 0).trigger('click')
-    expect(w.emitted('select')?.[0]).toEqual([101])
+    await w.findAll('.mall-directory-item button')[0]!.trigger('focus')
+    expect(w.find('.mall-category-flyout').exists()).toBe(true)
+    await w.get('.mall-home-hero').trigger('keydown', { key: 'Escape' })
+    expect(w.find('.mall-category-flyout').exists()).toBe(false)
+    await w.findAll('.mall-directory-item')[1]!.trigger('mouseenter')
+    expect(w.find('.mall-category-flyout').exists()).toBe(false)
   })
 })

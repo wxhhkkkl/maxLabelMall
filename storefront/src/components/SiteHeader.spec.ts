@@ -100,15 +100,11 @@ describe('SiteHeader —— 静态结构', () => {
     expect(w.get('.logo-en').text()).toBe('MaxLabel')
   })
 
-  it('**固定渲染设计稿的五个导航项 —— 新增入口一律不往顶栏加**', () => {
-    // 2026-09-27：一度把「领券中心」「我的订单」加在这里，但顶栏加到 7 项后
-    // 1101–1200px 挤到每个词都竖排折行。所有者反馈"放个人中心更合理"，
-    // 于是回退 —— 顶栏保持 5 项，那两处入口在 `AccountView` 的侧栏里
-    // （相关断言见 AccountView.spec.ts）。
+  it('公共导航包含公司介绍入口', () => {
     const labels = mountHeader()
       .findAll('.nav .nav-primary')
       .map((a) => a.text().replace('⌄', '').trim())
-    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
+    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持', '公司介绍'])
   })
 
   it('**顶栏不再出现「领券中心」「我的订单」**（它们归个人中心）', () => {
@@ -126,7 +122,7 @@ describe('SiteHeader —— 静态结构', () => {
     const hrefs = w
       .findAll('.nav .nav-primary')
       .map((a) => a.attributes('href'))
-    expect(hrefs).toEqual(['/', '/mall', '/software', '/solutions', '/support'])
+    expect(hrefs).toEqual(['/', '/mall', '/software', '/solutions', '/support', '/about'])
   })
 
   it('渲染购物车入口、登录入口与主按钮', () => {
@@ -145,11 +141,11 @@ describe('SiteHeader —— 静态结构', () => {
     expect(w.text()).not.toContain('购物车 (2)')
   })
 
-  it('移动端导航也渲染同样五项（汉堡菜单与主导航同源）', () => {
+  it('移动端导航包含相同的公司介绍入口', () => {
     const labels = mountHeader()
       .findAll('.mobile-nav [data-mobile-primary]')
       .map((a) => a.text().replace('＋', '').trim())
-    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持'])
+    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持', '公司介绍'])
   })
 
   it('**移动端汉堡菜单里必须有登录入口** —— `.login` 在 ≤768px 是隐藏的', () => {
@@ -244,6 +240,26 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     await flushPromises()
     expect(w.get('.login').text()).toContain('登录 / 注册')
     expect(w.get('.login').attributes('href')).not.toBe('/account')
+  })
+
+  it('昵称为空时显示脱敏手机号，旁边展示后台等级', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '  ', mobile: '13800008888', level: { id: 2, name: '黄金会员' } })
+    const w = await mountLoggedIn()
+    expect(w.get('.header-member .login').text()).toBe('138****8888')
+    expect(w.get('.header-member-level').text()).toBe('黄金会员')
+    expect(w.get('.mobile-member .header-member-level').text()).toBe('黄金会员')
+  })
+
+  it('未配置等级如实展示，可通过头部文字按钮退出并清空登录状态', async () => {
+    const w = await mountLoggedIn()
+    expect(w.get('.header-member-level').text()).toBe('暂无等级')
+    await w.get('.header-member .header-logout').trigger('click')
+    await flushPromises()
+    expect(w.find('.header-member').exists()).toBe(false)
+    expect(w.find('.mobile-member').exists()).toBe(false)
+    expect(w.get('.login').text()).toContain('登录 / 注册')
+    const { getAccessToken } = await import('@/utils/auth')
+    expect(getAccessToken()).toBe('')
   })
 
   it('带 ?login=1 进入时自动打开登录弹层（路由守卫/入口统一走这条路）', async () => {

@@ -1,16 +1,23 @@
 .mall-page .mall-home { padding-bottom: 64px; }
+.mall-page .mall-home-loading { min-height: 370px; margin-bottom: 44px; }
 .mall-page .mall-home .mall-home-all { display: flex; align-items: center; justify-content: flex-start; gap: 14px; background: #2e7cd6; color: #fff; border-radius: 5px; padding: 14px 18px; font-size: 14px; font-weight: 600; }
 .mall-icon { width: 22px; height: 22px; flex: none; vertical-align: middle; }
-.mall-home-hero { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 300px auto; gap: 12px; margin-bottom: 44px; }
-.mall-home-directory-wrap { grid-row: span 2; position: relative; display: flex; min-height: 0; }
-.mall-home-directory { flex: 1; min-width: 0; display: grid; grid-template-rows: 48px repeat(var(--category-count), minmax(0, 1fr)); min-height: 0; border: 1px solid #e0e8f2; border-radius: 5px; background: #fff; overflow-y: auto; }
+.mall-home-hero { position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 300px auto; gap: 12px; margin-bottom: 44px; }
+.mall-home-directory { grid-row: span 2; display: grid; grid-template-rows: 48px repeat(var(--category-count), minmax(0, 1fr)); min-height: 0; border: 1px solid #e0e8f2; border-radius: 5px; background: #fff; overflow-y: auto; }
 .mall-home-directory button { display: flex; gap: 8px; align-items: center; min-width: 0; width: 100%; padding: 5px 12px; background: transparent; border: 0; text-align: left; color: #72839b; cursor: pointer; }
-.mall-home-directory button:hover, .mall-home-directory button.is-active { background: #f0f6ff; color: #2e7cd6; }
-.mall-home-submenu { position: absolute; left: 100%; z-index: 6; width: 420px; max-height: 100%; overflow-y: auto; padding: 14px 16px; background: #fff; border: 1px solid #dce8f6; border-radius: 0 5px 5px 0; box-shadow: 0 14px 32px rgba(18, 54, 97, .14); }
-.mall-home-submenu-title { margin: 0 0 10px; color: #123661; font-size: 13px; font-weight: 600; }
-.mall-home-submenu-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
-.mall-home-submenu-list button { min-width: 0; padding: 7px 10px; background: transparent; border: 0; border-radius: 4px; text-align: left; color: #4c6889; font-size: 12px; cursor: pointer; }
-.mall-home-submenu-list button:hover { background: #f0f6ff; color: #2e7cd6; }
+.mall-home-directory button:hover { background: #f0f6ff; color: #2e7cd6; }
+.mall-directory-item { display: flex; min-height: 0; }
+.mall-home-directory button.is-open { background: #eef5ff; color: #2e7cd6; }
+.mall-home-directory button.is-open strong, .mall-home-directory button.is-open .mall-directory-icon { color: #2e7cd6; }
+.mall-category-flyout { position: absolute; top: 0; left: 232px; width: min(650px, calc(100% - 232px)); z-index: 10; background: #fff; border: 1px solid #dde8f5; border-top: 2px solid #2e7cd6; border-radius: 5px; padding: 26px; min-height: 300px; max-height: 100%; overflow-y: auto; box-shadow: 0 12px 30px #183a641a; }
+.mall-category-flyout-heading { display: flex; align-items: center; gap: 10px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid #e9eff6; color: #2e7cd6; }
+.mall-category-flyout-heading h2 { font-size: 17px; font-weight: 600; margin: 0; color: #294563; }
+.mall-category-flyout-heading > span { font-size: 11px; color: #94a3b6; margin-left: auto; }
+.mall-category-flyout-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 24px; }
+.mall-category-flyout-links button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 8px; font-size: 13px; color: #627b97; background: transparent; border: 0; border-radius: 4px; text-align: left; cursor: pointer; }
+.mall-category-flyout-links button:hover, .mall-category-flyout-links button:focus-visible { color: #2e7cd6; background: #f0f6ff; }
+.mall-category-flyout-links .mall-icon { width: 12px; height: 12px; color: #a3b5ca; }
+.mall-home-directory button:focus-visible, .mall-category-flyout-links button:focus-visible { outline: 2px solid #2e7cd6; outline-offset: -2px; }
 .mall-page .mall-home-directory .mall-home-all { border-radius: 4px 4px 0 0; color: white; }
 .mall-home-directory strong { font-size: 13px; color: #263d5a; font-weight: 500; }
 .mall-directory-icon { width: 21px; height: 21px; color: #385473; margin-right: 5px; }
@@ -35,7 +42,9 @@
 .mall-home .mall-floor-number { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #398ff1, #1265cd); width: 44px; height: 36px; padding: 0; color: white; font-size: 23px; font-weight: 600; line-height: 1; border-radius: 4px; }
 .mall-home .mall-department-head h2 { font-size: 20px; }
 .mall-floor-tabs { display: flex; flex: 1; gap: 12px 18px; min-width: 0; flex-wrap: wrap; }
-.mall-home .mall-floor-tabs button { color: #7d8ca2; white-space: nowrap; }
+.mall-home .mall-floor-tabs button { color: #7d8ca2; white-space: nowrap; transition: color .18s ease; }
+.mall-home .mall-floor-tabs button:hover,
+.mall-home .mall-floor-tabs button:focus-visible { color: #2e7cd6; }
 .mall-home .mall-department-head > button { margin-left: auto; white-space: nowrap; }
 .mall-floor-body { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .mall-floor-promo { position: relative; isolation: isolate; overflow: hidden; border: 0; border-radius: 5px; padding: 0; min-height: 360px; background: var(--promo-color); cursor: pointer; text-align: left; }
@@ -83,6 +92,7 @@
 }
 @media (max-width: 900px) {
   .mall-home-hero { grid-template-columns: 180px minmax(0, 1fr); }
+  .mall-category-flyout { left: 192px; width: min(650px, calc(100% - 192px)); padding: 20px; }
   .mall-home-banner-copy { padding: 48px 22px; }
   .mall-home-banner-copy h2 { max-width: 220px; }
   .mall-floor-body { grid-template-columns: 190px minmax(0, 1fr); }
@@ -97,7 +107,8 @@
 @media (max-width: 600px) {
   .mall-home-hero { grid-template-columns: 1fr; grid-template-rows: 280px auto; }
   .mall-home .mall-home-banner-area .mall-banner, .mall-home-banner { height: 280px; }
-  .mall-home-directory-wrap { display: none; }
+  .mall-home-directory { display: none; }
+  .mall-category-flyout { display: none; }
   .mall-home-banner-copy { padding: 24px 20px; }
   .mall-home-banner-copy h2 { font-size: 26px; max-width: 220px; }
   .mall-home-banner-copy p { font-size: 12px; }

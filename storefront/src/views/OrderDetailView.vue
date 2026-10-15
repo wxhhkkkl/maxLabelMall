@@ -550,6 +550,44 @@ onMounted(async () => {
           </p>
         </div>
 
+        <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货）。
+             排在收货信息**之前** —— 待支付时用户要办的是「怎么付」 -->
+        <div v-if="isUnpaid" class="od-actions">
+          <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
+               后台配好后不用改代码就会变成可选 -->
+          <div v-if="!needsNoPay && channelOptions.length" class="pay-channels">
+            <button
+              v-for="c in channelOptions"
+              :key="c.code"
+              :data-channel="c.code"
+              class="pay-channel"
+              :class="{ 'is-disabled': !c.enabled, 'is-active': c.code === selectedChannel }"
+              type="button"
+              :disabled="!c.enabled"
+              @click="selectedChannel = c.code"
+            >
+              {{ c.label }}
+              <span v-if="c.comingSoon" class="pay-channel-soon">即将上线</span>
+            </button>
+          </div>
+
+          <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
+          <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
+          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
+            取消订单
+          </button>
+          <button
+            v-if="!needsNoPay"
+            id="payOrder"
+            class="btn-buy"
+            type="button"
+            :disabled="paying || !selectedChannel || qrOpen"
+            @click="onPay"
+          >
+            {{ paying ? '支付中…' : '立即支付' }}
+          </button>
+        </div>
+
         <!-- 收货信息 -->
         <div class="ml-card">
           <div class="ml-card-title">收货信息</div>
@@ -660,43 +698,6 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-
-        <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
-        </div>
-        <div v-if="isUnpaid" class="od-actions">
-          <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
-               后台配好后不用改代码就会变成可选 -->
-          <div v-if="!needsNoPay && channelOptions.length" class="pay-channels">
-            <button
-              v-for="c in channelOptions"
-              :key="c.code"
-              :data-channel="c.code"
-              class="pay-channel"
-              :class="{ 'is-disabled': !c.enabled, 'is-active': c.code === selectedChannel }"
-              type="button"
-              :disabled="!c.enabled"
-              @click="selectedChannel = c.code"
-            >
-              {{ c.label }}
-              <span v-if="c.comingSoon" class="pay-channel-soon">即将上线</span>
-            </button>
-          </div>
-
-          <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
-          <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
-          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
-            取消订单
-          </button>
-          <button
-            v-if="!needsNoPay"
-            id="payOrder"
-            class="btn-buy"
-            type="button"
-            :disabled="paying || !selectedChannel || qrOpen"
-            @click="onPay"
-          >
-            {{ paying ? '支付中…' : '立即支付' }}
-          </button>
         </div>
       </template>
     </div>

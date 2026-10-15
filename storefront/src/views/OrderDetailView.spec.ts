@@ -265,6 +265,30 @@ describe('OrderDetailView —— 商品明细与收货信息（FR-035）', () =>
   })
 })
 
+describe('OrderDetailView —— 版式：支付条的位置', () => {
+  /** 卡片区的**实际排版顺序**（取 DOM 顺序，容器是 grid，视觉序即 DOM 序） */
+  function cardOrder(w: Awaited<ReturnType<typeof mountDetail>>) {
+    return Array.from(w.get('.account-order-detail').element.children)
+      .map(el => (el.classList.contains('od-actions') ? '支付条' : (el.querySelector('.ml-card-title')?.textContent?.trim() ?? '')))
+      .filter(Boolean)
+  }
+  /** 标题带后缀（「商品明细（1 项）」），所以按前缀定位；找不到返回 -1 */
+  const at = (order: string[], label: string) => order.findIndex(t => t.startsWith(label))
+
+  it('待支付时支付条排在**收货信息上方**', async () => {
+    const order = cardOrder(await mountDetail())
+    expect(at(order, '支付条')).toBeGreaterThanOrEqual(0)
+    expect(at(order, '收货信息')).toBeGreaterThanOrEqual(0)
+    expect(at(order, '支付条')).toBeLessThan(at(order, '收货信息'))
+  })
+
+  it('已付款没有支付条，卡片顺序不受影响', async () => {
+    const order = cardOrder(await mountDetail(detail({ status: OrderStatus.UNDELIVERED, payTime: PAID_AT })))
+    expect(order).not.toContain('支付条')
+    expect(at(order, '收货信息')).toBeLessThan(at(order, '商品明细'))
+  })
+})
+
 describe('OrderDetailView —— 金额构成与所用券（FR-035 / FR-026f / SC-007）', () => {
   it('逐项展示商品小计 / 促销优惠 / 运费 / 优惠券抵扣 / 应付总额', async () => {
     const w = await mountDetail()

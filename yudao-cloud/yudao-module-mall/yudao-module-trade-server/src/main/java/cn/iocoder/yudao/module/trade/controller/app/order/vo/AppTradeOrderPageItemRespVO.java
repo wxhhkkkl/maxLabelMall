@@ -55,4 +55,13 @@ public class AppTradeOrderPageItemRespVO {
     @Schema(description = "拼团记录编号", example = "100")
     private Long combinationRecordId;
 
+    /**
+     * 开票状态（006 / FR-178）
+     *
+     * ⚠️ **没申请开票时是 `null`** —— 列表上什么都不显示。
+     * 取值同订单详情：0 待开票 / 10 已开票 / 20 已作废。
+     */
+    @Schema(description = "开票状态：0 待开票，10 已开票，20 已作废；未申请为 null", example = "0")
+    private Integer invoiceStatus;
+
 }

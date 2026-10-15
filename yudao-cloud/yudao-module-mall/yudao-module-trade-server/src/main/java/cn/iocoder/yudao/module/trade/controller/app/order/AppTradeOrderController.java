@@ -1,11 +1,13 @@
 package cn.iocoder.yudao.module.trade.controller.app.order;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.*;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemCommentCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemRespVO;
+import cn.iocoder.yudao.module.trade.convert.invoice.InvoiceConvert;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -14,6 +16,7 @@ import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.order.config.TradeOrderProperties;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
+import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
 import cn.iocoder.yudao.module.trade.service.price.TradePriceService;
@@ -56,6 +59,8 @@ public class AppTradeOrderController {
 
     @Resource
     private TradeOrderProperties tradeOrderProperties;
+    @Resource
+    private TradeOrderInvoiceService tradeOrderInvoiceService;
 
     @GetMapping("/settlement")
     @Operation(summary = "获得订单结算信息")
@@ -114,7 +119,14 @@ public class AppTradeOrderController {
         DeliveryExpressDO express = order.getLogisticsId() != null && order.getLogisticsId() > 0 ?
                 deliveryExpressService.getDeliveryExpress(order.getLogisticsId()) : null;
         // 2.3 最终组合
-        return success(TradeOrderConvert.INSTANCE.convert02(order, orderItems, tradeOrderProperties, express));
+        AppTradeOrderDetailRespVO respVO = TradeOrderConvert.INSTANCE.convert02(order, orderItems, tradeOrderProperties, express);
+        // 2.4 开票信息（006）：**没申请时是 null** —— 前端据此区分"没申请"与"申请了"（FR-176）。
+        //     不塞进 convert02，是为了不碰那个被多处共用的 MapStruct 方法签名
+        if (respVO != null) {
+            respVO.setInvoice(InvoiceConvert.convertToAppRespVO(
+                    tradeOrderInvoiceService.getInvoiceByOrderId(order.getId())));
+        }
+        return success(respVO);
     }
 
     @GetMapping("/get-express-track-list")
@@ -134,7 +146,15 @@ public class AppTradeOrderController {
         List<TradeOrderItemDO> orderItems = tradeOrderQueryService.getOrderItemListByOrderId(
                 convertSet(pageResult.getList(), TradeOrderDO::getId));
         // 最终组合
-        return success(TradeOrderConvert.INSTANCE.convertPage02(pageResult, orderItems));
+        PageResult<AppTradeOrderPageItemRespVO> page = TradeOrderConvert.INSTANCE.convertPage02(pageResult, orderItems);
+        // 开票状态（006 / FR-178）：**一次 IN 批量查**，不许逐笔查（一页 12 条会变成 13 次查询）。
+        // 没申请的订单拿不到值 → 字段保持 null → 列表上什么都不显示
+        if (page != null && CollUtil.isNotEmpty(page.getList())) {
+            Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(
+                    convertSet(page.getList(), AppTradeOrderPageItemRespVO::getId));
+            page.getList().forEach(item -> item.setInvoiceStatus(invoiceStatusMap.get(item.getId())));
+        }
+        return success(page);
     }
 
     @GetMapping("/get-count")

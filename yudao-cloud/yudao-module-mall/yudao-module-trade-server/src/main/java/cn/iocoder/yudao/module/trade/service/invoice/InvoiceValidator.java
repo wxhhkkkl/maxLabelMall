@@ -1,0 +1,144 @@
+package cn.iocoder.yudao.module.trade.service.invoice;
+
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceTitleSaveReqVO;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
+
+import java.util.regex.Pattern;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
+
+/**
+ * 开票信息的校验（**全仓唯一一处**，T383）
+ *
+ * 三个入口共用它：下单时的 `invoice` 子对象、订单详情补开、发票抬头簿保存。
+ * 之所以要收在一处：**票种字段矩阵是财务口径**（Q27），散成两份必然在改票种时漏改一处。
+ *
+ * ⚠️ 本类**会把字段 trim 后写回入参 VO** —— 这是有意的：spec 与 data-model 都要求
+ * "提交时 trim"，而"校验用的值"与"落库的值"只要是同一份，就不可能出现
+ * "校验时看到的是空的、落库的是三个空格"这种分叉。调用方随后直接从 VO 取值落库即可。
+ *
+ * @author 芋道源码
+ */
+public final class InvoiceValidator {
+
+    private InvoiceValidator() {
+    }
+
+    /**
+     * 纳税人识别号：15 位（老税号）、18 位（统一社会信用代码）、20 位都合法。
+     *
+     * ⚠️ **只校验长度与字符集，不校验校验位**：校验位算法（GB 32100）会把"格式对但校验位错"的
+     * 客户挡在门外，而他手上那个号确实就是那样写的 —— 那是开票平台该报的错，不是我们的。
+     * 大小写：只接受**大写**字母（客户手打小写会被拒，报错信息里说明了格式）。
+     */
+    private static final Pattern TAX_NO_PATTERN = Pattern.compile("^[0-9A-Z]{15}$|^[0-9A-Z]{18}$|^[0-9A-Z]{20}$");
+
+    /** 列宽上限，与 `007-order-invoice.sql` 和 data-model §4 逐字一致 */
+    private static final int TITLE_NAME_MAX = 255;
+    private static final int TAX_NO_MAX = 64;
+    private static final int TITLE_ADDRESS_MAX = 255;
+    private static final int TITLE_PHONE_MAX = 64;
+    private static final int BANK_NAME_MAX = 255;
+
+    /**
+     * 校验一次**开票申请**（下单 / 补开共用），按票种判必填
+     *
+     * 普票只要抬头名称；专票五项全要 —— 缺哪一项就在报错里**点名哪一项**（FR-156）。
+     */
+    public static void validateApply(AppInvoiceApplyBaseVO invoice) {
+        // 票种本身：null / 0 / 99 一律拒（别让它悄悄落库成"未知票种"）
+        InvoiceTypeEnum type = InvoiceTypeEnum.valueOf(invoice.getType());
+        if (type == null) {
+            throw exception(INVOICE_TYPE_INVALID);
+        }
+        // 先 trim，再校验 —— 校验看到的值与落库的值是同一份
+        invoice.setTitleName(trim(invoice.getTitleName()));
+        invoice.setTaxNo(trim(invoice.getTaxNo()));
+        invoice.setTitleAddress(trim(invoice.getTitleAddress()));
+        invoice.setTitlePhone(trim(invoice.getTitlePhone()));
+        invoice.setBankName(trim(invoice.getBankName()));
+
+        // 必填矩阵（Q27）
+        requireText(invoice.getTitleName(), "抬头名称");
+        if (InvoiceTypeEnum.E_SPECIAL == type) {
+            requireText(invoice.getTaxNo(), "纳税人识别号");
+            requireText(invoice.getTitleAddress(), "注册地址");
+            requireText(invoice.getTitlePhone(), "注册电话");
+            requireText(invoice.getBankName(), "开户行及账号");
+        }
+        checkFormats(invoice.getTitleName(), invoice.getTaxNo(),
+                invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName());
+    }
+
+    /**
+     * 校验**发票抬头簿**里的一条抬头
+     *
+     * ⚠️ 比申请宽松：**只要求抬头名称**。抬头可以不完整（只开普票的客户没必要填开户行），
+     * 缺项在他**选择专票**时才由 {@link #validateApply} 拒掉。
+     */
+    public static void validateTitle(AppInvoiceTitleSaveReqVO title) {
+        title.setTitleName(trim(title.getTitleName()));
+        title.setTaxNo(trim(title.getTaxNo()));
+        title.setTitleAddress(trim(title.getTitleAddress()));
+        title.setTitlePhone(trim(title.getTitlePhone()));
+        title.setBankName(trim(title.getBankName()));
+
+        requireText(title.getTitleName(), "抬头名称");
+        checkFormats(title.getTitleName(), title.getTaxNo(),
+                title.getTitleAddress(), title.getTitlePhone(), title.getBankName());
+    }
+
+    // ==================== 内部 ====================
+
+    /** 选填字段"填了就要合法"：税号格式 + 各列长度上限 */
+    private static void checkFormats(String titleName, String taxNo, String titleAddress,
+                                     String titlePhone, String bankName) {
+        checkLength("抬头名称", titleName, TITLE_NAME_MAX);
+        if (!isBlank(taxNo) && !TAX_NO_PATTERN.matcher(taxNo).matches()) {
+            throw exception(INVOICE_TAX_NO_INVALID);
+        }
+        checkLength("纳税人识别号", taxNo, TAX_NO_MAX);
+        checkLength("注册地址", titleAddress, TITLE_ADDRESS_MAX);
+        checkLength("注册电话", titlePhone, TITLE_PHONE_MAX);
+        checkLength("开户行及账号", bankName, BANK_NAME_MAX);
+    }
+
+    /** 必填：trim 后为空即视为没填（报错点名是哪一项） */
+    private static void requireText(String value, String fieldName) {
+        if (isBlank(value)) {
+            throw exception(INVOICE_TITLE_FIELD_REQUIRED, fieldName);
+        }
+    }
+
+    /**
+     * 长度上限 —— **不能省**：MySQL 在非严格模式下会**静默截断**超长值，
+     * 于是客户填的公司名被砍掉一截、开出来的票抬头是错的，而系统里没有任何痕迹
+     */
+    private static void checkLength(String fieldName, String value, int max) {
+        if (value != null && value.length() > max) {
+            throw exception(INVOICE_TITLE_FIELD_REQUIRED, fieldName + " 过长（最多 " + max + " 个字符）");
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isEmpty(); // 已 trim，无需再看空白
+    }
+
+    /**
+     * trim，并把**空串归一成 null**。
+     *
+     * 为什么要归一：前端提交普票时会带上 `"titleAddress": ""` 这类空字段（契约里就是这么写的），
+     * 若原样落库就会得到一堆 `''` —— 于是"没填"在数据里有了两种表示（`''` 与 `NULL`），
+     * 后台列表与排查时都得多判一次。统一成 NULL，`''` 这种值在库里就不存在。
+     */
+    private static String trim(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+}

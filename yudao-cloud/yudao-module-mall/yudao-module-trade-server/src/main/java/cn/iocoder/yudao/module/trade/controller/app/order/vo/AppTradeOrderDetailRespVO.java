@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.app.order.vo;
 
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppOrderInvoiceRespVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemRespVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -147,5 +148,13 @@ public class AppTradeOrderDetailRespVO {
      * 订单项数组
      */
     private List<AppTradeOrderItemRespVO> items;
+
+    /**
+     * 开票信息（006）
+     *
+     * ⚠️ **没有申请开票时为 `null`**（不是空对象）—— 前端据此决定"整块不渲染"
+     * 还是"给申请开票入口"（FR-176 的四态）
+     */
+    private AppOrderInvoiceRespVO invoice;
 
 }

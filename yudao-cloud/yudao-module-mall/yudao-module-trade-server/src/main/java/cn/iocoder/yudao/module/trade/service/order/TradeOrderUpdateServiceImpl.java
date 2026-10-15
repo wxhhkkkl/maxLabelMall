@@ -55,6 +55,7 @@ import cn.iocoder.yudao.module.trade.framework.order.core.utils.TradeOrderLogUti
 import cn.iocoder.yudao.module.trade.service.cart.CartService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryPickUpStoreService;
+import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.message.TradeMessageService;
 import cn.iocoder.yudao.module.trade.service.message.bo.TradeOrderMessageWhenDeliveryOrderReqBO;
 import cn.iocoder.yudao.module.trade.service.order.handler.TradeOrderHandler;
@@ -105,6 +106,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
     @Resource
     private CartService cartService;
+    @Resource
+    private TradeOrderInvoiceService tradeOrderInvoiceService;
     @Resource
     private TradePriceService tradePriceService;
     @Resource
@@ -264,6 +267,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 4. 插入订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), null, order.getStatus());
+
+        // 5. 开票申请（006）：与订单**同一事务**（Q32 —— 要么都成、要么都不成，不允许"订单在、票没了"）。
+        //    不传 invoice = 不开票，内部直接返回、什么都不做；实付 0 元时内部**忽略**（订单照下）
+        tradeOrderInvoiceService.createInvoice(order, createReqVO.getInvoice());
 
         // TODO @LeeYan9: 是可以思考下, 订单的营销优惠记录, 应该记录在哪里, 微信讨论起来!
     }

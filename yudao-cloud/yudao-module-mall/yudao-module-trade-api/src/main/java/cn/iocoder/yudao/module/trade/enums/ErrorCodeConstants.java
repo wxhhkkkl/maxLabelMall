@@ -115,4 +115,22 @@ public interface ErrorCodeConstants {
     ErrorCode BROKERAGE_WITHDRAW_UPDATE_STATUS_FAIL_PAY_MERCHANT_EXISTS = new ErrorCode(1_011_008_008, "提现单更新转账状态失败，转账单的商户订单不匹配");
     ErrorCode BROKERAGE_WITHDRAW_UPDATE_STATUS_FAIL_PAY_CHANNEL_NOT_MATCH = new ErrorCode(1_011_008_009, "提现单更新转账状态失败，转账渠道不匹配");
 
+    // ========== 开票 模块 1-011-009-000 ==========
+    // 申请：下单时提交 / 订单详情补开，两处共用同一套校验（InvoiceValidator）
+    ErrorCode INVOICE_ORDER_NOT_PAID = new ErrorCode(1_011_009_000, "订单还未支付，付款后可申请开票");
+    ErrorCode INVOICE_ORDER_CANCELED = new ErrorCode(1_011_009_001, "订单已取消，无法申请开票");
+    ErrorCode INVOICE_ORDER_AMOUNT_ZERO = new ErrorCode(1_011_009_002, "本单实付金额为 0，无需开票");
+    ErrorCode INVOICE_ORDER_EXISTS = new ErrorCode(1_011_009_003, "该订单已提交过开票申请");
+    ErrorCode INVOICE_TYPE_INVALID = new ErrorCode(1_011_009_004, "发票类型不正确");
+    /** 必填项缺失，占位符是字段名（例如「纳税人识别号」）—— 报错要**指明缺哪一项**（FR-156） */
+    ErrorCode INVOICE_TITLE_FIELD_REQUIRED = new ErrorCode(1_011_009_005, "{} 不能为空");
+    ErrorCode INVOICE_TAX_NO_INVALID = new ErrorCode(1_011_009_006, "纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）");
+    // 抬头簿
+    ErrorCode INVOICE_TITLE_NOT_FOUND = new ErrorCode(1_011_009_020, "发票抬头不存在");
+    // 后台开具
+    ErrorCode INVOICE_NOT_FOUND = new ErrorCode(1_011_009_040, "开票申请不存在");
+    ErrorCode INVOICE_ISSUE_FAIL_STATUS_CANCELED = new ErrorCode(1_011_009_041, "该开票申请已作废，不能开具");
+    ErrorCode INVOICE_FILE_TYPE_NOT_ALLOWED = new ErrorCode(1_011_009_042, "发票文件格式不支持，只允许 PDF 或图片（jpg / jpeg / png）");
+    ErrorCode INVOICE_ISSUE_FAIL_ORDER_NOT_PAID = new ErrorCode(1_011_009_043, "订单还未支付，不能开具发票");
+
 }

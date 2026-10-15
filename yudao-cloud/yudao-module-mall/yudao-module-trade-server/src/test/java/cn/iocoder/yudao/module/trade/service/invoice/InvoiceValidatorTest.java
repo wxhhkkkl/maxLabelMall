@@ -40,20 +40,25 @@ class InvoiceValidatorTest {
     // ==================== 普票：宽松 ====================
 
     @Test
-    void testValidateApply_normal_onlyTitleName_pass() {
-        // 只填名称 —— 必须通过（Q27）
-        assertDoesNotThrow(() -> InvoiceValidator.validate(
-                apply(InvoiceTypeEnum.E_NORMAL.getType(), "张三", null, null, null, null)));
-
-        // 名称 + 税号（企业开普票的常见形态）
+    void testValidateApply_normal_titleNameAndTaxNo_pass() {
+        // 2026-10-15 所有者口径：**两种票都只必填「名称 + 税号」**，其余一律选填
         assertDoesNotThrow(() -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_NORMAL.getType(), "南京路桥机械有限公司", "91320104660690975E",
                         null, null, null)));
     }
 
     @Test
-    void testValidateApply_normal_taxNoFormatStillChecked() {
-        // 普票的税号是选填，但**填了就要合法** —— 否则开出来的票是废的
+    void testValidateApply_taxNoRequired_forBothTypes() {
+        // 税号**两种票都必填**（原来普票是选填 —— 所有者要求统一）
+        for (Integer type : new Integer[]{InvoiceTypeEnum.E_NORMAL.getType(), InvoiceTypeEnum.E_SPECIAL.getType()}) {
+            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
+                    apply(type, "南京路桥机械有限公司", null, null, null, null)), "票种 " + type + " 缺税号要拒");
+            assertTrue(e.getMessage().contains("纳税人识别号"), "实际：" + e.getMessage());
+        }
+    }
+
+    @Test
+    void testValidateApply_taxNoFormatStillChecked() {
         ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_NORMAL.getType(), "南京路桥机械有限公司", "123", null, null, null)));
         assertEquals(INVOICE_TAX_NO_INVALID.getCode(), e.getCode());
@@ -67,26 +72,15 @@ class InvoiceValidatorTest {
     }
 
     @Test
-    void testValidateApply_special_onlyTitleName_fail_andPointOutMissingField() {
-        // 一次只缺一项时，报错必须点名是哪一项
-        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
-                apply(InvoiceTypeEnum.E_SPECIAL.getType(), "南京路桥机械有限公司", null, null, null, null)));
-        assertEquals(INVOICE_TITLE_FIELD_REQUIRED.getCode(), e.getCode());
-        assertTrue(e.getMessage().contains("纳税人识别号"), "报错要点名缺哪一项，实际：" + e.getMessage());
-
-        // 缺地址
-        AppInvoiceApplyBaseVO noAddress = fullSpecialInvoice();
-        noAddress.setTitleAddress("  "); // 全空格 = 没填（要 trim）
-        ServiceException e2 = assertThrows(ServiceException.class,
-                () -> InvoiceValidator.validate(noAddress));
-        assertTrue(e2.getMessage().contains("注册地址"), "实际：" + e2.getMessage());
-
-        // 缺开户行
-        AppInvoiceApplyBaseVO noBank = fullSpecialInvoice();
-        noBank.setBankName(null);
-        ServiceException e3 = assertThrows(ServiceException.class,
-                () -> InvoiceValidator.validate(noBank));
-        assertTrue(e3.getMessage().contains("开户行"), "实际：" + e3.getMessage());
+    void testValidateApply_special_addressPhoneBank_optional() {
+        // **专票的地址 / 电话 / 开户行**（2026-10-15 起）是**选填** ——
+        // 客户手边未必有开户行账号，不该因此存不下/开不了票
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
+                apply(InvoiceTypeEnum.E_SPECIAL.getType(), "南京路桥机械有限公司", "91320104660690975E",
+                        null, null, null)));
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
+                apply(InvoiceTypeEnum.E_SPECIAL.getType(), "南京路桥机械有限公司", "91320104660690975E",
+                        "  ", "  ", "  ")));
     }
 
     @Test
@@ -96,7 +90,7 @@ class InvoiceValidatorTest {
             vo.setType(type);
             vo.setTitleName("   ");
             ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo),
-                    "票种 " + type + " 缺名称也要拒");
+                    "票种 " + type + " 缺名称也要拒（名称两种票都必填）");
             assertTrue(e.getMessage().contains("抬头名称"), "实际：" + e.getMessage());
         }
     }

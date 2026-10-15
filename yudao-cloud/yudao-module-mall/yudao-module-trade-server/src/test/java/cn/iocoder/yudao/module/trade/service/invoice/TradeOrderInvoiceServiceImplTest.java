@@ -247,13 +247,12 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         // 抬头校验与下单**同一套规则**（InvoiceValidator），没有更宽松的旁路
         TradeOrderDO order = createOrder(7800);
         AppTradeOrderInvoiceCreateReqVO reqVO = reopenReq(order.getId());
-        reqVO.setType(InvoiceTypeEnum.E_SPECIAL.getType());
-        reqVO.setTitleAddress(null); // 专票缺地址
+        reqVO.setTaxNo(null); // 缺**税号** —— 2026-10-15 起两种票都必填（地址/电话/开户行改为选填）
 
         ServiceException e = assertThrows(ServiceException.class,
                 () -> invoiceService.createInvoiceByMember(88L, reqVO));
         assertEquals(INVOICE_TITLE_FIELD_REQUIRED.getCode(), e.getCode());
-        assertTrue(e.getMessage().contains("注册地址"), "实际：" + e.getMessage());
+        assertTrue(e.getMessage().contains("纳税人识别号"), "实际：" + e.getMessage());
     }
 
     // ==================== 后台开具（US21 / T398） ====================

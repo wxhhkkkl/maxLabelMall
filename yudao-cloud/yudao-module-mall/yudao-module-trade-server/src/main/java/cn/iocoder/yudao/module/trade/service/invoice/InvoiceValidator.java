@@ -43,9 +43,10 @@ public final class InvoiceValidator {
     private static final int BANK_NAME_MAX = 255;
 
     /**
-     * 校验一次**开票信息**（下单 / 补开 / 抬头簿保存三处共用），按票种判必填
+     * 校验一次**开票信息**（下单 / 补开 / 抬头簿保存三处共用）
      *
-     * 普票只要抬头名称；专票五项全要 —— 缺哪一项就在报错里**点名哪一项**（FR-156）。
+     * **必填只有两项：抬头名称 + 纳税人识别号**（2026-10-15 所有者口径，两种票一致）；
+     * 地址 / 电话 / 开户行及账号选填。缺必填项时在报错里**点名是哪一项**（FR-156）。
      *
      * ⚠️ **Q36 之后抬头也带票种**，所以"抬头簿保存"与"开票申请"不再有区别 ——
      * 原来那个更宽松的 `validateTitle`（只要求名称）已经删掉：两份规则必然分叉。
@@ -63,14 +64,11 @@ public final class InvoiceValidator {
         invoice.setTitlePhone(trim(invoice.getTitlePhone()));
         invoice.setBankName(trim(invoice.getBankName()));
 
-        // 必填矩阵（Q27）
+        // 必填矩阵（2026-10-15 所有者口径）：**两种票都只必填「名称 + 税号」**
+        // —— 地址 / 电话 / 开户行一律**选填**，专票也一样（客户手边未必有开户行账号，
+        //    不该因此存不下抬头、或者提交不了开票申请；那几项财务开票时会核对）
         requireText(invoice.getTitleName(), "抬头名称");
-        if (InvoiceTypeEnum.E_SPECIAL == type) {
-            requireText(invoice.getTaxNo(), "纳税人识别号");
-            requireText(invoice.getTitleAddress(), "注册地址");
-            requireText(invoice.getTitlePhone(), "注册电话");
-            requireText(invoice.getBankName(), "开户行及账号");
-        }
+        requireText(invoice.getTaxNo(), "纳税人识别号");
         checkFormats(invoice.getTitleName(), invoice.getTaxNo(),
                 invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName());
     }

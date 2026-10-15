@@ -25,31 +25,31 @@ describe('开票信息校验', () => {
     bankName: '工商银行南京分行 6222 0000 0000 0000',
   }
 
-  it('普票：只填名称就能过', () => {
-    expect(invoiceFieldError(normal, InvoiceType.NORMAL)).toBeNull()
+  it('**两种票都只必填「名称 + 税号」**；地址/电话/开户行一律选填', () => {
+    // 2026-10-15 所有者口径：税号不再是"选填"，地址等也不再是专票必填
+    const both = { titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' }
+    expect(invoiceFieldError(both)).toBeNull()
+    expect(invoiceFieldError(both)).toBeNull()
+  })
+
+  it('只填名称过不了（税号两种票都必填）', () => {
+    expect(invoiceFieldError(normal)).toContain('纳税人识别号')
   })
 
   it('两种票：名称都是必填，且提示点名是哪一项', () => {
-    expect(invoiceFieldError({ titleName: '' }, InvoiceType.NORMAL)).toContain('抬头名称')
-    expect(invoiceFieldError({ titleName: '   ' }, InvoiceType.SPECIAL)).toContain('抬头名称')
-    expect(invoiceFieldError({}, InvoiceType.NORMAL)).toContain('抬头名称')
+    expect(invoiceFieldError({ titleName: '' })).toContain('抬头名称')
+    expect(invoiceFieldError({ titleName: '   ' })).toContain('抬头名称')
+    expect(invoiceFieldError({})).toContain('抬头名称')
   })
 
-  it('专票：缺哪一项就提示哪一项', () => {
-    expect(invoiceFieldError({ titleName: '公司' }, InvoiceType.SPECIAL)).toContain('纳税人识别号')
-    expect(invoiceFieldError({ ...special, titleAddress: ' ' }, InvoiceType.SPECIAL)).toContain('注册地址')
-    expect(invoiceFieldError({ ...special, titlePhone: '' }, InvoiceType.SPECIAL)).toContain('注册电话')
-    expect(invoiceFieldError({ ...special, bankName: undefined }, InvoiceType.SPECIAL)).toContain('开户行')
+  it('专票：五项填全当然也过', () => {
+    expect(invoiceFieldError(special)).toBeNull()
   })
 
-  it('专票：五项填全就过', () => {
-    expect(invoiceFieldError(special, InvoiceType.SPECIAL)).toBeNull()
-  })
-
-  it('税号是选填，但填了就必须合法 —— 两种票都一样', () => {
+  it('税号填了就必须合法 —— 两种票都一样', () => {
     for (const type of [InvoiceType.NORMAL, InvoiceType.SPECIAL] as const) {
       const form = type === InvoiceType.SPECIAL ? { ...special, taxNo: 'abc' } : { titleName: '张三', taxNo: 'abc' }
-      expect(invoiceFieldError(form, type)).toContain('纳税人识别号')
+      expect(invoiceFieldError(form)).toContain('纳税人识别号')
     }
   })
 

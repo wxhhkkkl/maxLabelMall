@@ -481,12 +481,13 @@ describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR
     const w = await mountCheckout()
     await invoiceBox(w).setValue(true)
     await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await submit(w)
 
     expect(lastInput().invoice).toEqual({
       type: 1,
       titleName: '南京路桥机械有限公司',
-      taxNo: '',
+      taxNo: '91320104660690975E',
       titleAddress: '',
       titlePhone: '',
       bankName: '',

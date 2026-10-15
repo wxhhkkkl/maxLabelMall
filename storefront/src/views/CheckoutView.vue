@@ -174,7 +174,7 @@ async function onSubmit() {
 
   // 开票必填项：与卡片上的实时提示**同一个纯函数**（utils/invoice.ts），两处不会各说各话（FR-156）
   if (invoiceEnabled.value) {
-    const invoiceError = invoiceFieldError(invoiceForm.value, invoiceForm.value.type)
+    const invoiceError = invoiceFieldError(invoiceForm.value)
     if (invoiceError) {
       submitError.value = invoiceError
       return

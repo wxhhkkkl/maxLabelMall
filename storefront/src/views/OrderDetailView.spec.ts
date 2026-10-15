@@ -1289,6 +1289,7 @@ describe('OrderDetailView —— 订单详情补开票（006 / US20 / FR-163）'
 
     await w.get('#applyInvoice').trigger('click')
     await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await w.get('#submitInvoice').trigger('click')
     await flushPromises()
     await flushPromises()

@@ -13,7 +13,7 @@ import { invoiceFieldError } from '@/utils/invoice'
  *
  * 字段复用结算页那一套（`InvoiceFieldsForm`，**票种也在里面选**）——
  * Q36 之后一条抬头**只服务一种票**：普票抬头只要名称，专票抬头五项全填，
- * 校验统一走 `invoiceFieldError(form, form.type)`（与后端同一套规则）。
+ * 校验统一走 `invoiceFieldError(form)`（与后端同一套规则）。
  */
 const props = defineProps<{
   open: boolean
@@ -63,7 +63,7 @@ async function onSubmit() {
   if (saving.value) return
   error.value = ''
   // 按**抬头自己的票种**判（与后端 `InvoiceValidator#validate` 同一套规则）
-  const invalid = invoiceFieldError(form.value, form.value.type)
+  const invalid = invoiceFieldError(form.value)
   if (invalid) {
     error.value = invalid
     return

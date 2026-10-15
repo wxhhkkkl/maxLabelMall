@@ -24,7 +24,7 @@ const form = defineModel<InvoiceApplyForm>('form', { required: true })
  *
  * 提交时的拦截在 CheckoutView —— 两处用的是**同一个纯函数**，不会各说各话。
  */
-const error = computed(() => (enabled.value ? invoiceFieldError(form.value, form.value.type) : null))
+const error = computed(() => (enabled.value ? invoiceFieldError(form.value) : null))
 
 /**
  * 把一条抬头填进表单（票种保留客户当前的选择 —— 选择器只列本票种的抬头）

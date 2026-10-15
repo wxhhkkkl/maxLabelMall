@@ -100,17 +100,14 @@ describe('结算页发票卡片', () => {
     // 名称为空时，两种票都先点名「抬头名称」（它是共同的必填项）
     expect(w.get('[role="alert"]').text()).toContain('抬头名称')
 
-    // 填上名称、切到专票 → 下一个缺的是纳税人识别号
+    // 填上名称 → 下一个缺的是纳税人识别号（**两种票都必填**，2026-10-15 口径）
     model.titleName = '南京路桥机械有限公司'
     await w.vm.$nextTick()
     await w.findAll('.invoice-type')[1]!.trigger('click')
     expect(w.get('[role="alert"]').text()).toContain('纳税人识别号')
 
-    // 五项填全 → 提示消失
+    // **只要再填税号就够** —— 专票的地址/电话/开户行是选填（不必填也能提交）
     model.taxNo = '91320104660690975E'
-    model.titleAddress = '南京市玄武区某某路 1 号'
-    model.titlePhone = '18913984596'
-    model.bankName = '工商银行南京分行 6222 0000 0000 0000'
     await w.vm.$nextTick()
     expect(w.find('[role="alert"]').exists()).toBe(false)
   })

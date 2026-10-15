@@ -53,16 +53,17 @@ describe('发票抬头弹层', () => {
     expect(w.text()).toContain('请填写抬头名称')
   })
 
-  it('**只填名称也能存**（抬头可以不完整）', async () => {
+  it('**名称 + 税号就能存**（地址/电话/开户行都选填）', async () => {
     const w = mountDialog()
-    await w.get('#invoiceTitleName').setValue('张三')
+    await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await w.get('#saveInvoiceTitle').trigger('click')
     await flushPromises()
 
     expect(createInvoiceTitle).toHaveBeenCalledWith({
       type: 1, // 默认普票
-      titleName: '张三',
-      taxNo: '',
+      titleName: '南京路桥机械有限公司',
+      taxNo: '91320104660690975E',
       titleAddress: '',
       titlePhone: '',
       bankName: '',
@@ -71,20 +72,30 @@ describe('发票抬头弹层', () => {
     expect(w.emitted('submitted')).toHaveLength(1)
   })
 
-  it('**专票抬头**必须五项全填（Q36：按抬头自己的票种判）', async () => {
-    const w = mount(InvoiceTitleDialog, { props: { open: true, title: null, type: 2 } })
-
-    // 只填名称 → 拒（专票要税号/地址/电话/开户行）
+  it('缺税号存不了（**两种票都必填**，2026-10-15 口径）', async () => {
+    const w = mountDialog()
     await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
     await w.get('#saveInvoiceTitle').trigger('click')
+
     expect(createInvoiceTitle).not.toHaveBeenCalled()
     expect(w.text()).toContain('纳税人识别号')
+  })
 
-    // 切回普票 → 只填名称就能存
-    await w.findAll('.invoice-type')[0]!.trigger('click')
+  it('**专票的头**：名称 + 税号即可存，地址/电话/开户行不必填（2026-10-15 口径）', async () => {
+    const w = mount(InvoiceTitleDialog, { props: { open: true, title: null, type: 2 } })
+
+    await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await w.get('#saveInvoiceTitle').trigger('click')
     await flushPromises()
-    expect(createInvoiceTitle).toHaveBeenCalledWith(expect.objectContaining({ type: 1, titleName: '南京路桥机械有限公司' }))
+
+    expect(createInvoiceTitle).toHaveBeenCalledWith(expect.objectContaining({
+      type: 2,
+      titleName: '南京路桥机械有限公司',
+      titleAddress: '',
+      titlePhone: '',
+      bankName: '',
+    }))
   })
 
   it('编辑时预填该条抬头，并用 update 带上 id', async () => {
@@ -113,6 +124,7 @@ describe('发票抬头弹层', () => {
     createInvoiceTitle.mockRejectedValue(new Error('发票抬头不存在'))
     const w = mountDialog()
     await w.get('#invoiceTitleName').setValue('张三')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await w.get('#saveInvoiceTitle').trigger('click')
     await flushPromises()
 

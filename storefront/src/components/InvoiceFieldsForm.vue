@@ -12,12 +12,15 @@ import { INVOICE_TYPE_OPTIONS } from '@/utils/invoice'
  * 以及"从已保存抬头里选一条"之后的手改 —— 各写一份必然在某次改动后分叉。
  *
  * ⚠️ **只负责"填"，不负责"判"**：必填与格式的判定统一在 `utils/invoice.ts` 的
- * `invoiceFieldError(form, type)`（**按票种判**，与后端 `InvoiceValidator` 同一套规则；
+ * `invoiceFieldError(form)`（与后端 `InvoiceValidator` 同一套规则；
  * Q36 之后抬头也带票种，所以抬头簿与开票申请用的是**同一个函数**）。
  */
 const model = defineModel<InvoiceApplyForm>({ required: true })
 
-/** 专票才要那四项 / 税号才必填 —— 与后端「专票五项全必填」的矩阵一致（Q27） */
+/**
+ * 专票才**显示**地址 / 电话 / 开户行三栏（**选填**，见 `invoiceFieldError`）。
+ * 必填只有「名称 + 税号」两项，**两种票一致**（2026-10-15 所有者口径）。
+ */
 const isSpecial = computed(() => model.value.type === InvoiceType.SPECIAL)
 </script>
 
@@ -54,14 +57,14 @@ const isSpecial = computed(() => model.value.type === InvoiceType.SPECIAL)
         id="invoiceTitleName"
         v-model="model.titleName"
         class="ml-input"
-        placeholder="公司名称或个人姓名"
+        placeholder="公司名称"
         autocomplete="off"
       >
     </MlField>
 
     <MlField
-      :label="isSpecial ? '纳税人识别号' : '纳税人识别号（选填）'"
-      :required="isSpecial"
+      label="纳税人识别号"
+      required
     >
       <input
         id="invoiceTaxNo"

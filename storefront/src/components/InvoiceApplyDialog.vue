@@ -34,7 +34,7 @@ const submitting = ref(false)
 const error = ref('')
 
 /** 实时提示（客户边填边看）；提交时再拦一道 —— 两处同一个纯函数 */
-const fieldError = computed(() => invoiceFieldError(form.value, form.value.type))
+const fieldError = computed(() => invoiceFieldError(form.value))
 
 // 每次打开都是一张空表：上一次填了一半的抬头留着，客户会以为已经提交过
 watch(() => props.open, (value) => {

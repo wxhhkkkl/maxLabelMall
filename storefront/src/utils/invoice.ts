@@ -10,8 +10,8 @@ import { InvoiceStatus, InvoiceType, type InvoiceStatusValue, type InvoiceTitleF
 
 /** 票种选项 —— 顺序即界面顺序；`label` 与后端 `InvoiceTypeEnum.name` 逐字一致 */
 export const INVOICE_TYPE_OPTIONS: Array<{ value: InvoiceTypeValue; label: string; hint: string }> = [
-  { value: InvoiceType.NORMAL, label: '电子普通发票', hint: '只需抬头名称，税号选填' },
-  { value: InvoiceType.SPECIAL, label: '电子增值税专用发票', hint: '需要名称、税号、地址、电话与开户行账号' },
+  { value: InvoiceType.NORMAL, label: '电子普通发票', hint: '填公司名称与纳税人识别号即可' },
+  { value: InvoiceType.SPECIAL, label: '电子增值税专用发票', hint: '名称与税号必填；地址、电话、开户行选填' },
 ]
 
 /**
@@ -41,20 +41,20 @@ export function isTaxNoValid(taxNo: string): boolean {
  *             而"没填"与"填了空"在界面上是同一件事 —— 两种都要能判
  * @returns 通过返回 `null`，否则返回**可直接展示给客户**的一句话，并点名缺哪一项（FR-156）
  */
-export function invoiceFieldError(form: Partial<InvoiceTitleFields>, type: InvoiceTypeValue): string | null {
+export function invoiceFieldError(form: Partial<InvoiceTitleFields>): string | null {
+  // **必填只有两项：抬头名称 + 纳税人识别号**（2026-10-15 所有者口径，两种票一致）。
+  // 地址 / 电话 / 开户行及账号一律选填 —— 专票也一样：客户手边未必有开户行账号，
+  // 不该因此存不下抬头、或者提交不了开票申请。
+  // ⚠️ **不看票种**：票种只决定"界面上显示不显示那三栏"，不决定必填。
+  // 后端 `InvoiceValidator.validate` 同此口径（它另外还要判票种本身的合法性）。
   if (!(form.titleName ?? '').trim()) {
     return '请填写抬头名称'
   }
-  // 专票比普票多要四项（Q27）
-  if (type === InvoiceType.SPECIAL) {
-    if (!(form.taxNo ?? '').trim()) return '请填写纳税人识别号'
-    if (!(form.titleAddress ?? '').trim()) return '请填写注册地址'
-    if (!(form.titlePhone ?? '').trim()) return '请填写注册电话'
-    if (!(form.bankName ?? '').trim()) return '请填写开户行及账号'
-  }
-  // 税号两种票都是选填，但**填了就要合法**
   const taxNo = (form.taxNo ?? '').trim()
-  if (taxNo && !isTaxNoValid(taxNo)) {
+  if (!taxNo) {
+    return '请填写纳税人识别号'
+  }
+  if (!isTaxNoValid(taxNo)) {
     return '纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）'
   }
   return null

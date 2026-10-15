@@ -63,6 +63,7 @@ describe('订单详情补开票弹层', () => {
     createOrderInvoice.mockRejectedValue(new Error('订单已取消，无法申请开票'))
     const w = mountDialog()
     await w.get('#invoiceTitleName').setValue('张三')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
     await w.get('#submitInvoice').trigger('click')
     await flushPromises()
 
@@ -75,6 +76,7 @@ describe('订单详情补开票弹层', () => {
     createOrderInvoice.mockReturnValue(new Promise<number>((r) => { resolve = r }))
     const w = mountDialog()
     await w.get('#invoiceTitleName').setValue('张三')
+    await w.get('#invoiceTaxNo').setValue('91320104660690975E')
 
     await w.get('#submitInvoice').trigger('click')
     await w.get('#submitInvoice').trigger('click')

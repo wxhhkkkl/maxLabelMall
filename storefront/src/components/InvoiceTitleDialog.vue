@@ -5,20 +5,26 @@ import { createInvoiceTitle, updateInvoiceTitle } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
 import MlCheck from '@/components/base/MlCheck.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types'
-import { invoiceTitleFieldError } from '@/utils/invoice'
+import { InvoiceType, type InvoiceApplyForm, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { invoiceFieldError } from '@/utils/invoice'
 
 /**
- * 发票抬头的**新增 / 编辑**弹层（US23 / FR-164）。
+ * 发票抬头的**新增 / 编辑**弹层（US23 / FR-164 + Q36）。
  *
- * 字段复用结算页那一套（`InvoiceFieldsForm`），但 **`show-type=false`** ——
- * 一条抬头两种票都能用，它本身不绑票种。
+ * 字段复用结算页那一套（`InvoiceFieldsForm`，**票种也在里面选**）——
+ * Q36 之后一条抬头**只服务一种票**：普票抬头只要名称，专票抬头五项全填，
+ * 校验统一走 `invoiceFieldError(form, form.type)`（与后端同一套规则）。
  */
-const props = defineProps<{ open: boolean; title?: InvoiceTitle | null }>()
+const props = defineProps<{
+  open: boolean
+  title?: InvoiceTitle | null
+  /** **预选票种**（Q36）：从结算页/补开弹层点「新增抬头」时，跟着当前选的票种走 */
+  type?: InvoiceTypeValue
+}>()
 const emit = defineEmits<{ close: []; submitted: [] }>()
 
 const emptyForm = (): InvoiceApplyForm => ({
-  type: InvoiceType.NORMAL, // 抬头簿不用票种，这里只是复用同一个表单模型
+  type: props.type ?? InvoiceType.NORMAL,
   titleName: '',
   taxNo: '',
   titleAddress: '',
@@ -41,7 +47,7 @@ watch(() => props.open, (value) => {
   const title = props.title
   form.value = title
     ? {
-        type: InvoiceType.NORMAL,
+        type: title.type,
         titleName: title.titleName,
         taxNo: title.taxNo ?? '',
         titleAddress: title.titleAddress ?? '',
@@ -56,8 +62,8 @@ watch(() => props.open, (value) => {
 async function onSubmit() {
   if (saving.value) return
   error.value = ''
-  // 抬头簿**只要求名称**（与后端 `InvoiceValidator#validateTitle` 同一口径）
-  const invalid = invoiceTitleFieldError(form.value)
+  // 按**抬头自己的票种**判（与后端 `InvoiceValidator#validate` 同一套规则）
+  const invalid = invoiceFieldError(form.value, form.value.type)
   if (invalid) {
     error.value = invalid
     return
@@ -65,6 +71,7 @@ async function onSubmit() {
   saving.value = true
   try {
     const payload = {
+      type: form.value.type,
       titleName: form.value.titleName,
       taxNo: form.value.taxNo,
       titleAddress: form.value.titleAddress,
@@ -93,10 +100,7 @@ async function onSubmit() {
     :title="isEdit ? '编辑发票抬头' : '新增发票抬头'"
     @close="emit('close')"
   >
-    <InvoiceFieldsForm
-      v-model="form"
-      :show-type="false"
-    />
+    <InvoiceFieldsForm v-model="form" />
     <MlCheck v-model="isDefault">
       设为默认抬头
     </MlCheck>

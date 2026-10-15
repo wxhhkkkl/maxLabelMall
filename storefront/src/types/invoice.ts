@@ -41,9 +41,16 @@ export interface InvoiceTitleFields {
   bankName?: string | null
 }
 
-/** 发票抬头簿里的一条（会员可维护多条） */
+/**
+ * 发票抬头簿里的一条（会员可维护多条）。
+ *
+ * ⚠️ **带票种**（Q36，2026-10-15 所有者要求"普票与专票分开管理"）：
+ * 一条抬头只服务一种票 —— 普票抬头只要名称，专票抬头五项全填。
+ * （此前是"不绑票种、一条两用"，已推翻。）
+ */
 export interface InvoiceTitle extends InvoiceTitleFields {
   id: number
+  type: InvoiceTypeValue
   defaultStatus: boolean
 }
 

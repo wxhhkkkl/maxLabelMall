@@ -4,7 +4,6 @@ import {
   INVOICE_TYPE_OPTIONS,
   invoiceFieldError,
   invoiceStatusName,
-  invoiceTitleFieldError,
   isTaxNoValid,
 } from './invoice'
 import { InvoiceStatus, InvoiceType } from '@/types/invoice'
@@ -68,14 +67,6 @@ describe('开票信息校验', () => {
     expect(INVOICE_TYPE_OPTIONS.map(o => o.label)).toEqual(['电子普通发票', '电子增值税专用发票'])
   })
 
-  it('抬头簿保存：**只要求名称**（抬头可以不完整，缺项在选专票时才暴露）', () => {
-    // 只开普票的客户不该被迫填开户行 —— 与后端 `validateTitle` 同一口径
-    expect(invoiceTitleFieldError({ titleName: '张三' })).toBeNull()
-    expect(invoiceTitleFieldError({ titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' })).toBeNull()
-    expect(invoiceTitleFieldError({ titleName: '  ' })).toContain('抬头名称')
-    // 税号是选填，但填了要合法
-    expect(invoiceTitleFieldError({ titleName: '张三', taxNo: 'abc' })).toContain('纳税人识别号')
-  })
 
   it('状态文案用词与后端枚举一致，不自行造同义词（SC-061 的可读性前提）', () => {
     expect(invoiceStatusName(InvoiceStatus.WAITING)).toBe('待开票')

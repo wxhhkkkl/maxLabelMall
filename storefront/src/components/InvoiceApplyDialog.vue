@@ -3,8 +3,9 @@ import { computed, ref, watch } from 'vue'
 
 import { createOrderInvoice } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
+import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceType, type InvoiceApplyForm } from '@/types/invoice'
+import { InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types/invoice'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -43,6 +44,18 @@ watch(() => props.open, (value) => {
   }
 })
 
+/** 选中一条已保存的抬头：只覆盖字段，**票种保留当前选择**（选择器只列本票种的） */
+function fillFrom(title: InvoiceTitle) {
+  form.value = {
+    type: form.value.type,
+    titleName: title.titleName,
+    taxNo: title.taxNo ?? '',
+    titleAddress: title.titleAddress ?? '',
+    titlePhone: title.titlePhone ?? '',
+    bankName: title.bankName ?? '',
+  }
+}
+
 async function onSubmit() {
   if (submitting.value) return
   error.value = ''
@@ -74,6 +87,10 @@ async function onSubmit() {
     <p class="invoice-apply-note">
       发票开出后可在这笔订单的详情里下载。开票信息提交后不可修改，请核对无误。
     </p>
+    <InvoiceTitlePicker
+      :type="form.type"
+      @picked="fillFrom"
+    />
     <InvoiceFieldsForm v-model="form" />
     <p
       v-if="error"

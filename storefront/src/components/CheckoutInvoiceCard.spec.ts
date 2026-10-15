@@ -122,43 +122,34 @@ describe('结算页发票卡片', () => {
   })
 })
 
-describe('结算页发票卡片 · 已保存的抬头（US23 / T420）', () => {
-  const savedTitles: InvoiceTitle[] = [
-    { id: 3, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E', titleAddress: '南京市玄武区', titlePhone: '18913984596', bankName: '工商银行', defaultStatus: true },
-    { id: 4, titleName: '张三', defaultStatus: false },
-  ]
-
-  it('**默认那条被预先填好**（但仍要客户自己勾"需要开发票"）', async () => {
-    listInvoiceTitles.mockResolvedValue(savedTitles)
-    const { w, model } = mountCard(false)
-    await flushPromises()
-
-    // 字段被填上，但开关没被动过 —— 不替客户决定"要开票"
-    expect(model.titleName).toBe('南京路桥机械有限公司')
-    expect(model.taxNo).toBe('91320104660690975E')
-    expect(w.emitted('update:enabled')).toBeUndefined()
-  })
-
-  it('可以改选另一条；选「重新填写」会清空字段', async () => {
-    listInvoiceTitles.mockResolvedValue(savedTitles)
+describe('结算页发票卡片 · 与抬头选择器的接线（US23 / T420）', () => {
+  it('选择器挑一条 → 字段被填上，**票种保留客户当前的选择**', async () => {
+    // 选择器自己的行为（按票种筛 / 新增 / 默认预选）由 InvoiceTitlePicker.spec.ts 覆盖，
+    // 这里只钉**接线**：卡片把选中的抬头填进表单时，不能把客户选的票种改掉
     const { w, model } = mountCard(true)
     await flushPromises()
+    model.type = InvoiceType.SPECIAL
 
-    await w.get('[data-invoice-title="4"]').trigger('click')
-    expect(model.titleName).toBe('张三')
-    // 第二条没填税号 → 不能带着上一条的税号
-    expect(model.taxNo).toBe('')
+    w.findComponent({ name: 'InvoiceTitlePicker' }).vm.$emit('picked', {
+      id: 3,
+      type: InvoiceType.NORMAL,
+      titleName: '南京路桥机械有限公司',
+      taxNo: '91320104660690975E',
+      defaultStatus: true,
+    })
+    await w.vm.$nextTick()
 
-    await w.get('[data-invoice-title="none"]').trigger('click')
-    expect(model.titleName).toBe('')
+    expect(model.titleName).toBe('南京路桥机械有限公司')
+    expect(model.taxNo).toBe('91320104660690975E')
+    expect(model.type).toBe(InvoiceType.SPECIAL) // ← 没有被抬头自带的票种改掉
   })
 
-  it('抬头列表拉不到 → 不显示选择区，但**照常能手填**（不阻塞开票）', async () => {
-    listInvoiceTitles.mockRejectedValue(new Error('offline'))
-    const { w } = mountCard(true)
+  it('把**当前票种**交给选择器（选专票时只列专票抬头）', async () => {
+    const { w, model } = mountCard(true)
     await flushPromises()
+    model.type = InvoiceType.SPECIAL
+    await w.vm.$nextTick()
 
-    expect(w.find('.invoice-saved').exists()).toBe(false)
-    expect(w.find('#invoiceTitleName').exists()).toBe(true)
+    expect(w.findComponent({ name: 'InvoiceTitlePicker' }).props('type')).toBe(InvoiceType.SPECIAL)
   })
 })

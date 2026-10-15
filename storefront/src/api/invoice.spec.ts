@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { InvoiceTitleForm } from '@/types'
+
 const get = vi.fn()
 const post = vi.fn()
 const put = vi.fn()
@@ -36,16 +38,18 @@ describe('发票抬头簿', () => {
 
   it('新增走 POST /trade/invoice-title/create，body 就是表单', async () => {
     post.mockResolvedValue(7)
-    const form = { titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E', defaultStatus: true }
+    // ⚠️ `type` 是必填（Q36：一条抬头只服务一种票）
+    const form: InvoiceTitleForm = { type: 1, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E', defaultStatus: true }
     await createInvoiceTitle(form)
     expect(post).toHaveBeenCalledWith('/trade/invoice-title/create', form)
   })
 
   it('修改带上 id', async () => {
     put.mockResolvedValue(true)
-    await updateInvoiceTitle(3, { titleName: '张三', defaultStatus: false })
+    await updateInvoiceTitle(3, { type: 1, titleName: '张三', defaultStatus: false })
     expect(put).toHaveBeenCalledWith('/trade/invoice-title/update', {
       id: 3,
+      type: 1,
       titleName: '张三',
       defaultStatus: false,
     })

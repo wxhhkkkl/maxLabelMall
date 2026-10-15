@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { deleteInvoiceTitle, listInvoiceTitles, updateInvoiceTitle } from '@/api/invoice'
 import AccountSidebar from '@/components/AccountSidebar.vue'
@@ -7,7 +7,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import InvoiceTitleDialog from '@/components/InvoiceTitleDialog.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import { useToasts } from '@/components/base/useToasts'
-import type { InvoiceTitle } from '@/types'
+import { INVOICE_TYPE_NAME, InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
 
 /**
  * 个人中心 · 发票抬头簿（US23 / FR-164）
@@ -24,6 +24,18 @@ const error = ref(false)
 
 const dialogOpen = ref(false)
 const editing = ref<InvoiceTitle | null>(null)
+/** 新增时的预选票种（Q36：两个票种分开管理，各自有"新增"入口） */
+const creatingType = ref<InvoiceTypeValue>(InvoiceType.NORMAL)
+
+/**
+ * 按票种**分两段**展示（Q36）。顺序固定：普票在前。
+ * ⚠️ 每段只列本票种的抬头 —— 混在一起就等于没分开管理。
+ */
+const groups = computed(() => ([InvoiceType.NORMAL, InvoiceType.SPECIAL] as const).map(type => ({
+  type,
+  label: INVOICE_TYPE_NAME[type],
+  list: list.value.filter(t => t.type === type),
+})))
 const toast = useToasts()
 
 async function load() {
@@ -38,8 +50,9 @@ async function load() {
   }
 }
 
-function openCreate() {
+function openCreate(type: InvoiceTypeValue = InvoiceType.NORMAL) {
   editing.value = null
+  creatingType.value = type
   dialogOpen.value = true
 }
 
@@ -66,6 +79,7 @@ async function onDelete(title: InvoiceTitle) {
 async function onSetDefault(title: InvoiceTitle) {
   try {
     await updateInvoiceTitle(title.id, {
+      type: title.type,
       titleName: title.titleName,
       taxNo: title.taxNo ?? '',
       titleAddress: title.titleAddress ?? '',
@@ -86,22 +100,32 @@ onMounted(load)
 <template>
   <div class="account-section-page">
     <div class="crumbs">
-      <RouterLink to="/">首页</RouterLink> / <RouterLink to="/account">个人中心</RouterLink> / <span>发票抬头</span>
+      <RouterLink to="/">
+        首页
+      </RouterLink> / <RouterLink to="/account">
+        个人中心
+      </RouterLink> / <span>发票抬头</span>
     </div>
 
     <div class="account-wrap">
       <AccountSidebar />
       <div class="account-main account-section-main">
         <div class="account-page-heading">
-          <div><h1>发票抬头</h1><p>存好常用抬头，下单开票时直接选，不用每次重填。</p></div>
-          <button id="addInvoiceTitle" class="account-primary-button" type="button" @click="openCreate">新增抬头</button>
+          <!--
+            Q36：不再有"全局新增"—— 普票与专票分开管理，**每一段各有自己的「新增」**。
+            一个不分票种的新增按钮，客户点下去还得再想"这是哪一类"。
+          -->
+          <div><h1>发票抬头</h1><p>普票与专票分开管理；存好后下单开票时直接选，不用每次重填。</p></div>
         </div>
 
         <div class="account-content-card">
           <div class="account-section-heading">
             <h2>抬头管理</h2><span v-if="!loading && !error">共 {{ list.length }} 条</span>
           </div>
-          <LoadingState v-if="loading" :count="2" />
+          <LoadingState
+            v-if="loading"
+            :count="2"
+          />
 
           <EmptyState
             v-else-if="error"
@@ -113,32 +137,99 @@ onMounted(load)
           />
 
           <template v-else>
-            <div v-if="list.length" class="invoice-title-list">
-              <div v-for="t in list" :key="t.id" class="ml-card invoice-title-card" :class="{ 'is-default': t.defaultStatus }">
-                <div class="invoice-title-head">
-                  <span class="invoice-title-name">{{ t.titleName }}</span>
-                  <span v-if="t.defaultStatus" class="ml-pill is-done">默认</span>
-                </div>
-                <p v-if="t.taxNo" class="invoice-title-line">税号：{{ t.taxNo }}</p>
-                <p v-if="t.titleAddress" class="invoice-title-line">地址：{{ t.titleAddress }}</p>
-                <p v-if="t.titlePhone" class="invoice-title-line">电话：{{ t.titlePhone }}</p>
-                <p v-if="t.bankName" class="invoice-title-line">开户行：{{ t.bankName }}</p>
-                <div class="invoice-title-actions">
-                  <button class="btn-cart" type="button" @click="openEdit(t)">编辑</button>
-                  <button v-if="!t.defaultStatus" class="btn-cart" type="button" @click="onSetDefault(t)">设为默认</button>
-                  <button class="btn-cart" type="button" @click="onDelete(t)">删除</button>
+            <!-- 按票种分两段（Q36）：普票 / 专票各自有"新增"，各自的默认也只在本段内生效 -->
+            <section
+              v-for="group in groups"
+              :key="group.type"
+              class="invoice-title-group"
+              :data-invoice-group="group.type"
+            >
+              <div class="invoice-title-group-head">
+                <h3>{{ group.label }}</h3>
+                <button
+                  class="account-primary-button"
+                  type="button"
+                  :data-add-title="group.type"
+                  @click="openCreate(group.type)"
+                >
+                  新增{{ group.label }}
+                </button>
+              </div>
+
+              <div
+                v-if="group.list.length"
+                class="invoice-title-list"
+              >
+                <div
+                  v-for="t in group.list"
+                  :key="t.id"
+                  class="ml-card invoice-title-card"
+                  :class="{ 'is-default': t.defaultStatus }"
+                >
+                  <div class="invoice-title-head">
+                    <span class="invoice-title-name">{{ t.titleName }}</span>
+                    <span
+                      v-if="t.defaultStatus"
+                      class="ml-pill is-done"
+                    >默认</span>
+                  </div>
+                  <p
+                    v-if="t.taxNo"
+                    class="invoice-title-line"
+                  >
+                    税号：{{ t.taxNo }}
+                  </p>
+                  <p
+                    v-if="t.titleAddress"
+                    class="invoice-title-line"
+                  >
+                    地址：{{ t.titleAddress }}
+                  </p>
+                  <p
+                    v-if="t.titlePhone"
+                    class="invoice-title-line"
+                  >
+                    电话：{{ t.titlePhone }}
+                  </p>
+                  <p
+                    v-if="t.bankName"
+                    class="invoice-title-line"
+                  >
+                    开户行：{{ t.bankName }}
+                  </p>
+                  <div class="invoice-title-actions">
+                    <button
+                      class="btn-cart"
+                      type="button"
+                      @click="openEdit(t)"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      v-if="!t.defaultStatus"
+                      class="btn-cart"
+                      type="button"
+                      @click="onSetDefault(t)"
+                    >
+                      设为默认
+                    </button>
+                    <button
+                      class="btn-cart"
+                      type="button"
+                      @click="onDelete(t)"
+                    >
+                      删除
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <EmptyState
-              v-else
-              icon="🧾"
-              title="还没有发票抬头"
-              desc="存一条常用抬头，下单开票时直接选"
-              action-text="新增抬头"
-              @action="openCreate"
-            />
+              <p
+                v-else
+                class="ml-hint invoice-title-group-empty"
+              >
+                还没有{{ group.label }}的抬头
+              </p>
+            </section>
           </template>
         </div>
 
@@ -153,6 +244,7 @@ onMounted(load)
     <InvoiceTitleDialog
       :open="dialogOpen"
       :title="editing"
+      :type="creatingType"
       @close="dialogOpen = false"
       @submitted="onSubmitted"
     />
@@ -167,6 +259,11 @@ onMounted(load)
 .invoice-title-name { font-size: 15px; font-weight: 600; color: #16233f; }
 .invoice-title-line { margin: 0; font-size: 13px; color: #5b6c8f; line-height: 1.8; }
 .invoice-title-actions { display: flex; gap: 10px; margin-top: 6px; }
+.invoice-title-group + .invoice-title-group { margin-top: 28px; }
+.invoice-title-group-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.invoice-title-group-head h3 { font-size: 15px; margin: 0; color: #16233f; }
+.invoice-title-group-head .account-primary-button { margin-left: auto; }
+.invoice-title-group-empty { margin: 0; }
 .invoice-title-note h2 { font-size: 15px; margin: 0 0 10px; }
 .invoice-title-note p { margin: 0 0 8px; font-size: 13px; color: #5b6c8f; line-height: 1.8; }
 </style>

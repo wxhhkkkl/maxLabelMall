@@ -1,3 +1,4 @@
+import type { InvoiceTitle } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,8 +22,9 @@ const InvoiceTitleDialog = (await import('./InvoiceTitleDialog.vue')).default
  * · 新增与编辑走不同接口，编辑必须带上 `id`
  * · 「设为默认」是随表单一起提交的 `defaultStatus`
  */
-const TITLE = {
+const TITLE: InvoiceTitle = {
   id: 3,
+  type: 2, // 专票（Q36 起抬头带票种）
   titleName: '南京路桥机械有限公司',
   taxNo: '91320104660690975E',
   titleAddress: '南京市玄武区某某路 1 号',
@@ -58,6 +60,7 @@ describe('发票抬头弹层', () => {
     await flushPromises()
 
     expect(createInvoiceTitle).toHaveBeenCalledWith({
+      type: 1, // 默认普票
       titleName: '张三',
       taxNo: '',
       titleAddress: '',
@@ -66,6 +69,22 @@ describe('发票抬头弹层', () => {
       defaultStatus: false,
     })
     expect(w.emitted('submitted')).toHaveLength(1)
+  })
+
+  it('**专票抬头**必须五项全填（Q36：按抬头自己的票种判）', async () => {
+    const w = mount(InvoiceTitleDialog, { props: { open: true, title: null, type: 2 } })
+
+    // 只填名称 → 拒（专票要税号/地址/电话/开户行）
+    await w.get('#invoiceTitleName').setValue('南京路桥机械有限公司')
+    await w.get('#saveInvoiceTitle').trigger('click')
+    expect(createInvoiceTitle).not.toHaveBeenCalled()
+    expect(w.text()).toContain('纳税人识别号')
+
+    // 切回普票 → 只填名称就能存
+    await w.findAll('.invoice-type')[0]!.trigger('click')
+    await w.get('#saveInvoiceTitle').trigger('click')
+    await flushPromises()
+    expect(createInvoiceTitle).toHaveBeenCalledWith(expect.objectContaining({ type: 1, titleName: '南京路桥机械有限公司' }))
   })
 
   it('编辑时预填该条抬头，并用 update 带上 id', async () => {

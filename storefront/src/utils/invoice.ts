@@ -59,21 +59,3 @@ export function invoiceFieldError(form: Partial<InvoiceTitleFields>, type: Invoi
   }
   return null
 }
-
-/**
- * 校验**保存到抬头簿**的一条抬头：**只要求名称**。
- *
- * ⚠️ 比 {@link invoiceFieldError} 宽松，与后端 `InvoiceValidator#validateTitle` 同一口径：
- * 抬头可以不完整（只开普票的客户没必要填开户行），缺项在他**选择专票**时才会被拒。
- * 两处不一致的后果：客户存不进一条合法的抬头，或者存进了开票时才报错。
- */
-export function invoiceTitleFieldError(form: Partial<InvoiceTitleFields>): string | null {
-  if (!(form.titleName ?? '').trim()) {
-    return '请填写抬头名称'
-  }
-  const taxNo = (form.taxNo ?? '').trim()
-  if (taxNo && !isTaxNoValid(taxNo)) {
-    return '纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）'
-  }
-  return null
-}

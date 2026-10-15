@@ -8,49 +8,43 @@ import { INVOICE_TYPE_OPTIONS } from '@/utils/invoice'
 /**
  * 开票信息的字段表单：**票种 + 抬头五件套**。
  *
- * 三个地方共用它：结算页的发票卡片、订单详情的补开弹层、个人中心的抬头簿弹层 ——
- * 各写一份必然在某次改动后分叉（placeholder、必填提示都不一样了）。
+ * 四个地方共用它：结算页的发票卡片、订单详情的补开弹层、抬头簿的新增/编辑弹层、
+ * 以及"从已保存抬头里选一条"之后的手改 —— 各写一份必然在某次改动后分叉。
  *
- * ⚠️ **只负责"填"，不负责"判"**：必填与格式的判定在 `utils/invoice.ts`
- * （`invoiceFieldError` 按票种判、`invoiceTitleFieldError` 只判名称），由调用方决定何时展示与拦截。
+ * ⚠️ **只负责"填"，不负责"判"**：必填与格式的判定统一在 `utils/invoice.ts` 的
+ * `invoiceFieldError(form, type)`（**按票种判**，与后端 `InvoiceValidator` 同一套规则；
+ * Q36 之后抬头也带票种，所以抬头簿与开票申请用的是**同一个函数**）。
  */
-const props = withDefaults(defineProps<{ showType?: boolean }>(), { showType: true })
 const model = defineModel<InvoiceApplyForm>({ required: true })
 
-/** 专票才要那四项 —— 与后端「专票五项全必填」的矩阵一致（Q27） */
+/** 专票才要那四项 / 税号才必填 —— 与后端「专票五项全必填」的矩阵一致（Q27） */
 const isSpecial = computed(() => model.value.type === InvoiceType.SPECIAL)
-/** 票种被隐藏时（抬头簿），税号不设为必填：一条抬头两种票都能用 */
-const taxNoRequired = computed(() => props.showType && isSpecial.value)
-/** 地址 / 电话 / 开户行**始终显示**（抬头可以不完整，客户愿意填就该让他填） */
-const showExtraFields = computed(() => !props.showType || isSpecial.value)
 </script>
 
 <template>
   <div class="invoice-fields">
-    <template v-if="showType">
-      <div
-        class="invoice-types"
-        role="radiogroup"
-        aria-label="发票类型"
+    <div
+      class="invoice-types"
+      role="radiogroup"
+      aria-label="发票类型"
+    >
+      <button
+        v-for="option in INVOICE_TYPE_OPTIONS"
+        :key="option.value"
+        type="button"
+        class="invoice-type"
+        role="radio"
+        :aria-checked="model.type === option.value"
+        :class="{ 'is-active': model.type === option.value }"
+        :data-invoice-type="option.value"
+        @click="model.type = option.value"
       >
-        <button
-          v-for="option in INVOICE_TYPE_OPTIONS"
-          :key="option.value"
-          type="button"
-          class="invoice-type"
-          role="radio"
-          :aria-checked="model.type === option.value"
-          :class="{ 'is-active': model.type === option.value }"
-          :data-invoice-type="option.value"
-          @click="model.type = option.value"
-        >
-          {{ option.label }}
-        </button>
-      </div>
-      <p class="invoice-type-hint">
-        {{ INVOICE_TYPE_OPTIONS.find(o => o.value === model.type)?.hint }}
-      </p>
-    </template>
+        {{ option.label }}
+      </button>
+    </div>
+    <p class="invoice-type-hint">
+      {{ INVOICE_TYPE_OPTIONS.find(o => o.value === model.type)?.hint }}
+    </p>
 
     <MlField
       label="抬头名称"
@@ -66,8 +60,8 @@ const showExtraFields = computed(() => !props.showType || isSpecial.value)
     </MlField>
 
     <MlField
-      :label="taxNoRequired ? '纳税人识别号' : '纳税人识别号（选填）'"
-      :required="taxNoRequired"
+      :label="isSpecial ? '纳税人识别号' : '纳税人识别号（选填）'"
+      :required="isSpecial"
     >
       <input
         id="invoiceTaxNo"
@@ -78,7 +72,7 @@ const showExtraFields = computed(() => !props.showType || isSpecial.value)
       >
     </MlField>
 
-    <template v-if="showExtraFields">
+    <template v-if="isSpecial">
       <MlField label="注册地址">
         <input
           id="invoiceTitleAddress"

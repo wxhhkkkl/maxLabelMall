@@ -87,8 +87,17 @@ const props = defineProps({
   drag: propTypes.bool.def(false), // 拖拽上传
   isShowTip: propTypes.bool.def(true), // 是否显示提示
   disabled: propTypes.bool.def(false), // 是否禁用上传组件 ==> 非必传（默认为 false）
-  directory: propTypes.string.def(undefined) // 上传目录 ==> 非必传（默认为 undefined）
+  directory: propTypes.string.def(undefined), // 上传目录 ==> 非必传（默认为 undefined）
+  // 列表里**显示的文件名**怎么算 ==> 非必传（默认取 URL 最后一段，与既有行为一致）。
+  // 给发票用：原始文件名常常是「%E5%BE%AE%E4%BF%A1..._20261012143256_109_114.png」这种
+  // 又长又是 URL 编码的，页面显示它既看不懂也挤不下（2026-10-15 所有者反馈）。
+  // 传一个 `(url) => string` 就能把它缩成短名，**不改动其它页面的行为**。
+  nameFormatter: propTypes.func.def(undefined)
 })
+
+/** 列表里显示的文件名：默认取 URL 最后一段（既有行为），调用方可自定义 */
+const displayName = (url: string) =>
+  props.nameFormatter ? props.nameFormatter(url) : url.substring(url.lastIndexOf('/') + 1)
 
 // ========== 上传相关 ==========
 const uploadList = ref<UploadUserFile[]>([])
@@ -197,13 +206,13 @@ watch(
     // 情况1：字符串
     if (isString(val)) {
       fileList.value.push(
-        ...val.split(',').map((url) => ({ name: url.substring(url.lastIndexOf('/') + 1), url }))
+        ...val.split(',').map((url) => ({ name: displayName(url), url }))
       )
       return
     }
     // 情况2：数组
     fileList.value.push(
-      ...(val as string[]).map((url) => ({ name: url.substring(url.lastIndexOf('/') + 1), url }))
+      ...(val as string[]).map((url) => ({ name: displayName(url), url }))
     )
   },
   { immediate: true, deep: true }

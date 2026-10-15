@@ -13,9 +13,13 @@ C 端（`storefront`）本期新增与改动的接口。所有路径以 `/app-ap
 
 当前登录会员的全部抬头，默认项排在最前。
 
+> **Q36（2026-10-15）起抬头带票种**：`type` 必填，一条抬头**只服务一种票** ——
+> 前端按它把列表分成"普票 / 专票"两段，结算/补开时**只列与所选票种相符**的那些。
+> 默认抬头的唯一性也随之变成**按会员 + 票种**各一条。
+
 ```jsonc
 { "code": 0, "data": [
-  { "id": 3, "titleName": "南京路桥机械有限公司", "taxNo": "91320104660690975E",
+  { "id": 3, "type": 1, "titleName": "南京路桥机械有限公司", "taxNo": "91320104660690975E",
     "titleAddress": "南京市…", "titlePhone": "18913984596", "bankName": "工商银行南京分行 6222…",
     "defaultStatus": true }
 ], "msg": "" }
@@ -25,7 +29,8 @@ C 端（`storefront`）本期新增与改动的接口。所有路径以 `/app-ap
 
 ```jsonc
 // 请求（`titleName` 必填，其余选填 —— 抬头可以不完整，缺项在选专票时才被拒，见 data-model §4）
-{ "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…", "defaultStatus": false }
+// `type` 必填（1 普票 / 2 专票，Q36）；普票抬头只要名称，专票抬头五项全填
+{ "type": 1, "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…", "defaultStatus": false }
 // 响应：新抬头的 id
 { "code": 0, "data": 4, "msg": "" }
 ```

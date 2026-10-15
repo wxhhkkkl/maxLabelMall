@@ -40,6 +40,8 @@ const loading = ref(true)
 const notFound = ref(false)
 const currentSkuId = ref<number | null>(null)
 const qty = ref(1)
+const qtyInput = ref('1')
+watch(qty, value => { qtyInput.value = String(value) })
 const detailTab = ref<'description' | 'specs' | 'support'>('description')
 const shownTab = computed(() => detailTab.value === 'description' && !safeDescription.value ? 'specs' : detailTab.value)
 const selectedSpecText = computed(() => currentSku.value?.properties?.map(p => `${p.propertyName}：${p.valueName}`).join(' / ') || '标准规格')
@@ -110,7 +112,14 @@ function pickSku(s: ProductSku) {
   pickedPic.value = ''
 }
 
+function commitQty() {
+  const value = Number(qtyInput.value)
+  qty.value = Math.max(1, Math.min(Number.isFinite(value) ? Math.floor(value) : 1, Math.max(1, stock.value)))
+  qtyInput.value = String(qty.value)
+}
+
 function stepQty(d: number) {
+  commitQty()
   const next = qty.value + d
   qty.value = Math.max(1, Math.min(next, Math.max(1, stock.value)))
 }
@@ -120,6 +129,7 @@ function stepQty(d: number) {
  * 此时必须明确提示而不是拿一个空 skuId 去加购或结算（FR-017 / FR-018）。
  */
 function requireSku(): ProductSku | null {
+  commitQty()
   if (currentSku.value) {
     if (currentSku.value.stock <= 0) { toast.warn('当前规格暂时缺货'); return null }
     if (qty.value > currentSku.value.stock) { toast.warn('购买数量超过可用库存'); return null }
@@ -364,10 +374,20 @@ watch(() => props.id, load)
               >
                 −
               </button>
-              <span
+              <input
+                v-model="qtyInput"
                 class="qty-num"
-                aria-live="polite"
-              >{{ qty }}</span>
+                type="number"
+                inputmode="numeric"
+                aria-label="购买数量"
+                min="1"
+                :max="Math.max(1, stock)"
+                step="1"
+                :disabled="stock <= 0"
+                @change="commitQty"
+                @blur="commitQty"
+                @keydown.enter.prevent="commitQty"
+              >
               <button
                 class="qty-btn plus"
                 type="button"

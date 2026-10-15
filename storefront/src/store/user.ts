@@ -36,7 +36,7 @@ export const useUserStore = defineStore('user', () => {
   /** 顶栏展示名：优先昵称，无昵称时回落为脱敏手机号（FR-016） */
   const displayName = computed(() => {
     if (!isLogin.value) return ''
-    const nickname = member.value?.nickname
+    const nickname = member.value?.nickname?.trim()
     if (nickname) return nickname
     const mobile = member.value?.mobile
     return mobile ? maskMobile(mobile) : ''

@@ -103,6 +103,35 @@ beforeEach(async () => {
 })
 
 describe('MallView —— 商品网格与总数', () => {
+  it('首页加载分类和楼层商品时始终不插入筛选列表布局', async () => {
+    let resolveCategories!: (value: Category[]) => void
+    let resolveProducts!: (value: { list: ProductSpu[]; total: number }) => void
+    listCategories.mockImplementationOnce(() => new Promise(resolve => { resolveCategories = resolve }))
+    pageProducts.mockImplementation(() => new Promise(resolve => { resolveProducts = resolve }))
+    const w = mount(MallView, { global: { plugins: [router, createPinia()] } })
+    expect(w.find('.mall-home-loading').exists()).toBe(true)
+    expect(w.find('.mall-page-main').exists()).toBe(false)
+    resolveCategories(CATS)
+    await flushPromises()
+    expect(w.find('.mall-home').exists()).toBe(true)
+    expect(w.find('.mall-page-main').exists()).toBe(false)
+    pageProducts.mockResolvedValue({ list: [], total: 0 })
+    resolveProducts({ list: [], total: 0 })
+    await flushPromises()
+    expect(w.find('.mall-home').exists()).toBe(true)
+  })
+
+  it('分类直达链接从首帧就进入筛选布局，不先显示首页', async () => {
+    await router.push('/mall?category=10')
+    listCategories.mockResolvedValue(CATS)
+    pageProducts.mockResolvedValue({ list: [], total: 0 })
+    const w = mount(MallView, { global: { plugins: [router, createPinia()] } })
+    expect(w.find('.mall-home').exists()).toBe(false)
+    expect(w.find('.mall-home-loading').exists()).toBe(false)
+    expect(w.find('.mall-page-main').exists()).toBe(true)
+    await flushPromises()
+  })
+
   it('展示真实商品', async () => {
     const w = await mountMall()
     expect(w.text()).toContain('真实商品 1')
@@ -257,6 +286,7 @@ describe('MallView —— 移除后端不支持的 UI（FR-004a / FR-002a）', (
 
 describe('MallView —— 请求失败要有可重试提示（FR-045）', () => {
   it('商品加载失败时展示错误态与重试按钮', async () => {
+    await router.push('/mall?view=all')
     pageProducts.mockRejectedValue(new Error('Network Error'))
     listCategories.mockResolvedValue(CATS)
     const w = mount(MallView, { global: { plugins: [router, createPinia()] } })

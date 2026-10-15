@@ -62,13 +62,14 @@ const ALL_PATHS = [
   '/templates',
   '/changelog',
   '/about',
+  '/after-sales-policy',
   '/news',
   '/contact',
   '/jobs',
 ]
 
 describe('路由表', () => {
-  it('声明了 29 条路径（含个人中心新增页、支持详情页、行业详情与商品评价页）', () => {
+  it('声明了 30 条路径（含售后政策页）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -83,7 +84,7 @@ describe('路由表', () => {
     // 2026-10-10：支持文章 / 联系支持页 +2（26 → 28）。
     // 2026-10-10：商品详情改版追加 /product/:id/comments（28 → 29）—— 与上一个 +2 是
     //             两条并行的线，合并时一起算，别把任一边的计数覆盖掉。
-    expect(paths).toHaveLength(29)
+    expect(paths).toHaveLength(30)
     expect(paths).toContain('/')
   })
 

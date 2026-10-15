@@ -1,12 +1,28 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, ref } from 'vue'
 import type { Banner, CategoryNode } from '@/types'
 import MallBanner from './MallBanner.vue'
 import MallDepartments from './MallDepartments.vue'
 import MallIcon from './MallIcon.vue'
 import '@/styles/mall-home.css'
 
-defineProps<{ categories: CategoryNode[]; banners: Banner[] }>()
+const props = defineProps<{ categories: CategoryNode[]; banners: Banner[] }>()
 const emit = defineEmits<{ select: [id?: number] }>()
+const openCategoryId = ref<number>()
+const openCategory = computed(() => props.categories.find(category => category.id === openCategoryId.value && category.children?.length))
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+function cancelClose() { clearTimeout(closeTimer) }
+function showCategory(category: CategoryNode) {
+  cancelClose()
+  openCategoryId.value = category.children?.length ? category.id : undefined
+}
+function closeCategory() { cancelClose(); openCategoryId.value = undefined }
+function scheduleClose() { cancelClose(); closeTimer = setTimeout(closeCategory, 300) }
+function pickCategory(id?: number) { closeCategory(); emit('select', id) }
+function closeOnFocusOut(event: FocusEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) closeCategory()
+}
+onBeforeUnmount(cancelClose)
 const steps = [{ title: '选购商品', icon: 'cart' }, { title: '确认订单', icon: 'order' }, { title: '完成支付', icon: 'payment' }, { title: '等待收货', icon: 'truck' }]
 function categoryIcon(name: string) {
   if (/RFID/i.test(name)) return 'rfid'
@@ -21,35 +37,74 @@ function categoryIcon(name: string) {
 
 <template>
   <div class="mall-container mall-home">
-    <div class="mall-home-hero">
+    <div
+      class="mall-home-hero"
+      @focusout="closeOnFocusOut"
+      @keydown.esc.stop.prevent="closeCategory"
+    >
       <nav
         class="mall-home-directory"
         aria-label="商品分类"
         :style="{ '--category-count': categories.length }"
+        @mouseleave="scheduleClose"
       >
         <button
           class="cat-all mall-home-all"
           type="button"
           @click="emit('select')"
+          @mouseenter="closeCategory"
+          @focus="closeCategory"
         >
           <MallIcon name="menu" /> 全部商品分类
         </button>
-        <button
+        <div
           v-for="category in categories"
           :key="category.id"
-          type="button"
-          @click="emit('select', category.id)"
+          class="mall-directory-item"
+          @mouseenter="showCategory(category)"
         >
-          <MallIcon
-            class="mall-directory-icon"
-            :name="categoryIcon(category.name)"
-          />
-          <strong>{{ category.name }}</strong><MallIcon
-            class="mall-directory-chevron"
-            name="chevron"
-          />
-        </button>
+          <button
+            type="button"
+            :class="{ 'is-open': openCategoryId === category.id }"
+            :aria-expanded="category.children?.length ? openCategoryId === category.id : undefined"
+            :aria-controls="category.children?.length ? 'mall-category-flyout' : undefined"
+            @focus="showCategory(category)"
+            @click="pickCategory(category.id)"
+          >
+            <MallIcon
+              class="mall-directory-icon"
+              :name="categoryIcon(category.name)"
+            />
+            <strong>{{ category.name }}</strong><MallIcon
+              class="mall-directory-chevron"
+              name="chevron"
+            />
+          </button>
+        </div>
       </nav>
+      <div
+        v-if="openCategory"
+        id="mall-category-flyout"
+        class="mall-category-flyout"
+        :aria-label="`${openCategory.name}二级分类`"
+        @mouseenter="cancelClose"
+        @mouseleave="scheduleClose"
+        @focusin="cancelClose"
+      >
+        <div class="mall-category-flyout-heading">
+          <MallIcon :name="categoryIcon(openCategory.name)" /><h2>{{ openCategory.name }}</h2><span>按分类选购</span>
+        </div>
+        <div class="mall-category-flyout-links">
+          <button
+            v-for="child in openCategory.children"
+            :key="child.id"
+            type="button"
+            @click="pickCategory(child.id)"
+          >
+            {{ child.name }}<MallIcon name="chevron" />
+          </button>
+        </div>
+      </div>
       <div class="mall-home-banner-area">
         <MallBanner
           v-if="banners.length"

@@ -141,6 +141,13 @@ onMounted(load)
       <!-- 有效条目 -->
       <div class="ml-card">
         <div class="ml-card-title">已选商品（{{ valid.length }}）</div>
+        <div v-if="valid.length" class="cart-list-head">
+          <span class="cart-head-product">商品名称</span>
+          <span class="cart-head-price">单价</span>
+          <span class="cart-head-qty">数量</span>
+          <span class="cart-head-total">总计</span>
+          <span class="cart-head-action">操作</span>
+        </div>
         <div v-for="item in valid" :key="item.id" class="cart-row">
           <MlCheck
             class="cart-check"
@@ -161,13 +168,13 @@ onMounted(load)
               </template>
             </p>
           </div>
-          <div class="cart-price">{{ formatYuan(item.sku.price) }}</div>
+          <div class="cart-price" data-label="单价">{{ formatYuan(item.sku.price) }}</div>
           <div class="cart-qty">
             <span class="cart-qty-minus qty-btn" @click="onStepQty(item, -1)">−</span>
             <span class="cart-qty-num qty-num">{{ item.count }}</span>
             <span class="cart-qty-plus qty-btn plus" @click="onStepQty(item, 1)">+</span>
           </div>
-          <div class="cart-subtotal">{{ formatYuan(item.sku.price * item.count) }}</div>
+          <div class="cart-subtotal" data-label="总计">{{ formatYuan(item.sku.price * item.count) }}</div>
           <button class="cart-remove" type="button" aria-label="删除" @click="onRemove(item)">
             ×
           </button>
@@ -190,7 +197,7 @@ onMounted(load)
           <div class="cart-info">
             <span class="cart-name">{{ item.spu.name }}</span>
           </div>
-          <div class="cart-price">{{ formatYuan(item.sku.price) }}</div>
+          <div class="cart-price" data-label="单价">{{ formatYuan(item.sku.price) }}</div>
           <button class="cart-remove" type="button" aria-label="删除" @click="onRemove(item)">
             ×
           </button>
@@ -226,11 +233,27 @@ onMounted(load)
 </template>
 
 <style scoped>
+.cart-list-head,
 .cart-row {
   display: grid;
-  grid-template-columns: 24px 72px 1fr auto auto auto 28px;
+  grid-template-columns: 24px 72px minmax(0, 1fr) 100px 96px 110px 44px;
   gap: 12px;
   align-items: center;
+}
+.cart-list-head {
+  padding: 12px 0;
+  background: var(--ml-bg-card);
+  border-radius: var(--ml-radius-field);
+  font-size: 13px;
+  color: var(--ml-text-sub);
+}
+.cart-head-product { grid-column: 1 / 4; padding-left: 36px; }
+.cart-head-price,
+.cart-head-total { text-align: right; }
+.cart-head-qty,
+.cart-head-action { text-align: center; }
+.cart-info { min-width: 0; overflow-wrap: anywhere; }
+.cart-row {
   padding: 14px 0;
   border-bottom: 1px solid var(--ml-border);
 }
@@ -292,6 +315,8 @@ onMounted(load)
   text-align: center;
 }
 .cart-remove {
+  grid-column: 7;
+  justify-self: center;
   border: 0;
   background: none;
   color: var(--ml-text-ph);
@@ -343,16 +368,32 @@ onMounted(load)
   cursor: not-allowed;
 }
 @media (max-width: 768px) {
+  .cart-list-head { display: none; }
   .cart-row {
     grid-template-columns: 24px 56px 1fr 28px;
     row-gap: 8px;
   }
+  .cart-check,
+  .cart-invalid-tag { grid-column: 1; grid-row: 1; }
+  .cart-thumb { grid-column: 2; grid-row: 1; width: 56px; height: 56px; }
+  .cart-info { grid-column: 3; grid-row: 1; }
+  .cart-remove { grid-column: 4; grid-row: 1; }
   .cart-price,
   .cart-qty,
   .cart-subtotal {
-    grid-column: 3 / 4;
+    grid-column: 3 / 5;
     text-align: left;
   }
+  .cart-price::before,
+  .cart-subtotal::before {
+    content: attr(data-label);
+    margin-right: 14px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ml-text-sub);
+  }
+  .cart-qty { position: relative; margin-left: 38px; justify-self: start; overflow: visible; }
+  .cart-qty::before { content: '数量'; position: absolute; left: -39px; color: var(--ml-text-sub); font-size: 12px; }
   .cart-bar {
     position: sticky;
     bottom: 0;

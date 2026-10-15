@@ -28,7 +28,7 @@ import HeaderCart from './HeaderCart.vue'
  */
 
 /**
- * 导航项 —— **固定为设计稿的这五项，不再往顶栏加入口**。
+ * 导航项 —— 公共导航与手机菜单共用；公司介绍直接进入 /about。
  *
  * 「领券中心」与「我的订单」一度放在这里（T125 / T113），但**已移到个人中心**
  * （2026-09-27，按所有者反馈：「放在个人中心里面比较合理」）。移到 `AccountView`
@@ -36,7 +36,7 @@ import HeaderCart from './HeaderCart.vue'
  *
  * 顺带解决了一个真实缺陷：顶栏加到 7 项后，1101–1200px 这段空间不够，
  * 而 header 里的文字**没有 `nowrap`**，于是每一个子项都逐字竖排折行
- * （「赋签」变成上下两个字）。回到 5 项 + 补 `nowrap` 之后不再出现。
+ * （「赋签」变成上下两个字）。保留 nowrap，并在增加公司入口后调整窄屏间距。
  */
 const NAV = [
   { to: '/', label: '首页', name: 'home' },
@@ -44,6 +44,7 @@ const NAV = [
   { to: '/software', label: '标签软件', name: 'software' },
   { to: '/solutions', label: '行业方案', name: 'solutions' },
   { to: '/support', label: '服务支持', name: 'support' },
+  { to: '/about', label: '公司介绍', name: 'about' },
 ] as const
 
 const route = useRoute()
@@ -52,6 +53,19 @@ const userStore = useUserStore()
 const cartStore = useCartStore()
 
 const loginOpen = ref(false)
+const loggingOut = ref(false)
+const memberLevel = computed(() => userStore.member?.level?.name || '暂无等级')
+async function onHeaderLogout() {
+  if (loggingOut.value) return
+  loggingOut.value = true
+  try {
+    await userStore.logout()
+    cartStore.pendingIntent = null
+    await cartStore.refreshCount()
+    document.body.classList.remove('nav-open')
+    if (route.matched.some(record => record.meta.requiresAuth)) await router.replace('/')
+  } finally { loggingOut.value = false }
+}
 const openMenu = ref<string | null>(null)
 let closeTimer: ReturnType<typeof setTimeout> | undefined
 function cancelMenuClose() {
@@ -137,7 +151,10 @@ function isActive(name: string): boolean {
 </script>
 
 <template>
-  <nav class="header">
+  <nav
+    class="header"
+    :class="{ 'is-member': userStore.isLogin }"
+  >
     <RouterLink
       class="logo"
       to="/"
@@ -221,13 +238,33 @@ function isActive(name: string): boolean {
       <!-- ⚠️ 兜底文案不能省：`displayName` 在"有令牌但会员信息还没回来/拉不到"时是空的，
            没有兜底就会渲染成一个 **0×0 的空白链接** —— 用户看到的是"个人中心不见了"
            （实测过：`a` 标签、文字为空、宽高 0）。移动端那处一直有兜底，桌面端漏了。 -->
-      <RouterLink
+      <div
         v-if="userStore.isLogin"
-        class="login"
-        to="/account"
+        class="header-member"
       >
-        {{ userStore.displayName || '个人中心' }}
-      </RouterLink>
+        <RouterLink
+          class="login"
+          to="/account"
+          :title="userStore.displayName || '个人中心'"
+        >
+          {{ userStore.displayName || '个人中心' }}
+        </RouterLink>
+        <RouterLink
+          class="header-member-level"
+          to="/account/points"
+          :title="`会员等级：${memberLevel}`"
+        >
+          {{ memberLevel }}
+        </RouterLink>
+        <button
+          class="header-logout"
+          type="button"
+          :disabled="loggingOut"
+          @click="onHeaderLogout"
+        >
+          {{ loggingOut ? '退出中…' : '退出登录' }}
+        </button>
+      </div>
       <button
         v-else
         class="login login-btn"
@@ -256,13 +293,31 @@ function isActive(name: string): boolean {
            设计稿有一条 `@media (max-width:768px) { .login { display:none } }`，
            而 `.login` 正是「登录入口」与「个人中心入口」的**同一个元素** ——
            少了它，手机上既登录不了、登录后也进不去个人中心（FR-016 在手机上失效）。 -->
-      <RouterLink
+      <div
         v-if="userStore.isLogin"
-        class="m-login"
-        to="/account"
+        class="mobile-member"
       >
-        {{ userStore.displayName || '个人中心' }}
-      </RouterLink>
+        <RouterLink
+          class="m-login"
+          to="/account"
+        >
+          {{ userStore.displayName || '个人中心' }}
+        </RouterLink>
+        <RouterLink
+          class="header-member-level"
+          to="/account/points"
+        >
+          {{ memberLevel }}
+        </RouterLink>
+        <button
+          class="header-logout"
+          type="button"
+          :disabled="loggingOut"
+          @click="onHeaderLogout"
+        >
+          {{ loggingOut ? '退出中…' : '退出登录' }}
+        </button>
+      </div>
       <button
         v-else
         class="m-login m-login-btn"

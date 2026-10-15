@@ -26,6 +26,9 @@
 .product-page .qty-box { border: 1px solid #e1e7f0; border-radius: 6px; }
 .product-page .qty-btn { border: 0; background: #f6f8fb; font-size: 16px; }
 .product-page .qty-btn:disabled { color: #c5ccd6; cursor: default; }
+.product-page input.qty-num { width: 64px; min-width: 0; height: 32px; padding: 0 4px; border: 0; background: #fff; color: #243c59; font: inherit; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.product-page input.qty-num::-webkit-inner-spin-button, .product-page input.qty-num::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.product-page input.qty-num:focus-visible { outline: 2px solid #2e7cd6; outline-offset: -2px; }
 .product-selection { font-size: 12px; color: #576b85; line-height: 1.8; }
 .product-selection span { color: #99a5b5; margin-right: 10px; }
 .product-page .btn-row { display: flex; gap: 12px; padding: 2px 0 8px; }

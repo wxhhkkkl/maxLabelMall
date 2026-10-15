@@ -10,6 +10,9 @@ public class AppInvoiceTitleRespVO {
     @Schema(description = "抬头编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "3")
     private Long id;
 
+    @Schema(description = "发票类型：1 电子普通发票，2 电子增值税专用发票", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Integer type;
+
     @Schema(description = "抬头名称（公司名或个人名）", requiredMode = Schema.RequiredMode.REQUIRED, example = "南京路桥机械有限公司")
     private String titleName;
 

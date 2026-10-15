@@ -44,10 +44,25 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
     private TradeOrderMapper orderMapper;
 
     private AppInvoiceTitleSaveReqVO buildTitle(String name) {
+        return buildTitle(name, InvoiceTypeEnum.E_NORMAL.getType());
+    }
+
+    /** ⚠️ 抬头**带票种**（Q36）：普票只要名称，专票要五项全填 */
+    private AppInvoiceTitleSaveReqVO buildTitle(String name, Integer type) {
         AppInvoiceTitleSaveReqVO reqVO = new AppInvoiceTitleSaveReqVO();
+        reqVO.setType(type);
         reqVO.setTitleName(name);
         reqVO.setTaxNo("91320104660690975E");
+        if (InvoiceTypeEnum.E_SPECIAL.getType().equals(type)) {
+            reqVO.setTitleAddress("南京市玄武区某某路 1 号");
+            reqVO.setTitlePhone("18913984596");
+            reqVO.setBankName("工商银行南京分行 6222");
+        }
         return reqVO;
+    }
+
+    private TradeInvoiceTitleDO byId(List<TradeInvoiceTitleDO> list, Long id) {
+        return list.stream().filter(t -> t.getId().equals(id)).findFirst().orElseThrow();
     }
 
     // ==================== CRUD 与默认唯一 ====================
@@ -65,19 +80,27 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    public void testCreate_defaultIsUnique() {
+    public void testCreate_defaultIsUniquePerType() {
         Long first = titleService.createInvoiceTitle(88L, buildTitle("老公司"));
         titleService.updateInvoiceTitle(88L, defaultReq(first, "老公司", true));
 
         Long second = titleService.createInvoiceTitle(88L, defaultReq(null, "新公司", true));
 
-        // 设了新的默认，旧的那条必须被清掉 —— 否则"默认"就有两条，结算页预选哪条全看运气
+        // **同一个票种内**设了新的默认，旧的那条必须被清掉 —— 否则"默认"有两条，预选哪条全看运气
         List<TradeInvoiceTitleDO> list = titleService.getInvoiceTitleList(88L);
         assertEquals(2, list.size());
         TradeInvoiceTitleDO newDefault = list.stream().filter(t -> t.getId().equals(second)).findFirst().orElseThrow();
         TradeInvoiceTitleDO oldOne = list.stream().filter(t -> t.getId().equals(first)).findFirst().orElseThrow();
         assertEquals(Boolean.TRUE, newDefault.getDefaultStatus());
         assertEquals(Boolean.FALSE, oldOne.getDefaultStatus());
+
+        // ⚠️ Q36：**另一个票种的默认不受影响** —— 普票默认归普票、专票默认归专票，
+        //    否则"设了专票默认"会把客户常用的那张普票默认也清掉
+        Long special = titleService.createInvoiceTitle(88L,
+                defaultReq(null, "专票公司", true, InvoiceTypeEnum.E_SPECIAL.getType()));
+        List<TradeInvoiceTitleDO> after = titleService.getInvoiceTitleList(88L);
+        assertEquals(Boolean.TRUE, byId(after, special).getDefaultStatus(), "专票默认应当生效");
+        assertEquals(Boolean.TRUE, byId(after, second).getDefaultStatus(), "**普票默认不该被专票动到**");
     }
 
     @Test
@@ -123,7 +146,7 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
 
     @Test
     public void testCreate_titleNameRequired() {
-        // 抬头名称是唯一的必填项（抬头可以不完整：只开普票的客户不必填开户行）
+        // 普票抬头：名称是唯一的必填项（专票抬头才要那四项 —— Q36）
         AppInvoiceTitleSaveReqVO reqVO = buildTitle("   ");
         ServiceException e = assertThrows(ServiceException.class,
                 () -> titleService.createInvoiceTitle(88L, reqVO));
@@ -161,7 +184,11 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
 
     /** 组一个"改抬头"的请求（id 为空时是新增） */
     private AppInvoiceTitleSaveReqVO defaultReq(Long id, String name, boolean isDefault) {
-        AppInvoiceTitleSaveReqVO reqVO = buildTitle(name);
+        return defaultReq(id, name, isDefault, InvoiceTypeEnum.E_NORMAL.getType());
+    }
+
+    private AppInvoiceTitleSaveReqVO defaultReq(Long id, String name, boolean isDefault, Integer type) {
+        AppInvoiceTitleSaveReqVO reqVO = buildTitle(name, type);
         reqVO.setId(id);
         reqVO.setDefaultStatus(isDefault);
         return reqVO;

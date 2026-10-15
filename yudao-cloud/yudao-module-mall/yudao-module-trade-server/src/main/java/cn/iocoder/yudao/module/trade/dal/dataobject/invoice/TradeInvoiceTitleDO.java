@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.dal.dataobject.invoice;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
@@ -13,11 +14,10 @@ import lombok.ToString;
 /**
  * 会员的发票抬头簿，一条抬头可以被两种票复用
  *
- * ⚠️ **没有票种字段**：开**普票**只用到「名称 + 税号」，开**专票**要求五列全有 ——
- * 所以抬头本身不绑票种，**缺项在选专票时才被拒**（判定在 `InvoiceValidator`）。
- * 反过来说，只开普票的客户**不该被迫**填开户行，故除名称外全部可空。
+ * ⚠️ **有票种字段**（Q36）：一条抬头只服务一种票 —— 普票抬头只要名称、专票抬头五项全填。
+ * （2026-10-15 之前是"不绑票种、一条两用"，所有者要求分开管理后推翻了。）
  *
- * ⚠️ 默认抬头的唯一性**在服务层保证**（设新的默认时清掉旧的），不加数据库唯一约束：
+ * ⚠️ 默认抬头的唯一性**按"会员 + 票种"**在服务层保证（设新的默认时清掉**同票种**的旧默认），不加数据库唯一约束：
  * "每个会员至多一条默认、且可以一条都没有"这种约束 MySQL 的部分索引表达不了
  * —— 与既有 `member_address` 的做法一致。
  *
@@ -41,6 +41,16 @@ public class TradeInvoiceTitleDO extends BaseDO {
      * 会员编号，关联 member_user.id
      */
     private Long userId;
+    /**
+     * 发票类型
+     *
+     * ⚠️ 一条抬头**只服务一种票**（Q36，2026-10-15 所有者要求"普票与专票分开管理"）——
+     * 原来"不绑票种、一条两用"的设计已推翻。于是校验也按它判：
+     * 普票抬头只要名称，专票抬头五项全填。
+     *
+     * 枚举 {@link InvoiceTypeEnum}
+     */
+    private Integer type;
     /**
      * 抬头名称（公司名或个人名）
      */

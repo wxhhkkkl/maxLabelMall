@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.trade.service.invoice;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
-import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceTitleSaveReqVO;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import org.junit.jupiter.api.Test;
 
@@ -43,11 +42,11 @@ class InvoiceValidatorTest {
     @Test
     void testValidateApply_normal_onlyTitleName_pass() {
         // 只填名称 —— 必须通过（Q27）
-        assertDoesNotThrow(() -> InvoiceValidator.validateApply(
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_NORMAL.getType(), "张三", null, null, null, null)));
 
         // 名称 + 税号（企业开普票的常见形态）
-        assertDoesNotThrow(() -> InvoiceValidator.validateApply(
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_NORMAL.getType(), "南京路桥机械有限公司", "91320104660690975E",
                         null, null, null)));
     }
@@ -55,7 +54,7 @@ class InvoiceValidatorTest {
     @Test
     void testValidateApply_normal_taxNoFormatStillChecked() {
         // 普票的税号是选填，但**填了就要合法** —— 否则开出来的票是废的
-        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateApply(
+        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_NORMAL.getType(), "南京路桥机械有限公司", "123", null, null, null)));
         assertEquals(INVOICE_TAX_NO_INVALID.getCode(), e.getCode());
     }
@@ -64,13 +63,13 @@ class InvoiceValidatorTest {
 
     @Test
     void testValidateApply_special_allFields_pass() {
-        assertDoesNotThrow(() -> InvoiceValidator.validateApply(fullSpecialInvoice()));
+        assertDoesNotThrow(() -> InvoiceValidator.validate(fullSpecialInvoice()));
     }
 
     @Test
     void testValidateApply_special_onlyTitleName_fail_andPointOutMissingField() {
         // 一次只缺一项时，报错必须点名是哪一项
-        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateApply(
+        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
                 apply(InvoiceTypeEnum.E_SPECIAL.getType(), "南京路桥机械有限公司", null, null, null, null)));
         assertEquals(INVOICE_TITLE_FIELD_REQUIRED.getCode(), e.getCode());
         assertTrue(e.getMessage().contains("纳税人识别号"), "报错要点名缺哪一项，实际：" + e.getMessage());
@@ -79,14 +78,14 @@ class InvoiceValidatorTest {
         AppInvoiceApplyBaseVO noAddress = fullSpecialInvoice();
         noAddress.setTitleAddress("  "); // 全空格 = 没填（要 trim）
         ServiceException e2 = assertThrows(ServiceException.class,
-                () -> InvoiceValidator.validateApply(noAddress));
+                () -> InvoiceValidator.validate(noAddress));
         assertTrue(e2.getMessage().contains("注册地址"), "实际：" + e2.getMessage());
 
         // 缺开户行
         AppInvoiceApplyBaseVO noBank = fullSpecialInvoice();
         noBank.setBankName(null);
         ServiceException e3 = assertThrows(ServiceException.class,
-                () -> InvoiceValidator.validateApply(noBank));
+                () -> InvoiceValidator.validate(noBank));
         assertTrue(e3.getMessage().contains("开户行"), "实际：" + e3.getMessage());
     }
 
@@ -96,7 +95,7 @@ class InvoiceValidatorTest {
             AppInvoiceApplyBaseVO vo = fullSpecialInvoice();
             vo.setType(type);
             vo.setTitleName("   ");
-            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateApply(vo),
+            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo),
                     "票种 " + type + " 缺名称也要拒");
             assertTrue(e.getMessage().contains("抬头名称"), "实际：" + e.getMessage());
         }
@@ -110,13 +109,13 @@ class InvoiceValidatorTest {
         for (String taxNo : new String[]{"123456789012345", "91320104660690975E", "12345678901234567890"}) {
             AppInvoiceApplyBaseVO vo = fullSpecialInvoice();
             vo.setTaxNo(taxNo);
-            assertDoesNotThrow(() -> InvoiceValidator.validateApply(vo), "税号 " + taxNo + " 应当合法");
+            assertDoesNotThrow(() -> InvoiceValidator.validate(vo), "税号 " + taxNo + " 应当合法");
         }
         // 位数不对、含非法字符
         for (String taxNo : new String[]{"12345678901234", "1234567890123456", "91320104660690975e", "9132010466069097-E"}) {
             AppInvoiceApplyBaseVO vo = fullSpecialInvoice();
             vo.setTaxNo(taxNo);
-            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateApply(vo),
+            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo),
                     "税号 " + taxNo + " 应当被拒");
             assertEquals(INVOICE_TAX_NO_INVALID.getCode(), e.getCode());
         }
@@ -129,35 +128,15 @@ class InvoiceValidatorTest {
         for (Integer type : new Integer[]{null, 0, 3, 99}) {
             AppInvoiceApplyBaseVO vo = fullSpecialInvoice();
             vo.setType(type);
-            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateApply(vo));
+            ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo));
             assertEquals(INVOICE_TYPE_INVALID.getCode(), e.getCode(), "票种 " + type + " 应当被拒");
         }
     }
 
-    // ==================== 抬头簿：只要求名称 ====================
+    // ==================== 抬头簿（Q36 之后与申请**同一套规则**） ====================
 
-    @Test
-    void testValidateTitle_onlyTitleName_pass() {
-        AppInvoiceTitleSaveReqVO vo = new AppInvoiceTitleSaveReqVO();
-        vo.setTitleName("张三");
-        assertDoesNotThrow(() -> InvoiceValidator.validateTitle(vo));
-    }
+    // 抬头带上票种之后，"抬头簿保存"与"开票申请"的校验不再有区别（都按票种判必填），
+    // 所以上面那张票种矩阵**同时就是抬头簿的规则** —— 不再单独写一份（两份必然分叉）。
 
-    @Test
-    void testValidateTitle_titleNameRequired() {
-        AppInvoiceTitleSaveReqVO vo = new AppInvoiceTitleSaveReqVO();
-        vo.setTitleName(" ");
-        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateTitle(vo));
-        assertTrue(e.getMessage().contains("抬头名称"), "实际：" + e.getMessage());
-    }
-
-    @Test
-    void testValidateTitle_taxNoFormatCheckedWhenPresent() {
-        AppInvoiceTitleSaveReqVO vo = new AppInvoiceTitleSaveReqVO();
-        vo.setTitleName("南京路桥机械有限公司");
-        vo.setTaxNo("abc");
-        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validateTitle(vo));
-        assertEquals(INVOICE_TAX_NO_INVALID.getCode(), e.getCode());
-    }
 
 }

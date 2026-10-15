@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.trade.service.invoice;
 
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
-import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceTitleSaveReqVO;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 
 import java.util.regex.Pattern;
@@ -12,7 +11,8 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 /**
  * 开票信息的校验（**全仓唯一一处**，T383）
  *
- * 三个入口共用它：下单时的 `invoice` 子对象、订单详情补开、发票抬头簿保存。
+ * 三个入口共用它：下单时的 `invoice` 子对象、订单详情补开、发票抬头簿保存
+ * （Q36 之后抬头也带票种，前两处的"按票种判"直接就是第三处的规则）。
  * 之所以要收在一处：**票种字段矩阵是财务口径**（Q27），散成两份必然在改票种时漏改一处。
  *
  * ⚠️ 本类**会把字段 trim 后写回入参 VO** —— 这是有意的：spec 与 data-model 都要求
@@ -43,11 +43,14 @@ public final class InvoiceValidator {
     private static final int BANK_NAME_MAX = 255;
 
     /**
-     * 校验一次**开票申请**（下单 / 补开共用），按票种判必填
+     * 校验一次**开票信息**（下单 / 补开 / 抬头簿保存三处共用），按票种判必填
      *
      * 普票只要抬头名称；专票五项全要 —— 缺哪一项就在报错里**点名哪一项**（FR-156）。
+     *
+     * ⚠️ **Q36 之后抬头也带票种**，所以"抬头簿保存"与"开票申请"不再有区别 ——
+     * 原来那个更宽松的 `validateTitle`（只要求名称）已经删掉：两份规则必然分叉。
      */
-    public static void validateApply(AppInvoiceApplyBaseVO invoice) {
+    public static void validate(AppInvoiceApplyBaseVO invoice) {
         // 票种本身：null / 0 / 99 一律拒（别让它悄悄落库成"未知票种"）
         InvoiceTypeEnum type = InvoiceTypeEnum.valueOf(invoice.getType());
         if (type == null) {
@@ -70,24 +73,6 @@ public final class InvoiceValidator {
         }
         checkFormats(invoice.getTitleName(), invoice.getTaxNo(),
                 invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName());
-    }
-
-    /**
-     * 校验**发票抬头簿**里的一条抬头
-     *
-     * ⚠️ 比申请宽松：**只要求抬头名称**。抬头可以不完整（只开普票的客户没必要填开户行），
-     * 缺项在他**选择专票**时才由 {@link #validateApply} 拒掉。
-     */
-    public static void validateTitle(AppInvoiceTitleSaveReqVO title) {
-        title.setTitleName(trim(title.getTitleName()));
-        title.setTaxNo(trim(title.getTaxNo()));
-        title.setTitleAddress(trim(title.getTitleAddress()));
-        title.setTitlePhone(trim(title.getTitlePhone()));
-        title.setBankName(trim(title.getBankName()));
-
-        requireText(title.getTitleName(), "抬头名称");
-        checkFormats(title.getTitleName(), title.getTaxNo(),
-                title.getTitleAddress(), title.getTitlePhone(), title.getBankName());
     }
 
     // ==================== 内部 ====================

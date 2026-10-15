@@ -29,16 +29,16 @@ public class TradeInvoiceTitleServiceImpl implements TradeInvoiceTitleService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createInvoiceTitle(Long userId, AppInvoiceTitleSaveReqVO reqVO) {
-        // 校验（唯一一处规则）：抬头簿**只要求名称** —— 抬头可以不完整，
-        // 缺项在他「选专票」时才会被 InvoiceValidator.validateApply 拒掉
-        InvoiceValidator.validateTitle(reqVO);
+        // 校验（唯一一处规则）：**按抬头自己的票种**判必填 ——
+        // 普票抬头只要名称，专票抬头五项全填（Q36）
+        InvoiceValidator.validate(reqVO);
 
         TradeInvoiceTitleDO title = BeanUtils.toBean(reqVO, TradeInvoiceTitleDO.class);
         title.setId(null); // 防一手：请求里带了 id 也当新增
         title.setUserId(userId); // 归属一律从登录态取
         title.setDefaultStatus(Boolean.TRUE.equals(reqVO.getDefaultStatus()));
         if (Boolean.TRUE.equals(title.getDefaultStatus())) {
-            titleMapper.clearDefaultByUserId(userId);
+            titleMapper.clearDefaultByUserIdAndType(userId, title.getType());
         }
         titleMapper.insert(title);
         return title.getId();
@@ -49,14 +49,14 @@ public class TradeInvoiceTitleServiceImpl implements TradeInvoiceTitleService {
     public void updateInvoiceTitle(Long userId, AppInvoiceTitleSaveReqVO reqVO) {
         // 先确认这条抬头是**本人的** —— 不属于自己的一律"抬头不存在"（不泄露它是否存在）
         validateTitleExists(userId, reqVO.getId());
-        InvoiceValidator.validateTitle(reqVO);
+        InvoiceValidator.validate(reqVO);
 
         TradeInvoiceTitleDO update = BeanUtils.toBean(reqVO, TradeInvoiceTitleDO.class);
         update.setUserId(userId);
         update.setDefaultStatus(Boolean.TRUE.equals(reqVO.getDefaultStatus()));
         // 默认唯一：清旧 + 置新**同一事务**，否则中途失败会留下"一条默认都没有"
         if (Boolean.TRUE.equals(update.getDefaultStatus())) {
-            titleMapper.clearDefaultByUserId(userId);
+            titleMapper.clearDefaultByUserIdAndType(userId, update.getType());
         }
         titleMapper.updateById(update);
     }

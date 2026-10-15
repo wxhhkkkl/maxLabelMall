@@ -30,14 +30,17 @@ public interface TradeInvoiceTitleMapper extends BaseMapperX<TradeInvoiceTitleDO
     }
 
     /**
-     * 清除某会员的"默认"标记（设新默认前调用）
+     * 清除某会员**某个票种**的"默认"标记（设新默认前调用）
      *
-     * ⚠️ 默认的唯一性靠**服务层**保证，所以这一步必须与"设置新默认"在同一个事务里，
+     * ⚠️ 唯一性按 **会员 + 票种**（Q36）：普票默认归普票、专票默认归专票 ——
+     * 否则"设了专票默认"会把客户常用的那张普票默认也清掉。
+     * 靠**服务层**保证，所以这一步必须与"设置新默认"在同一个事务里，
      * 否则中途失败会留下"一条默认都没有"的状态。
      */
-    default int clearDefaultByUserId(Long userId) {
+    default int clearDefaultByUserIdAndType(Long userId, Integer type) {
         return update(new LambdaUpdateWrapper<TradeInvoiceTitleDO>()
                 .eq(TradeInvoiceTitleDO::getUserId, userId)
+                .eq(TradeInvoiceTitleDO::getType, type)
                 .eq(TradeInvoiceTitleDO::getDefaultStatus, true)
                 .set(TradeInvoiceTitleDO::getDefaultStatus, false));
     }

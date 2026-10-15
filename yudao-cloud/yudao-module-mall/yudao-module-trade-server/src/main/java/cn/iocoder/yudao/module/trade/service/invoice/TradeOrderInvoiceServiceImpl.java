@@ -114,7 +114,7 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
             throw exception(INVOICE_ORDER_EXISTS);
         }
         // 校验票种与抬头（唯一一处规则，下单与补开共用）
-        InvoiceValidator.validateApply(invoice);
+        InvoiceValidator.validate(invoice);
 
         // 落库：抬头是**快照**（FR-158），金额取**订单实付**（FR-161，请求里没有这个字段）
         TradeOrderInvoiceDO invoiceDO = BeanUtils.toBean(invoice, TradeOrderInvoiceDO.class);

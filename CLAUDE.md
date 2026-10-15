@@ -4,22 +4,25 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/005-wechat-scan-login/plan.md
+specs/006-order-invoice/plan.md
 
 Supporting artifacts for the active feature:
-- specs/005-wechat-scan-login/spec.md — 功能规格（含 8 项已确认决策 Q19~Q26）
-- specs/005-wechat-scan-login/research.md — 技术决策与被否决方案（R15~R24）
-- specs/005-wechat-scan-login/data-model.md — 票据状态机、会员加列、绑定唯一性
-- specs/005-wechat-scan-login/contracts/app-api.md — C 端新增/改动接口
-- specs/005-wechat-scan-login/contracts/admin-api.md — 管理端展示 + **前置配置阻塞**
-- specs/005-wechat-scan-login/quickstart.md — 手工验证清单与显式不验证项
-  ⚠️ 计划开头有一条**前置阻塞**：C 端当前指向微信**测试号**，配置不修则真实客户用不了（见 plan.md / quickstart §零）
+- specs/006-order-invoice/spec.md — 功能规格（含 5 项已确认决策 Q27~Q31）
+- specs/006-order-invoice/research.md — 技术决策与被否决方案（R25~R37）
+- specs/006-order-invoice/data-model.md — 2 张新表、申请状态机、字段校验矩阵
+- specs/006-order-invoice/contracts/app-api.md — C 端新增/改动接口
+- specs/006-order-invoice/contracts/admin-api.md — 管理端 + 菜单权限点
+- specs/006-order-invoice/quickstart.md — 手工验证清单与显式不验证项
+  ⚠️ 三处口径**已由所有者拍板**（2026-10-15，Q32~Q34）：**申请与订单同一事务**（FR-181 收窄，plan R1）、
+  **部分退款不作废也不改金额**（FR-184，plan R2）、**下载失败只做到"不静默 + 求助路径"**（Edge Cases，plan R10）
 
-上一个特性（收货地址自动解析）：
+上一个特性（微信扫码登录与首次登录补全资料）：
+- specs/005-wechat-scan-login/{spec,plan,research,data-model,quickstart,tasks}.md
+- specs/005-wechat-scan-login/contracts/app-api.md · contracts/admin-api.md — 管理端展示 + 前置配置阻塞
+
+更早的特性（收货地址自动解析 / 商品分类筛选维度 / 商品详情与评价 / 门面站与后台打通）：
 - specs/004-address-auto-parse/{spec,plan,research,data-model,quickstart,tasks}.md
 - specs/004-address-auto-parse/contracts/address-parse.md — 客户端模块契约（无接口变更）
-
-更早的特性（商品分类筛选维度 / 商品详情 / 评价 / 商城页 banner）：
 - specs/003-product-filter-dimensions/{spec,plan,data-model,research,quickstart,tasks}.md
 - specs/003-product-filter-dimensions/contracts/{app-api,admin-api}.md — admin-api 是本仓库首份
 - specs/002-product-detail-reviews-banner/{spec,plan,data-model,research,quickstart,tasks}.md

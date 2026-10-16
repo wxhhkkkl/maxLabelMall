@@ -13,6 +13,7 @@ export const footerNavigation = [
     title: '软件与支持',
     links: [
       { label: '标签软件介绍', to: '/software' },
+      { label: '打印管理系统', to: '/print-management' },
       { label: '驱动安装指南', to: '/support/driver-install' },
       { label: '基础使用指南', to: '/support?category=guides#knowledge' },
       { label: '打印问题排查', to: '/support?category=troubleshooting#knowledge' },

@@ -41,6 +41,7 @@ const ALL_PATHS = [
   '/product/1',
   '/product/1/comments',
   '/software',
+  '/print-management',
   '/solutions',
   '/solutions/warehouse',
   '/support',
@@ -69,7 +70,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 30 条路径（含售后政策页）', () => {
+  it('声明了 31 条路径（含打印管理系统介绍页）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -84,7 +85,7 @@ describe('路由表', () => {
     // 2026-10-10：支持文章 / 联系支持页 +2（26 → 28）。
     // 2026-10-10：商品详情改版追加 /product/:id/comments（28 → 29）—— 与上一个 +2 是
     //             两条并行的线，合并时一起算，别把任一边的计数覆盖掉。
-    expect(paths).toHaveLength(30)
+    expect(paths).toHaveLength(31)
     expect(paths).toContain('/')
   })
 

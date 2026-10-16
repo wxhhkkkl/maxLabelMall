@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { InvoiceStatus, InvoiceType, OrderStatus, type OrderDetail, type OrderInvoice } from '@/types'
+import { InvoiceStatus, InvoiceTitleKind, InvoiceType, OrderStatus, type OrderDetail, type OrderInvoice } from '@/types'
 import { clearWxPayPending, markWxPayPending, readWxPayPending } from '@/utils/weixin'
 
 const getOrderDetail = vi.fn()
@@ -1188,6 +1188,8 @@ describe('OrderDetailView —— 订单详情补开票（006 / US20 / FR-163）'
     status: InvoiceStatus.WAITING,
     type: InvoiceType.SPECIAL,
     typeName: '电子增值税专用发票',
+    titleKind: InvoiceTitleKind.COMPANY,
+    titleKindName: '企业',
     titleName: '南京路桥机械有限公司',
     taxNo: '91320104660690975E',
     amount: 7800,

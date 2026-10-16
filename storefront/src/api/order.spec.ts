@@ -135,7 +135,7 @@ describe('下单', () => {
 
   it('带开票信息时原样透传（不做任何加工，票据由后端校验）', async () => {
     post.mockResolvedValue({ id: 1, payOrderId: 2 })
-    const invoice: InvoiceApplyForm = { type: 2, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' }
+    const invoice: InvoiceApplyForm = { type: 2, titleKind: 1, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' }
     await createOrder({ items: [{ skuId: 11, count: 1 }], addressId: 7, invoice })
     const body = post.mock.calls[0]?.[1] as Record<string, unknown>
     expect(body.invoice).toEqual(invoice)

@@ -27,11 +27,15 @@ const form = defineModel<InvoiceApplyForm>('form', { required: true })
 const error = computed(() => (enabled.value ? invoiceFieldError(form.value) : null))
 
 /**
- * 把一条抬头填进表单（票种保留客户当前的选择 —— 选择器只列本票种的抬头）
+ * 把一条抬头填进表单。
+ *
+ * 票种保留客户当前的选择（选择器只列本票种的抬头），但**抬头类型要跟着那条抬头走**（Q38）——
+ * 客户选中自己那条"个人"抬头，表单却还停在"企业"，下一步就会被要求填一个他根本没有的税号。
  */
 function fillFrom(title: InvoiceTitle) {
   form.value = {
     type: form.value.type,
+    titleKind: title.titleKind,
     titleName: title.titleName,
     taxNo: title.taxNo ?? '',
     titleAddress: title.titleAddress ?? '',

@@ -7,7 +7,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import InvoiceTitleDialog from '@/components/InvoiceTitleDialog.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import { useToasts } from '@/components/base/useToasts'
-import { INVOICE_TYPE_NAME, InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { INVOICE_TYPE_NAME, InvoiceTitleKind, InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
 
 /**
  * 个人中心 · 发票抬头簿（US23 / FR-164）
@@ -80,6 +80,9 @@ async function onSetDefault(title: InvoiceTitle) {
   try {
     await updateInvoiceTitle(title.id, {
       type: title.type,
+      // ⚠️ 抬头类型必须带上（Q38）：这里是把字段**逐项列出来**提交的，
+      // 漏了它后端会直接拒（"抬头类型不正确"），而客户只是点了一下"设为默认"
+      titleKind: title.titleKind,
       titleName: title.titleName,
       taxNo: title.taxNo ?? '',
       titleAddress: title.titleAddress ?? '',
@@ -168,6 +171,12 @@ onMounted(load)
                 >
                   <div class="invoice-title-head">
                     <span class="invoice-title-name">{{ t.titleName }}</span>
+                    <!-- 个人抬头只可能落在普票那一段里（个人开不了专票）—— 标出来，
+                         否则客户自己存的两条普票抬头看着没区别 -->
+                    <span
+                      v-if="t.titleKind === InvoiceTitleKind.PERSONAL"
+                      class="invoice-title-kind"
+                    >个人</span>
                     <span
                       v-if="t.defaultStatus"
                       class="ml-pill is-done"
@@ -257,6 +266,7 @@ onMounted(load)
 .invoice-title-card.is-default { border-color: #2e7cd6; }
 .invoice-title-head { display: flex; align-items: center; gap: 10px; }
 .invoice-title-name { font-size: 15px; font-weight: 600; color: #16233f; }
+.invoice-title-kind { border: 1px solid #e3e9f4; border-radius: 3px; padding: 1px 6px; font-size: 11px; color: #5b6c8f; }
 .invoice-title-line { margin: 0; font-size: 13px; color: #5b6c8f; line-height: 1.8; }
 .invoice-title-actions { display: flex; gap: 10px; margin-top: 6px; }
 .invoice-title-group + .invoice-title-group { margin-top: 28px; }

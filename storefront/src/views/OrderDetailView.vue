@@ -640,6 +640,8 @@ onMounted(async () => {
           -->
           <template v-if="order.invoice.status !== InvoiceStatus.CANCELED">
             <p class="od-text">类型：{{ order.invoice.typeName }}</p>
+            <!-- 抬头类型（Q38）：个人抬头没有税号，标出来客户就不会以为"怎么没开全" -->
+            <p class="od-text">抬头类型：{{ order.invoice.titleKindName }}</p>
             <p class="od-text">抬头：{{ order.invoice.titleName }}</p>
             <p class="od-text">金额：{{ formatYuan(order.invoice.amount) }}</p>
           </template>

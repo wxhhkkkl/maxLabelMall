@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
 
 const listInvoiceTitles = vi.fn()
 const createInvoiceTitle = vi.fn()
@@ -24,11 +24,18 @@ const InvoiceTitlePicker = (await import('./InvoiceTitlePicker.vue')).default
  * · **就地新增后自动选中它** —— 不用先跳去个人中心再回来选
  */
 const NORMAL_TITLE: InvoiceTitle = {
-  id: 3, type: InvoiceType.NORMAL, titleName: '普票公司', taxNo: '91320104660690975E', defaultStatus: true,
+  id: 3, type: InvoiceType.NORMAL, titleKind: InvoiceTitleKind.COMPANY,
+  titleName: '普票公司', taxNo: '91320104660690975E', defaultStatus: true,
 }
 const SPECIAL_TITLE: InvoiceTitle = {
-  id: 4, type: InvoiceType.SPECIAL, titleName: '专票公司', taxNo: '91320104660690975E',
+  id: 4, type: InvoiceType.SPECIAL, titleKind: InvoiceTitleKind.COMPANY,
+  titleName: '专票公司', taxNo: '91320104660690975E',
   titleAddress: '南京市玄武区', titlePhone: '18913984596', bankName: '工商银行', defaultStatus: true,
+}
+/** 个人抬头只可能落在普票那一段里（个人开不了专票） */
+const PERSONAL_TITLE: InvoiceTitle = {
+  id: 5, type: InvoiceType.NORMAL, titleKind: InvoiceTitleKind.PERSONAL,
+  titleName: '张三', taxNo: null, defaultStatus: false,
 }
 
 function mountPicker(type: InvoiceTypeValue = InvoiceType.NORMAL, titles: InvoiceTitle[] = []) {
@@ -70,7 +77,7 @@ describe('发票抬头选择器', () => {
   })
 
   it('换选另一条 → 抛出那一条', async () => {
-    const other: InvoiceTitle = { id: 9, type: InvoiceType.NORMAL, titleName: '另一家', defaultStatus: false }
+    const other: InvoiceTitle = { id: 9, type: InvoiceType.NORMAL, titleKind: InvoiceTitleKind.COMPANY, titleName: '另一家', defaultStatus: false }
     const w = mountPicker(InvoiceType.NORMAL, [NORMAL_TITLE, other])
     await flushPromises()
 
@@ -90,7 +97,7 @@ describe('发票抬头选择器', () => {
   it('**就地新增：存完自动选中它**（不必先跳个人中心）', async () => {
     const w = mountPicker(InvoiceType.SPECIAL, [])
     await flushPromises()
-    const created: InvoiceTitle = { id: 7, type: InvoiceType.SPECIAL, titleName: '新公司', taxNo: '91320104660690975E', titleAddress: 'x', titlePhone: '1', bankName: 'b', defaultStatus: false }
+    const created: InvoiceTitle = { id: 7, type: InvoiceType.SPECIAL, titleKind: InvoiceTitleKind.COMPANY, titleName: '新公司', taxNo: '91320104660690975E', titleAddress: 'x', titlePhone: '1', bankName: 'b', defaultStatus: false }
 
     // 打开弹层 → 弹层提交成功（真实链路里是弹层自己调的接口）
     await w.get('[data-add-invoice-title]').trigger('click')
@@ -100,6 +107,16 @@ describe('发票抬头选择器', () => {
 
     expect(w.get('.invoice-picker-item.is-active').text()).toContain('新公司')
     expect(w.emitted('picked')?.at(-1)).toEqual([created])
+  })
+
+  it('把**整条抬头**抛给调用方（含 `titleKind`）—— 调用方要靠它把抬头类型一起填上（Q38）', async () => {
+    const w = mountPicker(InvoiceType.NORMAL, [PERSONAL_TITLE])
+    await flushPromises()
+
+    await w.get('[data-invoice-title="5"]').trigger('click')
+
+    expect(w.emitted('picked')?.at(-1)).toEqual([PERSONAL_TITLE])
+    expect(w.get('.invoice-picker-item').text()).toContain('个人') // 与「公司抬头」区分开
   })
 
   it('抬头列表拉不到 → 不显示条目，但**照常能手填**（不阻塞开票）', async () => {

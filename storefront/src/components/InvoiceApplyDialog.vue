@@ -5,7 +5,7 @@ import { createOrderInvoice } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
 import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types/invoice'
+import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types/invoice'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -22,6 +22,7 @@ const emit = defineEmits<{ close: []; submitted: [] }>()
 
 const emptyForm = (): InvoiceApplyForm => ({
   type: InvoiceType.NORMAL,
+  titleKind: InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
@@ -44,10 +45,14 @@ watch(() => props.open, (value) => {
   }
 })
 
-/** 选中一条已保存的抬头：只覆盖字段，**票种保留当前选择**（选择器只列本票种的） */
+/**
+ * 选中一条已保存的抬头：只覆盖字段，**票种保留当前选择**（选择器只列本票种的），
+ * 但**抬头类型跟着那条抬头走**（Q38）—— 个人抬头被选中后不该还要求填税号
+ */
 function fillFrom(title: InvoiceTitle) {
   form.value = {
     type: form.value.type,
+    titleKind: title.titleKind,
     titleName: title.titleName,
     taxNo: title.taxNo ?? '',
     titleAddress: title.titleAddress ?? '',

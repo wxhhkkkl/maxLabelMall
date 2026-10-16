@@ -16,7 +16,7 @@ import { useToasts } from '@/components/base/useToasts'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
 import type { Address, CartItem, InvoiceApplyForm, SettlementCoupon, SettlementResp } from '@/types'
-import { InvoiceType } from '@/types'
+import { InvoiceTitleKind, InvoiceType } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
 import { reconcile } from '@/utils/money'
 
@@ -76,6 +76,8 @@ const priceChangePending = ref(false)
 const invoiceEnabled = ref(false)
 const invoiceForm = ref<InvoiceApplyForm>({
   type: InvoiceType.NORMAL,
+  // 默认「企业」—— 与后端枚举的默认档一致；客户是个人就在卡片上改成「个人」（Q38）
+  titleKind: InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',

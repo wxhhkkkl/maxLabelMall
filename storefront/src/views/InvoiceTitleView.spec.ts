@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import type { InvoiceTitle } from '@/types'
+import { InvoiceTitleKind, type InvoiceTitle } from '@/types'
 
 const listInvoiceTitles = vi.fn()
 const deleteInvoiceTitle = vi.fn()
@@ -35,6 +35,7 @@ const router = createRouter({
 const TITLE: InvoiceTitle = {
   id: 3,
   type: 2, // 专票
+  titleKind: InvoiceTitleKind.COMPANY,
   titleName: '南京路桥机械有限公司',
   taxNo: '91320104660690975E',
   titleAddress: '南京市玄武区某某路 1 号',
@@ -127,6 +128,8 @@ describe('发票抬头簿页面', () => {
 
     expect(updateInvoiceTitle).toHaveBeenCalledWith(3, {
       type: 2,
+      // ⚠️ 这里是**逐项列字段**提交的：漏了 `titleKind`，客户点一下"设为默认"就会被后端拒（Q38）
+      titleKind: InvoiceTitleKind.COMPANY,
       titleName: '南京路桥机械有限公司',
       taxNo: '91320104660690975E',
       titleAddress: '南京市玄武区某某路 1 号',
@@ -135,6 +138,37 @@ describe('发票抬头簿页面', () => {
       defaultStatus: true,
     })
     expect(listInvoiceTitles).toHaveBeenCalledTimes(2)
+  })
+
+  it('**个人抬头落在普票那一段里**，并带「个人」标记（Q38）', async () => {
+    const w = await mountView([
+      { ...TITLE, id: 5, type: 1, titleKind: InvoiceTitleKind.PERSONAL, titleName: '张三', taxNo: null, defaultStatus: false },
+    ])
+
+    const normalGroup = w.get('[data-invoice-group="1"]')
+    expect(normalGroup.text()).toContain('张三')
+    expect(normalGroup.text()).toContain('个人')
+    // 专票那一段是空的 —— 个人抬头**不可能**出现在里面（个人开不了专票）
+    expect(w.get('[data-invoice-group="2"]').text()).toContain('还没有电子增值税专用发票的抬头')
+  })
+
+  it('个人抬头设为默认：请求体同样带上 `titleKind`', async () => {
+    const personal: InvoiceTitle = {
+      id: 5, type: 1, titleKind: InvoiceTitleKind.PERSONAL, titleName: '张三', taxNo: null, defaultStatus: false,
+    }
+    const w = await mountView([personal])
+    listInvoiceTitles.mockResolvedValue([{ ...personal, defaultStatus: true }])
+
+    const setDefault = w.findAll('.invoice-title-actions .btn-cart').find(b => b.text() === '设为默认')
+    await setDefault?.trigger('click')
+    await flushPromises()
+
+    expect(updateInvoiceTitle).toHaveBeenCalledWith(5, expect.objectContaining({
+      type: 1,
+      titleKind: InvoiceTitleKind.PERSONAL,
+      titleName: '张三',
+      defaultStatus: true,
+    }))
   })
 
   it('拉列表失败 → 错误态 + 可重试，而不是白屏', async () => {

@@ -48,6 +48,7 @@ describe('订单详情补开票弹层', () => {
     expect(createOrderInvoice).toHaveBeenCalledWith({
       orderId: 1001,
       type: 1,
+      titleKind: 1, // 默认企业（Q38）
       titleName: '南京路桥机械有限公司',
       taxNo: '91320104660690975E',
       titleAddress: '',
@@ -57,6 +58,22 @@ describe('订单详情补开票弹层', () => {
     expect(w.emitted('submitted')).toHaveLength(1)
     // 成功后自己关掉，父组件不必再管
     expect(w.emitted('close')).toHaveLength(1)
+  })
+
+  it('**个人抬头**：只填姓名就能补开，请求体带着抬头类型（Q38）', async () => {
+    const w = mountDialog()
+    await w.findAll('.invoice-kind')[1]!.trigger('click') // 选「个人」
+    await w.get('#invoiceTitleName').setValue('张三')
+    await w.get('#submitInvoice').trigger('click')
+    await flushPromises()
+
+    expect(createOrderInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      orderId: 1001,
+      type: 1,
+      titleKind: 2,
+      titleName: '张三',
+      taxNo: '',
+    }))
   })
 
   it('后端拒绝时**原样透出**它的原因，且不谎报成功', async () => {

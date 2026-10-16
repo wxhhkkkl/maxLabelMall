@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 
 import { listInvoiceTitles } from '@/api/invoice'
 import InvoiceTitleDialog from '@/components/InvoiceTitleDialog.vue'
-import type { InvoiceTitle, InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
 
 /**
  * 「从已保存的抬头里选一条 / 没有就当场新增」的**选择器**（Q36）。
@@ -81,7 +81,7 @@ onMounted(async () => {
         :data-invoice-title="title.id"
         @click="pick(title)"
       >
-        {{ title.titleName }}<span v-if="title.defaultStatus" class="invoice-picker-tag">默认</span>
+        {{ title.titleName }}<span v-if="title.titleKind === InvoiceTitleKind.PERSONAL" class="invoice-picker-tag">个人</span><span v-if="title.defaultStatus" class="invoice-picker-tag">默认</span>
       </button>
     </div>
     <button

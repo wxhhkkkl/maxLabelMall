@@ -5,7 +5,7 @@ import { createInvoiceTitle, updateInvoiceTitle } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
 import MlCheck from '@/components/base/MlCheck.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceType, type InvoiceApplyForm, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -25,6 +25,7 @@ const emit = defineEmits<{ close: []; submitted: [] }>()
 
 const emptyForm = (): InvoiceApplyForm => ({
   type: props.type ?? InvoiceType.NORMAL,
+  titleKind: InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
@@ -48,6 +49,7 @@ watch(() => props.open, (value) => {
   form.value = title
     ? {
         type: title.type,
+        titleKind: title.titleKind,
         titleName: title.titleName,
         taxNo: title.taxNo ?? '',
         titleAddress: title.titleAddress ?? '',
@@ -72,6 +74,7 @@ async function onSubmit() {
   try {
     const payload = {
       type: form.value.type,
+      titleKind: form.value.titleKind,
       titleName: form.value.titleName,
       taxNo: form.value.taxNo,
       titleAddress: form.value.titleAddress,

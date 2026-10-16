@@ -486,12 +486,27 @@ describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR
 
     expect(lastInput().invoice).toEqual({
       type: 1,
+      titleKind: 1,
       titleName: '南京路桥机械有限公司',
       taxNo: '91320104660690975E',
       titleAddress: '',
       titlePhone: '',
       bankName: '',
     })
+  })
+
+  it('**个人抬头**：只填姓名就能下单，`titleKind` 确实发到了请求体里（Q38）', async () => {
+    const w = await mountCheckout()
+    await invoiceBox(w).setValue(true)
+    await w.findAll('.invoice-kind')[1]!.trigger('click') // 选「个人」
+    await w.get('#invoiceTitleName').setValue('张三')
+    await submit(w)
+
+    expect(lastInput().invoice).toEqual(expect.objectContaining({
+      type: 1,
+      titleKind: 2,
+      titleName: '张三',
+    }))
   })
 
   it('勾了开票但抬头没填全 → **不提交**，并指明缺哪一项（FR-156）', async () => {

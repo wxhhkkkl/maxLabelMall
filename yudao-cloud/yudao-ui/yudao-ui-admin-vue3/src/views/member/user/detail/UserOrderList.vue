@@ -127,7 +127,8 @@
           v-model="queryParams[queryType.queryParam]"
           class="!w-280px"
           clearable
-          placeholder="请输入"
+          :disabled="!queryType.queryParam"
+          :placeholder="queryType.queryParam ? '请输入' : '请先选择搜索类型'"
         >
           <template #prepend>
             <el-select
@@ -257,6 +258,11 @@ const resetQuery = () => {
 const getList = async () => {
   loading.value = true
   try {
+    // ⚠️ 聚合搜索**没选搜索类型**时，上面那个输入框的 v-model 键是空串（`queryParams['']`），
+    // 序列化出来就是 `?pageNo=1&pageSize=10&=%E6%9D%8Esir` —— **空参数名会让 Tomcat
+    // 直接拒掉整个查询串**，前端只看得到「系统异常」（2026-10-16 线上就是这个问题）。
+    // 输入框已改成"没选类型就禁用"，这里再兜一道。
+    delete queryParams.value['']
     const data = await OrderApi.getOrderPage(queryParams.value)
     list.value = data.list
     total.value = data.total

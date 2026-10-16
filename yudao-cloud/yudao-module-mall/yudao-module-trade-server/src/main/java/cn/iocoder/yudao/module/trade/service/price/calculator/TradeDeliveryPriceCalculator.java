@@ -65,6 +65,10 @@ public class TradeDeliveryPriceCalculator implements TradePriceCalculator {
             calculateByPickUp(param);
         } else if (DeliveryTypeEnum.EXPRESS.getType().equals(param.getDeliveryType())) {
             calculateExpress(param, result);
+        } else if (DeliveryTypeEnum.VIRTUAL.getType().equals(param.getDeliveryType())) {
+            // 虚拟商品（软件等）：**不产生运费**。
+            // ⚠️ 这一支以前是不存在的 —— 那时它靠"两个 if 都不命中"隐式地得到 0 运费。
+            // 显式写出来，是为了将来再加配送方式时，能一眼分清"故意不计费"和"忘了处理"。
         }
     }
 

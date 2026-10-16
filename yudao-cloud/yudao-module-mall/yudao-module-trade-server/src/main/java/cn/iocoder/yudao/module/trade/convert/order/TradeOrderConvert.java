@@ -61,6 +61,10 @@ public interface TradeOrderConvert {
             @Mapping(target = "id", ignore = true),
             @Mapping(source = "userId", target = "userId"),
             @Mapping(source = "createReqVO.couponId", target = "couponId"),
+            // ⚠️ 配送方式取**服务端判定的那个**（`calculateRespBO.deliveryType`），不是请求里传的：
+            // 请求没传时由商品自动判定（全是虚拟商品 → 3）。两者都有 deliveryType，
+            // 不写这条 MapStruct 会报 "Several possible source properties"。
+            @Mapping(source = "calculateRespBO.deliveryType", target = "deliveryType"),
             @Mapping(target = "remark", ignore = true),
             @Mapping(source = "createReqVO.remark", target = "userRemark"),
             @Mapping(source = "calculateRespBO.price.totalPrice", target = "totalPrice"),

@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.promotion.api.reward.RewardActivityApi;
 import cn.iocoder.yudao.module.promotion.api.reward.dto.RewardActivityMatchRespDTO;
 import cn.iocoder.yudao.module.promotion.enums.common.PromotionTypeEnum;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeProductSettlementRespVO;
+import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateReqBO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateRespBO;
 import cn.iocoder.yudao.module.trade.service.price.calculator.TradeDiscountActivityPriceCalculator;
@@ -63,12 +64,18 @@ public class TradePriceServiceImpl implements TradePriceService {
         List<ProductSkuRespDTO> skuList = checkSkuList(calculateReqBO);
         // 1.2 获得商品 SPU 数组
         List<ProductSpuRespDTO> spuList = checkSpuList(skuList);
+        // 1.3 客户端没指定配送方式时，**由商品自动判定**（全是虚拟商品 → 虚拟；否则快递）
+        if (calculateReqBO.getDeliveryType() == null) {
+            calculateReqBO.setDeliveryType(resolveDeliveryType(spuList));
+        }
 
         // 2.1 计算价格
         TradePriceCalculateRespBO calculateRespBO = TradePriceCalculatorHelper
                 .buildCalculateResp(calculateReqBO, spuList, skuList);
         priceCalculators.forEach(calculator -> calculator.calculate(calculateReqBO, calculateRespBO));
-        // 2.2  如果最终支付金额小于等于 0，则抛出业务异常
+        // 2.2 记下本单**实际采用**的配送方式（可能来自请求、也可能是 1.3 判出来的），由结算响应回传前端
+        calculateRespBO.setDeliveryType(calculateReqBO.getDeliveryType());
+        // 2.3  如果最终支付金额小于等于 0，则抛出业务异常
         if (calculateReqBO.getPointActivityId() == null // 积分订单，允许支付金额为 0
                 && calculateRespBO.getPrice().getPayPrice() <= 0) {
             log.error("[calculatePrice][价格计算不正确，请求 calculateReqDTO({})，结果 priceCalculate({})]",
@@ -76,6 +83,28 @@ public class TradePriceServiceImpl implements TradePriceService {
             throw exception(PRICE_CALCULATE_PAY_PRICE_ILLEGAL);
         }
         return calculateRespBO;
+    }
+
+    /**
+     * 由商品自动判定本单的配送方式（虚拟商品 = 软件等，不涉及物流）
+     *
+     * **规则**：所有商品都**只支持虚拟商品** —— 配送方式里含 {@link DeliveryTypeEnum#VIRTUAL}、
+     * 且既不含快递也不含自提 → 整单虚拟；否则按快递。
+     *
+     * ⚠️ 两个**刻意保守**的选择，别顺手"改宽松"：
+     *   1. **配送方式为空不算虚拟**：历史数据里有 `delivery_types = ''` 的商品（建表默认值就是 `''`），
+     *      把它们当虚拟会让那些实物商品变成"不要收货地址"。空 → 按快递。
+     *   2. **同时勾了快递与虚拟商品**（`[1,3]`）也按快递 —— 它支持快递，就该要地址。
+     */
+    static Integer resolveDeliveryType(List<ProductSpuRespDTO> spuList) {
+        boolean allVirtual = spuList.stream().allMatch(spu -> {
+            List<Integer> types = spu.getDeliveryTypes();
+            return types != null
+                    && types.contains(DeliveryTypeEnum.VIRTUAL.getType())
+                    && !types.contains(DeliveryTypeEnum.EXPRESS.getType())
+                    && !types.contains(DeliveryTypeEnum.PICK_UP.getType());
+        });
+        return allVirtual ? DeliveryTypeEnum.VIRTUAL.getType() : DeliveryTypeEnum.EXPRESS.getType();
     }
 
     private List<ProductSkuRespDTO> checkSkuList(TradePriceCalculateReqBO reqBO) {

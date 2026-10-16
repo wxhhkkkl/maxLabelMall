@@ -36,7 +36,7 @@ vi.mock('@/api/mall/product/filterValue', () => ({
 
 import { ElMessageBox } from 'element-plus'
 
-import { createDimension, getDimensionList } from '@/api/mall/product/filterDimension'
+import { createDimension, getDimensionList, updateDimension } from '@/api/mall/product/filterDimension'
 import { getValueList } from '@/api/mall/product/filterValue'
 
 const OWN_DIMENSION = { id: 21, categoryId: 114, name: '宽度', sort: 1 }
@@ -157,5 +157,87 @@ describe('FilterDimensionDrawer —— 新增维度的完整路径', () => {
     expect(createDimension).toHaveBeenCalledWith(
       expect.objectContaining({ categoryId: 113, name: '宽度' })
     )
+  })
+})
+
+describe('FilterDimensionDrawer —— 改名与排序的完整路径（2026-10-16 线上 bug）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * ⚠️ **回归测试**，针对 2026-10-16 线上：**改名点不动**，前端只看到
+   * `Uncaught (in promise) error`（排序同样坏，只是没人报）。
+   *
+   * 根因：`updateDimension` 的请求体少了 `categoryId`，而后端的
+   * `ProductFilterDimensionSaveReqVO` 挂着 `@NotNull("归属分类不能为空")` ——
+   * 请求**在进业务代码之前**就被参数校验拦掉了。
+   * 讽刺的是后端 `updateDimension` **根本不读**这个字段（它自己的注释写着
+   * "本接口不接受改分类"，重名校验用的是库里那条记录的分类）—— 一个后端不用的字段却强制要传。
+   *
+   * 与上面那条"新增"的回归测试同一个教训：**只断言渲染、不跑处理器 → 测试全绿**。
+   * 所以这里 `await` 处理器返回的 promise，并**逐字段断言请求体**。
+   */
+  it('改名：请求体带上 categoryId，且不崩', async () => {
+    vi.mocked(getDimensionList).mockResolvedValue({ own: [OWN_DIMENSION], inherited: [] } as never)
+    vi.mocked(updateDimension).mockResolvedValue(true as never)
+    const promptSpy = vi
+      .spyOn(ElMessageBox, 'prompt')
+      .mockResolvedValue({ value: '宽度（新）', action: 'confirm' } as never)
+
+    const wrapper = mount(FilterDimensionDrawer, {
+      props: { modelValue: true, categoryId: 114, categoryName: '蜡基' },
+      global: { stubs: { 'el-drawer': { template: '<div><slot /></div>' } } }
+    })
+    await flushPromises()
+
+    await expect(
+      (
+        wrapper.vm as unknown as {
+          onRenameDimension: (d: typeof OWN_DIMENSION) => Promise<void>
+        }
+      ).onRenameDimension(OWN_DIMENSION)
+    ).resolves.toBeUndefined()
+
+    expect(promptSpy).toHaveBeenCalled()
+    expect(updateDimension).toHaveBeenCalledWith({
+      id: 21,
+      categoryId: 114, // ← 漏了它就会被后端的参数校验拦掉（这正是本次的 bug）
+      name: '宽度（新）',
+      sort: 1
+    })
+  })
+
+  it('排序：交换两项时**两次**请求都带上 categoryId，且不崩', async () => {
+    const second = { id: 22, categoryId: 114, name: '厚度', sort: 2 }
+    vi.mocked(getDimensionList).mockResolvedValue({
+      own: [OWN_DIMENSION, second],
+      inherited: []
+    } as never)
+    vi.mocked(updateDimension).mockResolvedValue(true as never)
+
+    const wrapper = mount(FilterDimensionDrawer, {
+      props: { modelValue: true, categoryId: 114, categoryName: '蜡基' },
+      global: { stubs: { 'el-drawer': { template: '<div><slot /></div>' } } }
+    })
+    await flushPromises()
+
+    await expect(
+      (wrapper.vm as unknown as { onMoveDimension: (i: number, o: number) => Promise<void> })
+        .onMoveDimension(0, 1)
+    ).resolves.toBeUndefined()
+
+    expect(updateDimension).toHaveBeenNthCalledWith(1, {
+      id: 21,
+      categoryId: 114,
+      name: '宽度',
+      sort: 2
+    })
+    expect(updateDimension).toHaveBeenNthCalledWith(2, {
+      id: 22,
+      categoryId: 114,
+      name: '厚度',
+      sort: 1
+    })
   })
 })

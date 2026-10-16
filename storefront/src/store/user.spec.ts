@@ -100,6 +100,24 @@ describe('顶栏展示用', () => {
     expect(s.displayName).toBe('138****8888')
   })
 
+  it('**顶栏用脱敏手机号**（headerLabel）：有昵称也一样（所有者 2026-10-16 指定）', async () => {
+    setTokens('at-1', 'rt-1')
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888' })
+    const s = useUserStore()
+    await s.loadMember()
+    expect(s.headerLabel).toBe('138****8888')
+    // 个人中心那个仍然是昵称 —— 两个用途别合并
+    expect(s.displayName).toBe('张三')
+  })
+
+  it('headerLabel 没有手机号时回落昵称（不渲染空白）', async () => {
+    setTokens('at-1', 'rt-1')
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '' })
+    const s = useUserStore()
+    await s.loadMember()
+    expect(s.headerLabel).toBe('张三')
+  })
+
   it('未登录时 displayName 为空串，不显示占位文案', () => {
     expect(useUserStore().displayName).toBe('')
   })

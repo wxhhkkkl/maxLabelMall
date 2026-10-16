@@ -33,13 +33,34 @@ export const useUserStore = defineStore('user', () => {
     return `${mobile.slice(0, 3)}****${mobile.slice(-4)}`
   }
 
-  /** 顶栏展示名：优先昵称，无昵称时回落为脱敏手机号（FR-016） */
+  /**
+   * 个人中心的展示名：**优先昵称**，无昵称时回落为脱敏手机号（FR-016）
+   *
+   * ⚠️ 它**不是顶栏用的那个** —— 顶栏见 {@link headerLabel}。两者用途不同，别合并。
+   */
   const displayName = computed(() => {
     if (!isLogin.value) return ''
     const nickname = member.value?.nickname?.trim()
     if (nickname) return nickname
     const mobile = member.value?.mobile
     return mobile ? maskMobile(mobile) : ''
+  })
+
+  /**
+   * **顶栏**展示名：**脱敏手机号优先**，没有手机号才回落昵称（所有者 2026-10-16 指定）
+   *
+   * ⚠️ 为什么与 {@link displayName} 分开（而不是改后者）：
+   *   · 顶栏要回答的是"**我登的是哪个账号**" → 客户认手机号，昵称可以随便改、还可能重名
+   *   · 个人中心「账号信息」卡要的是"我的展示名" → 昵称（那一页下面本来就单列了手机号）
+   *
+   * ⚠️ **必须脱敏**：FR-016 明确要求顶栏展示「脱敏后的账号标识」，
+   * 完整号码在别人能瞥见的屏幕上等于泄露账号 —— 所以永远是 `138****8888` 这种形式。
+   */
+  const headerLabel = computed(() => {
+    if (!isLogin.value) return ''
+    const mobile = member.value?.mobile
+    if (mobile) return maskMobile(mobile)
+    return member.value?.nickname?.trim() || ''
   })
 
   /** 登录成功后调用：同步令牌并拉取会员信息 */
@@ -107,6 +128,7 @@ export const useUserStore = defineStore('user', () => {
     agreedToTerms,
     isLogin,
     displayName,
+    headerLabel,
     loadMember,
     syncAfterLogin,
     logout,

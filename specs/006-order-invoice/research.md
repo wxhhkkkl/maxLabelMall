@@ -43,7 +43,7 @@ C 端抬头簿接口走 `/app-api/trade/invoice-title/**`。
 | 事实 | 出处 |
 |---|---|
 | `trade_order` 是全局最热的表（详情 / 列表 / 售后 / 统计都查它），本身已有 40+ 列 | `sql/mysql/mall-2026-04-18.sql:1473`；`TradeOrderDO.java` |
-| 订单里**只有一个自由文本位 `remark`**，且 C 端从来不填 —— 承载不了"票种 + 5 个抬头字段 + 状态 + 文件"这一组结构化数据 | `AppTradeOrderCreateReqVO.java:13`；`storefront/src/types/order.ts:154` |
+| 订单里**只有一个自由文本位 `remark`** —— 承载不了"票种 + 5 个抬头字段 + 状态 + 文件"这一组结构化数据<br>📌 原文还写着"且 C 端从来不填"，**该半句自 2026-10-16 起不再成立**（结算页补了「买家留言」输入框）。R25/R26 的结论不变：**能填但仍是自由文本**，依然承载不了结构化的开票信息 | `AppTradeOrderCreateReqVO.java:13`；`storefront/src/types/order.ts:154` |
 | 新表用 `trade_` 前缀、继承 `BaseDO`、带 `tenant_id`（既有 trade 表都这样） | `trade_after_sale` 的 DDL（`mall-2026-04-18.sql:1078-1113`）；`AfterSaleDO.java:26 extends BaseDO` |
 | **FR-179 在子表上天然成立**："历史订单视为未申请"= 子表里没有对应行，**一行数据都不用补** | spec FR-179 |
 

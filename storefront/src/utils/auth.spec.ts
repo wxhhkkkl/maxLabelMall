@@ -75,16 +75,50 @@ describe('migrateLegacyTokens —— 清理撞车的旧 key', () => {
     expect(window.localStorage.getItem('REFRESH_TOKEN')).toBeNull()
   })
 
-  it('旧 key 里是管理端的 wsCache 信封 → **丢弃**（那不是令牌），但旧 key 仍要删掉', () => {
-    window.localStorage.setItem('ACCESS_TOKEN', '{"c":1791534862803,"e":253402300799000,"v":"x"}')
-    window.localStorage.setItem('REFRESH_TOKEN', '{"c":1791534862803,"e":253402300799000,"v":"y"}')
+  /**
+   * ⚠️ **2026-10-16 事故**（用户报的："同时登录前后台，前台刷新一下后台就掉登录"）。
+   *
+   * 原来这条写的是"信封也要删掉"，理由是"留着会被管理端继续写" ——
+   * 那是把"清理前台残留"和"删掉管理端的会话"混为一谈了：同源共享 localStorage，
+   * **管理端此刻正在用这两个键**，删了它 = 把后台登出；而这个函数在 `main.ts`
+   * 顶层，**每次刷新都会跑**。
+   */
+  it('旧 key 里是管理端的 wsCache 信封 → **原封不动**（那是管理端此刻的会话）', () => {
+    const adminAt = '{"c":1791534862803,"e":253402300799000,"v":"x"}'
+    const adminRt = '{"c":1791534862803,"e":253402300799000,"v":"y"}'
+    window.localStorage.setItem('ACCESS_TOKEN', adminAt)
+    window.localStorage.setItem('REFRESH_TOKEN', adminRt)
 
     migrateLegacyTokens()
 
+    // 前台没捡到什么（信封不是令牌）
     expect(getAccessToken()).toBe('')
     expect(getRefreshToken()).toBe('')
-    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBeNull()
-    expect(window.localStorage.getItem('REFRESH_TOKEN')).toBeNull()
+    // **管理端的会话必须还在** —— 这条就是本次修复的核心
+    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBe(adminAt)
+    expect(window.localStorage.getItem('REFRESH_TOKEN')).toBe(adminRt)
+  })
+
+  it('**反复跑也不会动管理端的会话**（这个函数每次页面加载都会跑，不是只跑一次）', () => {
+    const adminAt = '{"c":1791534862803,"e":253402300799000,"v":"x"}'
+    window.localStorage.setItem('ACCESS_TOKEN', adminAt)
+
+    migrateLegacyTokens()
+    migrateLegacyTokens()
+    migrateLegacyTokens()
+
+    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBe(adminAt)
+  })
+
+  it('前台的令牌存取**不会**顺手清掉管理端的键', () => {
+    const adminAt = '{"c":1791534862803,"e":253402300799000,"v":"x"}'
+    window.localStorage.setItem('ACCESS_TOKEN', adminAt)
+
+    setTokens('at-123', 'rt-456')
+    clearTokens()
+    migrateLegacyTokens()
+
+    expect(window.localStorage.getItem('ACCESS_TOKEN')).toBe(adminAt)
   })
 
   it('不覆盖已存在的新 key（迁移只做一次，不影响当前会话）', () => {

@@ -33,8 +33,8 @@
 | 事实 | 出处 |
 |---|---|
 | 新商城**没有任何发票实现** —— 后端 `yudao-module-mall`、C 端 `storefront/src`、管理端 `yudao-ui-admin-vue3/src` 搜 `invoice` / `发票` 全部零命中 | 全仓搜索 |
-| 下单入参里**只有一个自由文本位 `remark`**，而且**前台从来不填**：`remark` 只出现在类型定义与 API body 里，没有任何 UI 给它赋值 | `AppTradeOrderCreateReqVO`；`storefront/src/types/order.ts:154`、`api/order.ts:100` |
-| 结算页是**一叠卡片**（收货地址 / 商品清单 / 金额…），**没有备注框**，加一个「发票」卡片是新增不是改造 | `CheckoutView.vue` |
+| 下单入参里**只有一个自由文本位 `remark`**，而且**前台从来不填**：`remark` 只出现在类型定义与 API body 里，没有任何 UI 给它赋值<br>📌 **后半句自 2026-10-16 起不再成立** —— 结算页补了「买家留言」输入框、订单详情也补了展示位（**与发票无关，是本表论证之外的一次补齐**）。结论不受影响：它仍然只是一个自由文本位 | `AppTradeOrderCreateReqVO`；`storefront/src/types/order.ts:154`、`api/order.ts:100` |
+| 结算页是**一叠卡片**（收货地址 / 商品清单 / 金额…），**没有备注框**，加一个「发票」卡片是新增不是改造<br>📌 **"没有备注框"自 2026-10-16 起不再成立**（补了「买家留言」卡片）。"一叠卡片、加一张是新增不是改造"这个结论不受影响 —— 发票卡片当初正是这么加进去的 | `CheckoutView.vue` |
 | 订单详情返回 `AppTradeOrderDetailRespVO` **没有任何发票字段**（只有 `userRemark`） | 同上 |
 | 管理端订单页只有上游自带的**「商家备注」**，没有开票入口、没有发票列表 | `views/mall/trade/order/detail/index.vue` |
 | 会员表**没有开票字段**。005 新加的 `company`（公司名称）明确声明**不用于开票** | `specs/005-wechat-scan-login/spec.md:337` |

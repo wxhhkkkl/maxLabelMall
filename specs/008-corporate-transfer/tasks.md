@@ -288,7 +288,23 @@
 
 - [ ] T493 交易配置里**填真实收款账户**（所有者）—— ⚠️ 见下面这条**必须知道**的事
       （业务事实，留占位符的必须由所有者替换）+ 发版（顺序：**脚本 → 后端 → 两个前端**）
-- [ ] T494 提交
+- [x] T494 提交 —— ✅ 2026-10-16 已推到 GitHub（`origin/006-order-invoice`），**按特性拆成 6 个提交**：
+      | 提交 | 内容 |
+      |---|---|
+      | `ff32a030` | fix(admin): 003 筛选维度改名报错（缺 `categoryId`） |
+      | `37620b8e` | fix(admin): 聚合搜索空参数名被 Tomcat 拒（线上 500） |
+      | `e7e9b503` | feat(trade): **007 虚拟商品** |
+      | `10b3778c` | feat(trade): **008 对公转账**（含 T478b/T488b/T495/T496） |
+      | `80c8062c` | feat(storefront): 顶栏改显示脱敏手机号（FR-016） |
+      | `148bfdb5` | fix(storefront): 刷新 C 端掉后台登录 + 买家留言 |
+      共 101 个文件、+6283/−149、36 个新文件。
+      ⚠️ **坦白一处不干净**：008 那个提交里含若干**同时带其他特性改动**的文件
+      （`CheckoutView.vue` / `OrderDetailView.vue` / `types/order.ts` / `api/order.ts` /
+      `OrderTableColumn.vue` / `admin 订单列表 index.vue` / `AppTradeOrderCreateReqVO.java`），
+      它们同时承载 007、买家留言、管理端列表版式与聚合搜索修复的 hunks。
+      非交互式下**无法按 hunk 切开**（`git add -p` 要交互），所以随 008 一起进去 ——
+      提交说明里已写明是哪些文件、各含什么。**结论**：`git log` 能按特性读懂，
+      但 `git blame` 到这些文件时要留意。
 
 ---
 

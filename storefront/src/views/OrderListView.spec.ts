@@ -264,3 +264,47 @@ describe('OrderListView —— 开票状态（006 / FR-178）', () => {
     expect(w.findAll('.oc-invoice')).toHaveLength(0)
   })
 })
+
+/**
+ * 对公转账「待收款」（008 / FR-200）。
+ *
+ * ⚠️ FR-200 明确要求**订单列表**也显示「待收款」而不是「待支付」—— 列表上原本
+ * 会给出一个「立即支付」按钮，而对公单**没有任何在线支付入口**（FR-201），
+ * 客户按下去只会到了一个没有支付按钮的详情页。**把入口本身去掉**才自洽。
+ *
+ * 判定来自后端的 `offlineWaiting`（列表接口一次批量查出来的）。
+ */
+describe('OrderListView —— 对公转账「待收款」（008 / FR-200）', () => {
+  it('待收款单：状态标签是「**待收款**」，不是「待支付」', async () => {
+    const w = await mountList([order(1, { offlineWaiting: true })])
+
+    expect(w.get('.ml-pill').text()).toBe('待收款')
+    expect(w.get('.oc-head').text()).not.toContain('待支付')
+  })
+
+  it('待收款单：**不给「立即支付」入口**（FR-201 客户侧没有在线支付入口）', async () => {
+    const w = await mountList([order(1, { offlineWaiting: true })])
+
+    expect(w.find('.go-pay').exists()).toBe(false)
+  })
+
+  it('待收款单：**「取消订单」入口仍在** —— 打款前反悔是正常路径', async () => {
+    const w = await mountList([order(1, { offlineWaiting: true })])
+
+    expect(w.find('.cancel-order').exists()).toBe(true)
+  })
+
+  it('**普通未支付订单不受影响**：仍是「待支付」+「立即支付」（FR-211）', async () => {
+    const w = await mountList([order(1)])
+
+    expect(w.get('.ml-pill').text()).toBe('待支付')
+    expect(w.find('.go-pay').exists()).toBe(true)
+  })
+
+  it('筛选胶囊仍是后端 5 态（对公单在后端就是「未支付」，筛出来不该换名字）', async () => {
+    const w = await mountList([order(1, { offlineWaiting: true })])
+
+    const labels = w.findAll('.cat-pills .tab').map((t) => t.text())
+    expect(labels).toEqual(['全部', '待支付', '待发货', '已发货', '已完成', '已取消'])
+  })
+})

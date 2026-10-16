@@ -89,6 +89,20 @@ public interface PayOrderService {
     Long createOrder(@Valid PayOrderCreateReqDTO reqDTO);
 
     /**
+     * 创建一笔**已支付**的对公转账支付单（008）
+     *
+     * ⚠️ 与 {@link #createOrder} 的区别：那一个建的是"待支付"，本方法**直接造成已支付**。
+     * 对公转账的钱是客户**线下**打进银行账户的，财务确认到账后才调它。
+     *
+     * ⚠️ 它会**同时建一条支付通知任务**，贸易端据此把订单从「待收款」推到「待发货」——
+     * 也就是说这条链路**完全复用**了在线支付的成功路径（原则 III）。
+     *
+     * @param reqDTO 创建请求（`merchantOrderId` = 订单编号、`price` = 订单实付）
+     * @return 支付单编号
+     */
+    Long createPaidOfflineOrder(@Valid PayOrderCreateReqDTO reqDTO);
+
+    /**
      * 提交支付
      * 此时，会发起支付渠道的调用
      *

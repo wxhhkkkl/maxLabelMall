@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { Address, SettlementResp } from '@/types'
+import { DELIVERY_TYPE_EXPRESS, DELIVERY_TYPE_VIRTUAL } from '@/api/order'
 
 const settlement = vi.fn()
 const createOrder = vi.fn()
@@ -107,6 +108,9 @@ const COUPON_BAD = {
 function settlementResp(over: Partial<SettlementResp> = {}): SettlementResp {
   return {
     type: 0,
+    // 默认按**快递**（有运费、要地址）—— 与改前的行为一致，绝大多数既有用例的前提。
+    // 虚拟商品单用 `settlementResp({ deliveryType: DELIVERY_TYPE_VIRTUAL })` 单独构造。
+    deliveryType: DELIVERY_TYPE_EXPRESS,
     items: [
       {
         categoryId: 1,
@@ -130,6 +134,9 @@ function settlementResp(over: Partial<SettlementResp> = {}): SettlementResp {
       payPrice: 10800,
     },
     address: null,
+    // 默认**不开放对公转账** —— 与改前的行为一致（大多数既有用例的前提）。
+    // 对公转账的用例各自显式打开（008）。
+    offlinePayEnabled: false,
     usePoint: 0,
     totalPoint: 0,
     promotions: [],
@@ -534,5 +541,206 @@ describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR
     )
 
     expect(w.find('.invoice-card').exists()).toBe(false)
+  })
+})
+
+describe('CheckoutView —— 买家留言', () => {
+  const lastInput = () => createOrder.mock.calls.at(-1)?.[0] as Record<string, unknown>
+  const remarkBox = (w: Awaited<ReturnType<typeof mountCheckout>>) => w.get('#orderRemark')
+
+  async function submit(w: Awaited<ReturnType<typeof mountCheckout>>) {
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+  }
+
+  it('不填时请求体里**没有** remark（不是空串、也不是 null）', async () => {
+    const w = await mountCheckout()
+    await submit(w)
+
+    expect(createOrder).toHaveBeenCalled()
+    expect(lastInput().remark).toBeUndefined()
+  })
+
+  it('填了：**逐字段进请求体**（接线断言 —— 本项目吃过"只断言 UI、不断言请求体"的亏）', async () => {
+    const w = await mountCheckout()
+    await remarkBox(w).setValue('请在工作日送')
+
+    await submit(w)
+
+    expect(lastInput().remark).toBe('请在工作日送')
+  })
+
+  it('只敲了空格：当成没填（别让库里留下 `"   "` 这种值）', async () => {
+    const w = await mountCheckout()
+    await remarkBox(w).setValue('   ')
+
+    await submit(w)
+
+    expect(lastInput().remark).toBeUndefined()
+  })
+
+  it('输入框上限 200 字 —— 与 `trade_order.user_remark` 的列宽一致', async () => {
+    const w = await mountCheckout()
+
+    expect(remarkBox(w).attributes('maxlength')).toBe('200')
+  })
+})
+
+describe('CheckoutView —— 虚拟商品：软件不需要收货地址（007）', () => {
+  const lastInput = () => createOrder.mock.calls.at(-1)?.[0] as Record<string, unknown>
+  /** 卡片标题列表 —— 比 `w.text()` 精确：弹层里也有「收货地址」字样 */
+  const cardTitles = (w: Awaited<ReturnType<typeof mountCheckout>>) =>
+    w.findAll('.ml-card-title').map((n) => n.text())
+
+  it('整单虚拟：**整块不渲染收货地址卡片**，没有地址也能提交', async () => {
+    const w = await mountCheckout(settlementResp({ deliveryType: DELIVERY_TYPE_VIRTUAL }))
+
+    expect(cardTitles(w)).not.toContain('收货地址')
+    expect(w.find('#addressPicker').exists()).toBe(false)
+    expect(w.find('#coAddAddress').exists()).toBe(false)
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    expect(createOrder).toHaveBeenCalled()
+    // 别把「请先选择收货地址」甩给买软件的人
+    expect(w.text()).not.toContain('请先选择收货地址')
+  })
+
+  it('整单虚拟：下单请求带上**结算判定的**配送方式，且不带 addressId', async () => {
+    const w = await mountCheckout(settlementResp({ deliveryType: DELIVERY_TYPE_VIRTUAL }))
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    const body = lastInput()
+    expect(body.deliveryType).toBe(DELIVERY_TYPE_VIRTUAL)
+    expect(body.addressId).toBeUndefined()
+  })
+
+  it('整单虚拟：**不去挑默认地址**（否则卡片没了、地址却已被选中）', async () => {
+    // 账号有默认地址（beforeEach 里塞了 ADDR），但本单是虚拟的 —— 不该自动选中它。
+    // 非虚拟单会用默认地址**再结算一次**，所以这里断言只结算了一次。
+    await mountCheckout(settlementResp({ deliveryType: DELIVERY_TYPE_VIRTUAL }))
+
+    expect(settlement).toHaveBeenCalledTimes(1)
+  })
+
+  it('含实物的混买单（服务端判成快递）：照旧渲染地址卡片、照旧带 addressId', async () => {
+    const w = await mountCheckout(settlementResp({ deliveryType: DELIVERY_TYPE_EXPRESS }))
+
+    expect(cardTitles(w)).toContain('收货地址')
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    const body = lastInput()
+    expect(body.deliveryType).toBe(DELIVERY_TYPE_EXPRESS)
+    expect(body.addressId).toBe(ADDR.id)
+  })
+
+  it('非虚拟单没选地址：仍然拦住并提示（这条**不能**被虚拟商品改松）', async () => {
+    listAddress.mockResolvedValue([]) // 一个地址都没有
+    const w = await mountCheckout(settlementResp({ deliveryType: DELIVERY_TYPE_EXPRESS }))
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(w.text()).toContain('请先选择收货地址')
+  })
+})
+
+/**
+ * 对公转账（008 / FR-199 / FR-211）。
+ *
+ * ⚠️ 这里的断言**盯的是下单请求体**，不是页面上有没有那个按钮 ——
+ * 「选了但没发出去」是本项目踩过的坑（只断言 UI、不断言请求体）。
+ */
+describe('CheckoutView —— 对公转账（008 / FR-199 / FR-211）', () => {
+  const lastInput = () => createOrder.mock.calls.at(-1)?.[0] as Record<string, unknown>
+
+  async function submit(w: Awaited<ReturnType<typeof mountCheckout>>) {
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+  }
+
+  it('后台**没开**对公转账时：结算页根本不给这个选项（FR-210 的"可关掉"）', async () => {
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: false }))
+
+    expect(w.find('#payMethodOffline').exists()).toBe(false)
+    expect(w.text()).not.toContain('对公转账')
+  })
+
+  it('开了对公转账：与「在线支付」**并列**给出两种方式，并带上后台配的提示语', async () => {
+    const w = await mountCheckout(
+      settlementResp({ offlinePayEnabled: true, offlinePayTip: '请在转账附言里写订单号' }),
+    )
+
+    expect(w.find('#payMethodOffline').exists()).toBe(true)
+    expect(w.find('#payMethodOnline').exists()).toBe(true)
+    expect(w.text()).toContain('请在转账附言里写订单号')
+  })
+
+  it('卡片顺序：商品清单 → 支付方式 → 发票 → 优惠券（所有者 2026-10-16 指定）', async () => {
+    // 先说清为什么值得钉：这几张卡的顺序被所有者连着调过两次，
+    // 而 `.ml-card-title` 是页面左列**唯一**稳定的定位锚（卡片之间没有 id/class 区分）
+    const titles = (await mountCheckout(settlementResp({ offlinePayEnabled: true })))
+      .findAll('.ml-card-title')
+      .map((n) => n.text())
+    expect(titles.indexOf('商品清单（1 件）')).toBeLessThan(titles.indexOf('支付方式'))
+    expect(titles.indexOf('支付方式')).toBeLessThan(titles.indexOf('发票'))
+    expect(titles.indexOf('发票')).toBeLessThan(titles.indexOf('优惠券'))
+    expect(titles.indexOf('优惠券')).toBeLessThan(titles.indexOf('买家留言'))
+  })
+
+  it('⚠️ 结算响应里**没有**收款账户明细 —— 客户还没下单时不该看到完整账号（契约 §2）', async () => {
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: true }))
+
+    // 结算响应本身就没有这些字段；页面上也不能凭空出现
+    expect(w.text()).not.toContain('收款账号')
+  })
+
+  it('选「对公转账」→ 请求体带 `payChannelCode: "offline"`', async () => {
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: true }))
+
+    await w.get('#payMethodOffline').trigger('click')
+    await flushPromises()
+    await submit(w)
+
+    expect(lastInput().payChannelCode).toBe('offline')
+  })
+
+  it('**默认（在线支付）请求体里没有 payChannelCode** —— 与改动前逐字一致（FR-211）', async () => {
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: true }))
+
+    await submit(w)
+
+    expect(createOrder).toHaveBeenCalled()
+    expect(lastInput().payChannelCode).toBeUndefined()
+  })
+
+  it('选了之后**又改回**在线支付：请求体里不留下 offline（不能按键序残留）', async () => {
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: true }))
+
+    await w.get('#payMethodOffline').trigger('click')
+    await flushPromises()
+    await w.get('#payMethodOnline').trigger('click')
+    await flushPromises()
+    await submit(w)
+
+    expect(lastInput().payChannelCode).toBeUndefined()
+  })
+
+  it('地址与对公转账**互不影响**：对公单照旧要收货地址', async () => {
+    listAddress.mockResolvedValue([]) // 一个地址都没有
+    const w = await mountCheckout(settlementResp({ offlinePayEnabled: true }))
+
+    await w.get('#payMethodOffline').trigger('click')
+    await flushPromises()
+    await submit(w)
+
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(w.text()).toContain('请先选择收货地址')
   })
 })

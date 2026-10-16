@@ -13,7 +13,7 @@ import type { InvoiceStatusValue, OrderPageItem } from '@/types'
 import { OrderStatus } from '@/types'
 import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan } from '@/utils/money'
-import { canCommentOrder, orderStatusFilters } from '@/utils/orderStatus'
+import { OFFLINE_WAITING_TEXT, canCommentOrder, orderStatusFilters } from '@/utils/orderStatus'
 import { formatDateTime } from '@/utils/time'
 
 /**
@@ -160,7 +160,11 @@ onMounted(load)
             <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
             <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null） -->
             <span v-if="o.invoiceStatus != null" class="oc-invoice">发票·{{ invoiceStatusName(o.invoiceStatus as InvoiceStatusValue) }}</span>
-            <MlPill :status="o.status" />
+            <!-- 对公待收款单：底层仍是「未支付」，但说辞要换（008 / FR-200） -->
+            <MlPill
+              :status="o.status"
+              :text="o.offlineWaiting ? OFFLINE_WAITING_TEXT : undefined"
+            />
           </div>
 
           <div class="oc-items">
@@ -193,9 +197,11 @@ onMounted(load)
             <!--
               支付入口在订单详情页（T117）—— 全站只有一处实现支付调用，
               列表这里只把人送过去，不复制一份支付逻辑。
+              ⚠️ **对公待收款单不给这个入口**（008 / FR-201）：客户侧对公单没有任何
+              在线支付入口，留个「立即支付」只会把人送到一个没有支付按钮的详情页。
             -->
             <button
-              v-if="o.status === OrderStatus.UNPAID"
+              v-if="o.status === OrderStatus.UNPAID && !o.offlineWaiting"
               class="btn-cart go-pay"
               type="button"
               @click="router.push(`/order/${o.id}`)"

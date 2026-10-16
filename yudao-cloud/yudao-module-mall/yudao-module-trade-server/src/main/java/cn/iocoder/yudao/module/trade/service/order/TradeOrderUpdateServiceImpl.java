@@ -30,7 +30,9 @@ import cn.iocoder.yudao.module.promotion.api.combination.dto.CombinationRecordRe
 import cn.iocoder.yudao.module.promotion.enums.combination.CombinationRecordStatusEnum;
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
@@ -43,11 +45,13 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.cart.CartDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryPickUpStoreDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.config.TradeConfigDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.dal.redis.no.TradeNoRedisDAO;
 import cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum;
+import cn.iocoder.yudao.module.pay.enums.PayChannelEnum;
 import cn.iocoder.yudao.module.trade.enums.order.*;
 import cn.iocoder.yudao.module.trade.framework.order.config.TradeOrderProperties;
 import cn.iocoder.yudao.module.trade.framework.order.core.annotations.TradeOrderLog;
@@ -56,6 +60,9 @@ import cn.iocoder.yudao.module.trade.service.cart.CartService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryExpressService;
 import cn.iocoder.yudao.module.trade.service.delivery.DeliveryPickUpStoreService;
 import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
+import cn.iocoder.yudao.module.trade.service.config.TradeConfigService;
+import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
+import cn.iocoder.yudao.module.trade.service.offline.bo.TradeOrderOfflineConfirmReqBO;
 import cn.iocoder.yudao.module.trade.service.message.TradeMessageService;
 import cn.iocoder.yudao.module.trade.service.message.bo.TradeOrderMessageWhenDeliveryOrderReqBO;
 import cn.iocoder.yudao.module.trade.service.order.handler.TradeOrderHandler;
@@ -109,6 +116,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Resource
     private TradeOrderInvoiceService tradeOrderInvoiceService;
     @Resource
+    private TradeConfigService tradeConfigService;
+    @Resource
+    private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
+    @Resource
     private TradePriceService tradePriceService;
     @Resource
     private DeliveryExpressService deliveryExpressService;
@@ -147,7 +158,16 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO);
 
         // 3. 拼接返回
-        return TradeOrderConvert.INSTANCE.convert(calculateRespBO, address);
+        AppTradeOrderSettlementRespVO respVO = TradeOrderConvert.INSTANCE.convert(calculateRespBO, address);
+        // 3.1 008 对公转账：只下发"开没开"与提示语 —— **账户明细不在这里给**
+        //     （结算时还没下单，客户不需要看到完整账号；那是订单详情里逐个订单对照的信息）
+        // ⚠️ 必须兜住"**租户根本没有 trade_config 行**"：`getTradeConfig()` 那时返回 **null**
+        //     （线上租户 162 实测就是这种 —— 表里只有 tenant_id=1 的一行，2026-10-16 发版当天
+        //      因此让**结算页对每个客户 500**）。没有配置的语义 = 对公转账不开放，不是崩掉。
+        TradeConfigDO tradeConfig = ObjUtil.defaultIfNull(tradeConfigService.getTradeConfig(), new TradeConfigDO());
+        respVO.setOfflinePayEnabled(Boolean.TRUE.equals(tradeConfig.getOfflinePayEnabled()));
+        respVO.setOfflinePayTip(tradeConfig.getOfflinePayTip());
+        return respVO;
     }
 
     /**
@@ -187,6 +207,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Transactional(rollbackFor = Exception.class)
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.MEMBER_CREATE)
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
+        // 0. 008 对公转账：先校验入参里的支付渠道（**越早失败越好** —— 别等订单建了一半才发现）
+        validatePayChannelCode(createReqVO);
         // 1.1 价格计算
         TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
         // 1.2 构建订单
@@ -206,6 +228,31 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         return order;
     }
 
+    /**
+     * 校验下单入参里的**支付渠道**（008 对公转账）
+     *
+     * ⚠️ **下单时只接受 `offline`**：其余渠道是**支付时**才选的，下单这一刻客户只有
+     * "要不要走线下打款"这一个决定。传了别的值一律拒，免得出现"单还没下就指定了微信"这种半截状态。
+     *
+     * 不传 / 传空 = 在线支付，**行为与改动前逐字一致**（FR-211）。
+     */
+    private void validatePayChannelCode(AppTradeOrderCreateReqVO createReqVO) {
+        String payChannelCode = createReqVO.getPayChannelCode();
+        if (StrUtil.isBlank(payChannelCode)) {
+            return;
+        }
+        if (!PayChannelEnum.OFFLINE.getCode().equals(payChannelCode)) {
+            throw exception(ORDER_CREATE_FAIL_PAY_CHANNEL_CODE_INVALID);
+        }
+        // 开关关了就**不让新下单**（FR-210）；⚠️ 已产生的待收款订单不受影响 —— 那两条路
+        // （确认收款 / 取消）都不经过这里
+        // 同上：没有配置行 = 没开（不是 NPE）
+        TradeConfigDO tradeConfig = ObjUtil.defaultIfNull(tradeConfigService.getTradeConfig(), new TradeConfigDO());
+        if (!Boolean.TRUE.equals(tradeConfig.getOfflinePayEnabled())) {
+            throw exception(ORDER_CREATE_FAIL_OFFLINE_PAY_DISABLED);
+        }
+    }
+
     private TradeOrderDO buildTradeOrder(Long userId, AppTradeOrderCreateReqVO createReqVO,
                                          TradePriceCalculateRespBO calculateRespBO) {
         TradeOrderDO order = TradeOrderConvert.INSTANCE.convert(userId, createReqVO, calculateRespBO);
@@ -221,13 +268,15 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         order.setAdjustPrice(0).setPayStatus(false);
         order.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus()).setRefundPrice(0);
         // 物流信息
-        order.setDeliveryType(createReqVO.getDeliveryType());
-        if (Objects.equals(createReqVO.getDeliveryType(), DeliveryTypeEnum.EXPRESS.getType())) {
+        // ⚠️ 用**服务端判定的**配送方式（`calculateRespBO.deliveryType` —— 上面的 convert 已经写进 order），
+        // 不是请求里传的那个：客户端没传时是判定出来的，传了的话两者相同。
+        // 007：纯虚拟商品单（软件等）**两个分支都不进** —— 于是 receiver* 保持为空，不需要收货地址。
+        if (Objects.equals(order.getDeliveryType(), DeliveryTypeEnum.EXPRESS.getType())) {
             MemberAddressRespDTO address = addressApi.getAddress(createReqVO.getAddressId(), userId).getCheckedData();
             Assert.notNull(address, "地址({}) 不能为空", createReqVO.getAddressId()); // 价格计算时，已经计算
             order.setReceiverName(address.getName()).setReceiverMobile(address.getMobile())
                     .setReceiverAreaId(address.getAreaId()).setReceiverDetailAddress(address.getDetailAddress());
-        } else if (Objects.equals(createReqVO.getDeliveryType(), DeliveryTypeEnum.PICK_UP.getType())) {
+        } else if (Objects.equals(order.getDeliveryType(), DeliveryTypeEnum.PICK_UP.getType())) {
             order.setReceiverName(createReqVO.getReceiverName()).setReceiverMobile(createReqVO.getReceiverMobile());
             order.setPickUpVerifyCode(RandomUtil.randomNumbers(8)); // 随机一个核销码，长度为 8 位
         }
@@ -259,9 +308,13 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             cartService.deleteCart(order.getUserId(), cartIds);
         }
 
-        // 3. 生成预支付
-        // 特殊情况：积分兑换时，可能支付金额为零
-        if (order.getPayPrice() > 0) {
+        // 3. 支付单
+        // ⚠️ 008：对公转账**不建在线支付单** —— 客户是线下打款的，没有"去支付"这回事（FR-199）。
+        //    改为记一行"这单走对公转账"，它同时也是「待收款」的判据。
+        //    ⚠️ 这一步**必须在订单落库之后**（就是这里）—— 它要用 order.getId()。
+        if (PayChannelEnum.OFFLINE.getCode().equals(createReqVO.getPayChannelCode())) {
+            tradeOrderOfflinePaymentService.createOfflinePayment(order.getId());
+        } else if (order.getPayPrice() > 0) { // 特殊情况：积分兑换时，可能支付金额为零
             createPayOrder(order, orderItems);
         }
 
@@ -382,8 +435,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     public void deliveryOrder(TradeOrderDeliveryReqVO deliveryReqVO) {
         // 1.1 校验并获得交易订单（可发货）
         TradeOrderDO order = validateOrderDeliverable(deliveryReqVO.getId());
-        // 1.2 校验 deliveryType 是否为快递，是快递才可以发货
-        if (ObjectUtil.notEqual(order.getDeliveryType(), DeliveryTypeEnum.EXPRESS.getType())) {
+        // 1.2 校验配送方式：**只有自提不能走"发货"**（自提有专门的核销入口，不走这里）
+        //     · 快递（1）：正常发货
+        //     · 虚拟商品（3）：走下面的「无需发货」分支（logisticsId = 0）标记为已交付 ——
+        //       软件这类商品由客服线下交付，运营点一下"发货 → 无需发货"把它推进到已发货
+        if (ObjectUtil.equal(order.getDeliveryType(), DeliveryTypeEnum.PICK_UP.getType())) {
             throw exception(ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS);
         }
 
@@ -570,7 +626,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             throw exception(ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID);
         }
         // 1.3 校验是否支持延迟（不允许取消）
-        if (TradeOrderStatusEnum.isUnpaid(order.getStatus())) {
+        // ⚠️ 必须判 payOrderId 非空（008）：**对公转账单没有在线支付单**（FR-199），
+        //    它是草稿态的 `payOrderId = null`，无条件去查支付单等于拿 null 当 id 用。
+        if (TradeOrderStatusEnum.isUnpaid(order.getStatus()) && order.getPayOrderId() != null) {
             PayOrderRespDTO payOrder = payOrderApi.getOrder(order.getPayOrderId()).getCheckedData();
             if (payOrder != null && PayOrderStatusEnum.isSuccess(payOrder.getStatus())) {
                 log.warn("[cancelOrderByMember][order({}) 支付单已支付（支付回调延迟），不支持取消]", order.getId());
@@ -583,11 +641,101 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmOfflinePaid(TradeOrderOfflineConfirmReqVO reqVO, Long confirmUserId) {
+        // 1.1 校验订单存在
+        TradeOrderDO order = validateOrderExists(reqVO.getId());
+        // 1.2 校验**是对公单** —— 普通订单没有"线下收款"这回事，别让它被误确认成已支付
+        //     ⚠️ 只看"子表有没有这一行"，**不看有没有确认过** —— 已确认过的对公单
+        //        该报「已收款」（下面的状态校验），报「不是对公单」会把人带偏
+        if (tradeOrderOfflinePaymentService.getOfflinePaymentByOrderId(order.getId()) == null) {
+            throw exception(ORDER_CONFIRM_OFFLINE_PAID_FAIL_NOT_OFFLINE_ORDER);
+        }
+        // 1.3 校验状态：**只有「待收款」能确认**（FR-207）
+        //     已取消 → 明确说取消（FR-214）；已收款（含重复提交）→ 幂等的边界（FR-206）
+        if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {
+            throw exception(ORDER_CONFIRM_OFFLINE_PAID_FAIL_CANCELED);
+        }
+        if (!TradeOrderStatusEnum.isUnpaid(order.getStatus()) || order.getPayStatus()) {
+            throw exception(ORDER_CONFIRM_OFFLINE_PAID_FAIL_ALREADY_PAID);
+        }
+
+        // 2. **先落子表的确认痕迹** —— 它是幂等闸门（条件更新：只有"还没确认"的行会被改到，FR-206/R44）。
+        //    抢不到这一行说明别人正在/已经确认，直接报"已收款"，**绝不往下造支付单**。
+        boolean confirmed = tradeOrderOfflinePaymentService.confirmReceipt(
+                TradeOrderOfflineConfirmReqBO.builder()
+                        .orderId(order.getId()).bankSerialNo(reqVO.getBankSerialNo())
+                        .payerName(reqVO.getPayerName()).paidTime(reqVO.getPaidTime())
+                        .remark(reqVO.getRemark()).confirmUserId(confirmUserId)
+                        .build());
+        if (!confirmed) {
+            throw exception(ORDER_CONFIRM_OFFLINE_PAID_FAIL_ALREADY_PAID);
+        }
+
+        // 3. 造一张 **`offline` 渠道的已支付支付单**（FR-208 / R43）
+        //    ⚠️ 金额取订单实付、merchantOrderId 取订单 id —— `updateOrderPaid` 会逐项校验，
+        //       对不上会抛 `..._PAY_PRICE_NOT_MATCH`。
+        //       直接复用下单时那套转换（`TradeOrderConvert.convert`），保证与在线支付**同形**。
+        List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(order.getId());
+        PayOrderCreateReqDTO payOrderCreateReqDTO = TradeOrderConvert.INSTANCE.convert(
+                order, orderItems, tradeOrderProperties);
+        Long payOrderId = payOrderApi.createPaidOfflineOrder(payOrderCreateReqDTO).getCheckedData();
+
+        // 4. 走**既有的**唯一入口把订单推进「待发货」—— **不自己改状态**（R43：退款挂在支付单上）
+        getSelf().updateOrderPaid(order.getId(), payOrderId);
+
+        // 5. 把支付单号写回订单 —— 线上支付是在 `createPayOrder` 里写的；
+        //    而 `updateOrderPaid` **不写**这个字段。不补这一步，这笔"已支付"的订单
+        //    会留下 `pay_order_id = null`（退款不读它，但详情/对账会看到一个空缺）。
+        tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId()).setPayOrderId(payOrderId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.ADMIN_CANCEL)
+    public void cancelOrderByAdmin(TradeOrderCancelReqVO reqVO) {
+        // 1.1 校验订单存在
+        TradeOrderDO order = tradeOrderMapper.selectById(reqVO.getId());
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        // 1.2 只能取消**未支付**订单（FR-213 的口径）——
+        //     已支付的（含已确认收款）MUST 走**退款**：取消不改金额，退款才对得上账
+        if (!TradeOrderStatusEnum.isUnpaid(order.getStatus())) {
+            throw exception(ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID);
+        }
+        // 1.3 与会员取消同一条"回调延迟"保护：支付单已成功就别取消（对公单没有支付单，跳过）
+        if (order.getPayOrderId() != null) {
+            PayOrderRespDTO payOrder = payOrderApi.getOrder(order.getPayOrderId()).getCheckedData();
+            if (payOrder != null && PayOrderStatusEnum.isSuccess(payOrder.getStatus())) {
+                log.warn("[cancelOrderByAdmin][order({}) 支付单已支付（支付回调延迟），不支持取消]", order.getId());
+                throw exception(ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID);
+            }
+        }
+
+        // 2. 留痕：把取消原因写进订单备注（后台可见）—— 后来的人能看懂"这单为什么没了"
+        if (StrUtil.isNotEmpty(reqVO.getReason())) {
+            tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId()).setRemark(reqVO.getReason()));
+        }
+        // 3. 取消订单（复用既有链路：释放库存、作废开票申请…）
+        cancelOrder0(order, TradeOrderCancelTypeEnum.ADMIN_CANCEL);
+    }
+
+    @Override
     public int cancelOrderBySystem() {
         // 1. 查询过期的待支付订单
         LocalDateTime expireTime = minusTime(tradeOrderProperties.getPayExpireTime());
-        List<TradeOrderDO> orders = tradeOrderMapper.selectListByStatusAndCreateTimeLt(
+        // ⚠️ 008：**对公转账单不参与超时自动取消**（FR-212）——
+        //    公司走对公打款要好几天，照 2 小时砍掉，钱还没打出去单子就没了。
+        //    ⚠️ 排除条件**必须与下面 `cancelOrderBySystem(order)` 里的保护一致**：
+        //       只改一处会让对公单在第二步里被 `payOrderId = null` 带进 pay RPC（R45）。
+        List<TradeOrderDO> expiredOrders = tradeOrderMapper.selectListByStatusAndCreateTimeLt(
                 TradeOrderStatusEnum.UNPAID.getStatus(), expireTime);
+        Set<Long> offlineOrderIds = tradeOrderOfflinePaymentService.getWaitingReceiptOrderIds(
+                convertList(expiredOrders, TradeOrderDO::getId));
+        List<TradeOrderDO> orders = expiredOrders.stream()
+                .filter(order -> !offlineOrderIds.contains(order.getId()))
+                .toList();
         if (CollUtil.isEmpty(orders)) {
             return 0;
         }
@@ -613,8 +761,16 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Transactional(rollbackFor = Exception.class)
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.SYSTEM_CANCEL)
     public void cancelOrderBySystem(TradeOrderDO order) {
+        // ⚠️ 008：对公转账单**根本不进自动取消**（FR-212）。这里是**第二道**保护 ——
+        //    主查询漏了、或者有人直接调这个方法时，仍然不会把它当成"超时未支付"砍掉。
+        if (tradeOrderOfflinePaymentService.isWaitingReceipt(order.getId())) {
+            log.warn("[cancelOrderBySystem][order({}) 是对公转账待收款单，不参与超时自动取消]", order.getId());
+            return;
+        }
         // 校验是否支持延迟（不允许取消）
-        if (TradeOrderStatusEnum.isUnpaid(order.getStatus())) {
+        // ⚠️ 必须判 payOrderId 非空（008）：对公单没有在线支付单，
+        //    无条件去查支付单等于拿 null 当 id 用（R45 说的那句兜底就在这）
+        if (TradeOrderStatusEnum.isUnpaid(order.getStatus()) && order.getPayOrderId() != null) {
             PayOrderRespDTO payOrder = payOrderApi.getOrder(order.getPayOrderId()).getCheckedData();
             if (payOrder != null && PayOrderStatusEnum.isSuccess(payOrder.getStatus())) {
                 log.warn("[cancelOrderBySystem][order({}) 支付单已支付（支付回调延迟），不支持取消]", order.getId());

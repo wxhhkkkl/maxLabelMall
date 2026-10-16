@@ -97,4 +97,23 @@ public class TradeConfigBaseVO {
     @InEnum(value = BrokerageWithdrawTypeEnum.class, message = "提现方式必须是 {value}")
     private List<Integer> brokerageWithdrawTypes;
 
+    // ==================== 对公转账（008） ====================
+    // ⚠️ 这几个字段**都允许为空**、也 MUST NOT 加 @NotNull —— 它们是"想用才填"的可选项，
+    // 强制必填会让**不用对公转账的环境**（含所有单测与本地环境）根本存不下交易配置。
+
+    @Schema(description = "是否启用对公转账", example = "false")
+    private Boolean offlinePayEnabled;
+
+    @Schema(description = "对公转账：收款户名", example = "[[收款户名占位]]")
+    private String offlinePayAccountName;
+
+    @Schema(description = "对公转账：收款账号", example = "[[收款账号占位]]")
+    private String offlinePayAccountNo;
+
+    @Schema(description = "对公转账：开户行", example = "[[开户行占位]]")
+    private String offlinePayBankName;
+
+    @Schema(description = "对公转账：给客户的提示（如「请在转账附言里写订单号」）")
+    private String offlinePayTip;
+
 }

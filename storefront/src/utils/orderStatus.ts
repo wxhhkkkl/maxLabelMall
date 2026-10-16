@@ -18,6 +18,19 @@ export const ORDER_STATUS_TEXT: Record<OrderStatusValue, string> = {
 }
 
 /**
+ * 「**待收款**」—— 对公转账订单在客户侧的文案（008 / FR-200 / Q44）。
+ *
+ * ⚠️ **它不是第 6 个订单状态**：底层仍是后端**同一个** `status = 0`（未支付），
+ * 只是文案要换 —— 对公单在客户侧**没有任何在线支付入口**（FR-201），
+ * 说「待支付」会让客户去找支付宝。
+ *
+ * 因为底层状态没变，`orderStatusFilters()` 里那一格**仍然叫「待支付」**：
+ * 筛的是后端状态，对公单就在那一格里。由**订单数据**（`offlineWaiting` / `offlinePay.waiting`）
+ * 决定列表项与详情用哪个词，页面自己不许另起名字（FR-041a）。
+ */
+export const OFFLINE_WAITING_TEXT = '待收款'
+
+/**
  * C6 状态标签的变体名。与 `store.css` 中的 `.ml-pill.is-*` 一一对应。
  *
  * 早期版本用过 `.is-paid` 表示「已支付」—— 那是**不可实现的**：后端五个状态里

@@ -3,13 +3,17 @@ package cn.iocoder.yudao.module.trade.controller.admin.order;
 import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
+import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
@@ -17,6 +21,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -48,6 +53,8 @@ public class TradeOrderController {
 
     @Resource
     private MemberUserApi memberUserApi;
+    @Resource
+    private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
 
     @GetMapping("/page")
     @Operation(summary = "获得交易订单分页")
@@ -67,7 +74,15 @@ public class TradeOrderController {
         List<TradeOrderItemDO> orderItems = tradeOrderQueryService.getOrderItemListByOrderId(
                 convertSet(pageResult.getList(), TradeOrderDO::getId));
         // 最终组合
-        return success(TradeOrderConvert.INSTANCE.convertPage(pageResult, orderItems, userMap));
+        PageResult<TradeOrderPageItemRespVO> page = TradeOrderConvert.INSTANCE.convertPage(pageResult, orderItems, userMap);
+
+        // 对公转账「待收款」（008 / FR-209）：**一次 IN 批量查**，与 C 端同一手法
+        Set<Long> waitingOrderIds = tradeOrderOfflinePaymentService.getWaitingReceiptOrderIds(
+                convertSet(page.getList(), TradeOrderPageItemRespVO::getId));
+        page.getList().forEach(item -> item.setOfflineWaiting(
+                waitingOrderIds.contains(item.getId())
+                        && TradeOrderStatusEnum.isUnpaid(item.getStatus())));
+        return success(page);
     }
 
     @GetMapping("/summary")
@@ -95,7 +110,27 @@ public class TradeOrderController {
         MemberUserRespDTO brokerageUser = order.getBrokerageUserId() != null ?
                 memberUserApi.getUser(order.getBrokerageUserId()).getCheckedData() : null;
         List<TradeOrderLogDO> orderLogs = tradeOrderLogService.getOrderLogListByOrderId(id);
-        return success(TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser));
+        TradeOrderDetailRespVO respVO = TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser);
+        // 对公转账信息（008）：待收款标记 + 确认痕迹（FR-205 的可追溯）
+        buildOfflinePayment(respVO, order);
+        return success(respVO);
+    }
+
+    /**
+     * 拼对公转账信息（008）—— 照 006 挂开票信息的同一手法
+     *
+     * ⚠️ `offlineWaiting` **由服务端判**（"是对公单 **且** 未支付 **且** 未确认"），
+     * 不让前端自己拼三个条件 —— 对公单确认前 `payChannelCode` 是空的，前端根本拼不出来。
+     */
+    private void buildOfflinePayment(TradeOrderDetailRespVO respVO, TradeOrderDO order) {
+        TradeOrderOfflinePaymentDO offlinePayment = tradeOrderOfflinePaymentService.getOfflinePaymentByOrderId(order.getId());
+        if (offlinePayment == null) {
+            respVO.setOfflineWaiting(false); // 不是对公单 → 两个字段都别让人误会
+            return;
+        }
+        respVO.setOfflineWaiting(offlinePayment.getConfirmTime() == null
+                && TradeOrderStatusEnum.isUnpaid(order.getStatus()));
+        respVO.setOfflinePayment(BeanUtils.toBean(offlinePayment, TradeOrderOfflinePaymentRespVO.class));
     }
 
     @GetMapping("/get-express-track-list")
@@ -136,6 +171,33 @@ public class TradeOrderController {
     @PreAuthorize("@ss.hasPermission('trade:order:update')")
     public CommonResult<Boolean> updateOrderAddress(@RequestBody TradeOrderUpdateAddressReqVO reqVO) {
         tradeOrderUpdateService.updateOrderAddress(reqVO);
+        return success(true);
+    }
+
+    /**
+     * 确认**对公转账收款**（008 / FR-203）
+     *
+     * ⚠️ **独立权限点** `trade:order:confirm-paid`：这是**资金动作**，不是所有后台角色都该能做
+     * （FR-203）。漏登记权限点 = 连超管都看不到按钮，而接口是通的 —— 只能手工验（quickstart §二.6）。
+     */
+    @PutMapping("/confirm-offline-paid")
+    @Operation(summary = "确认对公转账收款")
+    @PreAuthorize("@ss.hasPermission('trade:order:confirm-paid')")
+    public CommonResult<Boolean> confirmOfflinePaid(@Valid @RequestBody TradeOrderOfflineConfirmReqVO reqVO) {
+        tradeOrderUpdateService.confirmOfflinePaid(reqVO, getLoginUserId());
+        return success(true);
+    }
+
+    /**
+     * **取消订单**（008 / FR-213）
+     *
+     * 沿用既有的 `trade:order:update` 权限点（不新增 —— 它本来就是个通用的订单操作）。
+     */
+    @PutMapping("/cancel")
+    @Operation(summary = "取消订单")
+    @PreAuthorize("@ss.hasPermission('trade:order:update')")
+    public CommonResult<Boolean> cancelOrder(@Valid @RequestBody TradeOrderCancelReqVO reqVO) {
+        tradeOrderUpdateService.cancelOrderByAdmin(reqVO);
         return success(true);
     }
 

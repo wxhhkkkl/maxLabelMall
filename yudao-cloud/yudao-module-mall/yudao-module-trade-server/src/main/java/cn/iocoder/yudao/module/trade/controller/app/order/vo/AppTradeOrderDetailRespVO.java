@@ -26,6 +26,12 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "下单时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 
+    /**
+     * 对公转账信息（008）。**不是对公单时为 null** —— 前端据此渲染「待收款」区块
+     */
+    @Schema(description = "对公转账信息（不是对公单时为 null）")
+    private AppOrderOfflinePayRespVO offlinePay;
+
     @Schema(description = "用户备注", requiredMode = Schema.RequiredMode.REQUIRED, example = "你猜")
     private String userRemark;
 

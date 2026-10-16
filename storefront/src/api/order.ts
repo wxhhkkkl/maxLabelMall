@@ -23,8 +23,23 @@ import type {
  *    用 PUT 会拿到 405。
  */
 
-/** 本期固定按快递配送（FR-027a，不提供配送方式切换与自提） */
+/** 快递发货（FR-027a：不提供配送方式切换与自提） */
 export const DELIVERY_TYPE_EXPRESS = 1
+/**
+ * 虚拟商品（007）：软件这类**不涉及物流**的商品 —— 下单不需要收货地址、不产生运费。
+ *
+ * ⚠️ **前端不要自己判断"这单算不算虚拟"**：结算时把配送方式交给服务端按商品判定，
+ * 响应里的 `deliveryType` 就是结果。这里只用来做展示判断（要不要渲染地址卡片）。
+ */
+export const DELIVERY_TYPE_VIRTUAL = 3
+
+/**
+ * 对公转账（008）：**下单时唯一可以指定的支付渠道**。
+ *
+ * ⚠️ 其余渠道（`wx_lite` / `alipay_pc` …）是**支付时**才选的 —— 下单这一刻客户只有
+ * "要不要走线下打款"这一个决定，传了别的值后端会报「支付渠道不正确」（FR-199）。
+ */
+export const PAY_CHANNEL_OFFLINE = 'offline'
 
 /**
  * 结算/下单的**入参**：`pointStatus` 与 `deliveryType` 不在其中。
@@ -35,8 +50,14 @@ export const DELIVERY_TYPE_EXPRESS = 1
  * 因此由本模块统一兜住，调用方只需给商品、地址与券。
  */
 export type TradeOrderInput = Omit<OrderCreateReq, 'pointStatus' | 'deliveryType'> & {
-  /** 仅测试与未来的多配送方式需要覆盖；业务代码不要传 */
+  /** 仅测试需要覆盖；业务代码不要传（固定不使用积分） */
   pointStatus?: boolean
+  /**
+   * ⚠️ **只有下单需要传**，且必须传**结算响应里那个** `deliveryType`。
+   *
+   * 结算时**不要传**（见 `buildSettlementQuery` 的说明）—— 让服务端按商品判定。
+   * 下单接口要求它非空，漏传会兜底成快递，而虚拟商品单会因此报「配送方式不匹配」。
+   */
   deliveryType?: number
 }
 
@@ -66,8 +87,12 @@ export function buildSettlementQuery(req: TradeOrderInput): string {
   if (req.addressId !== undefined) parts.push(`addressId=${encodeURIComponent(req.addressId)}`)
   // 必填：本期固定不使用积分
   parts.push(`pointStatus=${req.pointStatus === true}`)
-  // 本期固定按快递
-  parts.push(`deliveryType=${req.deliveryType ?? DELIVERY_TYPE_EXPRESS}`)
+  // ⚠️ **刻意不传 deliveryType**：结算时由**服务端按商品判定**本单的配送方式
+  // （007：整单都是虚拟商品 → 3 虚拟，否则 → 1 快递），响应里的 `deliveryType` 就是结果。
+  // 传了的话前端就得自己知道"这单算不算虚拟" —— 而购物车接口根本不返回商品的配送方式。
+  //
+  // ⚠️ `payChannelCode` 同理**只在 createOrder 里带**（008）：结算只是问"能不能选对公转账"
+  // （响应里的 `offlinePayEnabled`），支付方式还不影响任何金额。
 
   return parts.join('&')
 }
@@ -97,6 +122,9 @@ export function createOrder(req: TradeOrderInput): Promise<OrderCreateResp> {
     addressId: req.addressId,
     pointStatus: req.pointStatus === true,
     deliveryType: req.deliveryType ?? DELIVERY_TYPE_EXPRESS,
+    // 支付渠道（008）：**不传 = 在线支付**，与改动前逐字一致（FR-211）。
+    // `undefined` 在 JSON 序列化时会被整键丢掉，后端拿到的就是"没传"。
+    payChannelCode: req.payChannelCode,
     remark: req.remark,
     // 开票信息（006）：**不传 = 不开票**。只在 createOrder 里带上 ——
     // settlement 不需要它（开票不影响任何金额），它的 query 是逐字段手工拼的

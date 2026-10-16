@@ -17,6 +17,18 @@ public class AppTradeOrderSettlementRespVO {
     @Schema(description = "交易类型", requiredMode = Schema.RequiredMode.REQUIRED, example = "1") // 对应 TradeOrderTypeEnum 枚举
     private Integer type;
 
+    /**
+     * 本单**实际采用**的配送方式（1 快递发货，2 用户自提，3 虚拟商品）
+     *
+     * ⚠️ 前端**不要自己判断** —— 请求没指定时由商品自动判定（全是虚拟商品 → 3），
+     * 本字段就是判定结果。前端据此决定"要不要收货地址"，并在**下单时原样回传**。
+     *
+     * 枚举 {@link cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum}
+     */
+    @Schema(description = "本单实际采用的配送方式：1 快递发货，2 用户自提，3 虚拟商品",
+            requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Integer deliveryType;
+
     @Schema(description = "购物项数组", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<Item> items;
 
@@ -28,6 +40,21 @@ public class AppTradeOrderSettlementRespVO {
 
     @Schema(description = "收件地址", requiredMode = Schema.RequiredMode.REQUIRED)
     private Address address;
+
+    /**
+     * 是否对客户开放「对公转账」（008）
+     *
+     * ⚠️ **结算页只靠这一个布尔决定"要不要显示对公转账"** —— 前端 MUST NOT 自己判断，
+     * 更 MUST NOT 猜收款账户（账户明细在**订单详情**里给，不下发到这里）。
+     */
+    @Schema(description = "是否开放对公转账", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
+    private Boolean offlinePayEnabled;
+
+    /**
+     * 对公转账的提示语（如「请在转账附言里写订单号」）—— 后台可配（FR-210）
+     */
+    @Schema(description = "对公转账提示语", example = "[[提示语占位]]")
+    private String offlinePayTip;
 
     @Schema(description = "已使用的积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer usePoint;

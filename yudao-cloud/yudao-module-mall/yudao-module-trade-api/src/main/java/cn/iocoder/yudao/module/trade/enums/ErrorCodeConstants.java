@@ -62,6 +62,14 @@ public interface ErrorCodeConstants {
     ErrorCode AFTER_SALE_CANCEL_FAIL_STATUS_NOT_APPLY_OR_AGREE_OR_BUYER_DELIVERY =
             new ErrorCode(1_011_000_115, "取消售后单失败，售后单状态不是【待审核】或【卖家同意】或【商家待收货】");
     ErrorCode AFTER_SALE_CREATE_FAIL_ORDER_STATUS_COMBINATION_IN_PROGRESS = new ErrorCode(1_011_000_116, "订单拼团中，无法申请售后");
+    // 008 对公转账：下单时只需要判"要不要走线下"，别的渠道是**支付时**才选的
+    ErrorCode ORDER_CREATE_FAIL_PAY_CHANNEL_CODE_INVALID = new ErrorCode(1_011_000_117, "支付渠道不正确：下单时仅支持「对公转账」，其余渠道请在支付时选择");
+    ErrorCode ORDER_CREATE_FAIL_OFFLINE_PAY_DISABLED = new ErrorCode(1_011_000_118, "对公转账已关闭，暂时无法使用");
+    // 008 确认收款（财务动作）
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_NOT_OFFLINE_ORDER = new ErrorCode(1_011_000_119, "该订单不是对公转账订单，无法确认收款");
+    /** 已收款（含重复提交）—— 幂等的边界：第二次提交就该报这个，而不是再记一遍 */
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_ALREADY_PAID = new ErrorCode(1_011_000_120, "该订单已收款，请勿重复确认");
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_CANCELED = new ErrorCode(1_011_000_121, "订单已取消，无法确认收款");
 
     // ========== Cart 模块 1-011-002-000 ==========
     ErrorCode CARD_ITEM_NOT_FOUND = new ErrorCode(1_011_002_000, "购物车项不存在");

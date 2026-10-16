@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.trade.service.order;
 
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
@@ -89,6 +91,34 @@ public interface TradeOrderUpdateService {
      * @param id     订单编号
      */
     void cancelOrderByMember(Long userId, Long id);
+
+    /**
+     * 【管理员】**确认对公转账收款**（008 / FR-203~208）
+     *
+     * 一件事：把"客户线下打款"这件事**记成系统里的已支付** ——
+     * 造一张 `offline` 渠道的已支付支付单，再走**既有的** {@link #updateOrderPaid(Long, Long)}
+     * 让订单进「待发货」。
+     *
+     * ⚠️ **不自己改订单状态**（R43）：退款挂在支付单上，绕开它退款就断了（SC-073）。
+     *
+     * ⚠️ **幂等**：重复提交（含并发）只会生效一次，第二次报「该订单已收款」（FR-206）。
+     *
+     * @param reqVO         确认收款请求（流水号必填）
+     * @param confirmUserId 确认人（后台操作者）—— 财务动作必须可追溯（FR-205）
+     */
+    void confirmOfflinePaid(TradeOrderOfflineConfirmReqVO reqVO, Long confirmUserId);
+
+    /**
+     * 【管理员】取消交易订单（008 / FR-213）
+     *
+     * ⚠️ 为什么要新增这个能力：对公转账单**不参与超时自动取消**（FR-212），
+     * 客户弃单后必须有人能清掉它 —— 而后台此前**根本没有取消订单的功能**。
+     *
+     * 复用既有的 {@code cancelOrder0}（释放库存、作废开票申请…与系统超时取消同一套）。
+     *
+     * @param reqVO 取消请求（含原因）
+     */
+    void cancelOrderByAdmin(TradeOrderCancelReqVO reqVO);
 
     /**
      * 【系统】自动取消订单

@@ -49,6 +49,26 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
 
     }
 
+    // ========== 008 对公转账 ==========
+
+    /**
+     * 是不是**待收款**的对公转账单（= 是对公单 **且** 订单未支付 **且** 财务还没确认）
+     *
+     * ⚠️ 管理端靠它决定"要不要显示「确认收款」按钮" —— 别的字段分不出来：
+     * 对公单在**确认收款前** `payChannelCode` 是**空的**（那一列记的是"支付成功的渠道"）。
+     * 判定在服务端做，前端不自己拼（原则 III）。
+     */
+    @Schema(description = "是否待收款（对公转账单且未确认收款）", example = "true")
+    private Boolean offlineWaiting;
+
+    /**
+     * 对公转账收款信息；**不是对公单时为 `null`**
+     *
+     * 已确认收款时带上流水号 / 确认人 / 确认时间 —— 财务动作可追溯（FR-205）。
+     */
+    @Schema(description = "对公转账收款信息；不是对公单为 null")
+    private TradeOrderOfflinePaymentRespVO offlinePayment;
+
     @Schema(description = "管理后台 - 交易订单的详情的订单项目")
     @Data
     public static class Item extends TradeOrderItemBaseVO {

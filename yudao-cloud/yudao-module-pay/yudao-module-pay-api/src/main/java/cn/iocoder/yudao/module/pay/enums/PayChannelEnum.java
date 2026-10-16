@@ -33,7 +33,16 @@ public enum PayChannelEnum implements ArrayValuable<String> {
 
     MOCK("mock", "模拟支付"),
 
-    WALLET("wallet", "钱包支付");
+    WALLET("wallet", "钱包支付"),
+
+    /**
+     * 对公转账（008）：客户**线下**银行打款，财务在后台确认收款。
+     *
+     * ⚠️ 与其它渠道的本质区别：**钱不经过任何支付平台** —— 收与退都是银行账户之间的转账，
+     * 系统只负责**记账**。所以它的 `OfflinePayClient` 下单/退款都**本地直接返回成功**。
+     * ⚠️ 附带后果（所有者已知情，spec Q47）：**退款时客户会先看到「已退款」，而钱靠财务线下转回**。
+     */
+    OFFLINE("offline", "对公转账");
 
     public static final String[] ARRAYS = Arrays.stream(values()).map(PayChannelEnum::getCode).toArray(String[]::new);
 

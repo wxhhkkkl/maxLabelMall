@@ -31,14 +31,52 @@ export interface OrderPrice {
 /** 结算响应（AppTradeOrderSettlementRespVO） */
 export interface SettlementResp {
   type: number
+  /**
+   * 本单**实际采用**的配送方式（1 快递 / 2 自提 / 3 虚拟商品）。
+   *
+   * ⚠️ 由**服务端**按商品判定（结算时不传 deliveryType）—— 前端只据此决定
+   * "要不要收货地址"（3 = 虚拟商品，不要），并在**下单时原样回传**。
+   * 前端 MUST NOT 自己判断"这单算不算虚拟"。
+   */
+  deliveryType: number
   items: SettlementItem[]
   /** 可用 + 不可用，含 match / mismatchReason */
   coupons: SettlementCoupon[]
   price: OrderPrice
   address?: Address | null
+  /**
+   * 是否对客户开放「对公转账」（008 / FR-199）。
+   *
+   * ⚠️ **结算页只靠这一个布尔决定"要不要显示对公转账"** —— 前端 MUST NOT 自己判断，
+   * 也 MUST NOT 猜收款账户（账户明细在**订单详情**里给，结算响应里没有）。
+   * 后台关掉（`trade_config.offline_pay_enabled = false`）时这里就是 `false`（FR-210）。
+   */
+  offlinePayEnabled: boolean
+  /** 对公转账的提示语（如「请在转账附言里写订单号」）—— 后台可配，可为空 */
+  offlinePayTip?: string
   usePoint: number
   totalPoint: number
   promotions: unknown[]
+}
+
+/**
+ * 订单的对公转账信息（008 / `AppOrderOfflinePayRespVO`）。
+ *
+ * ⚠️ **不是对公单时整个对象是 `null`**（不是空对象）—— 与 006 的 `invoice` 同一个做法。
+ */
+export interface OfflinePayInfo {
+  /**
+   * 是否还在**等客户打款**（= 是对公单 **且** 订单还没付）。
+   *
+   * ⚠️ 前端 MUST 用它**压过**"未支付 + 没有支付单 → 无需支付"那条既有判断（R47）——
+   * 对公单正好命中那条判断，不压的话会把"要打款"显示成"无需支付"。
+   */
+  waiting: boolean
+  /** 收款户名 / 账号 / 开户行 —— 由业务所有者在交易配置里填，前端不编造 */
+  accountName?: string
+  accountNo?: string
+  bankName?: string
+  tip?: string
 }
 
 export interface SettlementItem {
@@ -82,6 +120,13 @@ export interface OrderPageItem {
    * 取值同订单详情：0 待开票 / 10 已开票 / 20 已作废。
    */
   invoiceStatus?: number | null
+  /**
+   * 是不是**还没确认收款的对公转账单**（008 / FR-200）。
+   *
+   * ⚠️ 列表上用它把状态显示成「**待收款**」而不是「待支付」，**并去掉「立即支付」入口** ——
+   * 对公单在客户侧没有任何在线支付入口（FR-201）。后端一次批量查出来，前端不自己判。
+   */
+  offlineWaiting?: boolean
   /**
    * 订单项。**名称 / 规格 / 单价 / 数量都是下单时的快照** —— 商品后续改名、
    * 换规格、调价都不应让历史订单跟着变。
@@ -136,6 +181,14 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
    * **不得把 null 提交给支付接口**（FR-037）。
    */
   payOrderId?: number | null
+  /**
+   * 买家留言（下单时客户自己填的）。
+   *
+   * ⚠️ **与后台的「商家备注」不是一回事**：这一栏由**客户**填、客户在订单详情能看到；
+   * 商家备注是运营在后台写的。两个字段在库/响应里分别是 `user_remark` / `remark`。
+   * 没填时后端返回 `null`。
+   */
+  userRemark?: string | null
   receiverName: string
   receiverMobile: string
   receiverAreaName?: string
@@ -149,6 +202,11 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
    * 订单详情的发票区块四态靠它区分（FR-176）。
    */
   invoice?: OrderInvoice | null
+  /**
+   * 对公转账信息（008）。**不是对公单时为 `null`**（不是空对象）——
+   * 「待收款」区块靠它决定渲不渲染，同时它也是"压过无需支付误判"的依据（R47）。
+   */
+  offlinePay?: OfflinePayInfo | null
 }
 
 /**
@@ -162,6 +220,13 @@ export interface OrderCreateReq {
   pointStatus: boolean
   /** 本期固定按快递（FR-027a） */
   deliveryType?: number
+  /**
+   * 支付渠道（008）。**下单时只传 `offline`（对公转账）**，不传 = 在线支付（FR-211）。
+   *
+   * ⚠️ 别的渠道（`wx_lite` / `alipay_pc` …）是**支付时**才选的 —— 下单这一刻客户只有
+   * "要不要走线下打款"这一个决定，传了别的值后端会拒。
+   */
+  payChannelCode?: string
   remark?: string
   /**
    * 开票信息（006 / FR-153~156）。**不传 = 不开票**。

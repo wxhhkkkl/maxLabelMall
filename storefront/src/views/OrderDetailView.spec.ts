@@ -278,6 +278,31 @@ describe('OrderDetailView —— 商品明细与收货信息（FR-035）', () =>
   })
 })
 
+describe('OrderDetailView —— 买家留言', () => {
+  /**
+   * ⚠️ 这一栏是**客户自己**在下单时填的（`trade_order.user_remark`），
+   * 与后台那个「商家备注」是两个字段 —— 别把两者混成一个。
+   */
+  it('有留言时展示出来', async () => {
+    const w = await mountDetail(detail({ userRemark: '请在工作日送' }))
+
+    expect(w.text()).toContain('买家留言')
+    expect(w.text()).toContain('请在工作日送')
+  })
+
+  it('没留言时**整块不渲染** —— 空标题比没有更让人犯嘀咕', async () => {
+    const w = await mountDetail(detail({ userRemark: null }))
+
+    expect(w.text()).not.toContain('买家留言')
+  })
+
+  it('后端返回空白串（历史数据里可能存成空格）也当没填', async () => {
+    const w = await mountDetail(detail({ userRemark: '   ' }))
+
+    expect(w.text()).not.toContain('买家留言')
+  })
+})
+
 describe('OrderDetailView —— 版式：支付条的位置', () => {
   /** 卡片区的**实际排版顺序**（取 DOM 顺序，容器是 grid，视觉序即 DOM 序） */
   function cardOrder(w: Awaited<ReturnType<typeof mountDetail>>) {
@@ -1297,5 +1322,124 @@ describe('OrderDetailView —— 订单详情补开票（006 / US20 / FR-163）'
     await flushPromises()
 
     expect(getOrderDetail.mock.calls.length).toBeGreaterThan(before)
+  })
+})
+
+/**
+ * 对公转账「待收款」（008 / FR-200 / FR-201 / FR-212 / R47）。
+ *
+ * ⚠️ **本组最要命的断言是"不显示无需支付"**：对公单**没有在线支付单**（`payOrderId`
+ * 为 null），与"全额券抵扣那类无需支付"**外形完全一样** —— 既有的 `needsNoPay`
+ * （`未支付 && !payOrderId`）会把对公单判成"无需支付"（R47）。
+ */
+describe('OrderDetailView —— 对公转账「待收款」（008 / FR-200 / FR-201）', () => {
+  const OFFLINE = {
+    waiting: true,
+    // 业务事实留占位符：真实户名/账号由所有者在交易配置里填，代码与测试都不编造
+    accountName: '[[收款户名占位]]',
+    accountNo: '[[收款账号占位]]',
+    bankName: '[[开户行占位]]',
+    tip: '请在转账附言里写订单号',
+  }
+
+  /** 对公待收款单：**没有在线支付单** —— 与 payPrice=0 那类从响应上分不出来 */
+  const waitingOrder = (over: Partial<OrderDetail> = {}) =>
+    detail({ payOrderId: null, offlinePay: OFFLINE, ...over })
+
+  it('状态文案是「**待收款**」，**不沿用「待支付」**（FR-200 / Q44）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.get('.ml-pill').text()).toBe('待收款')
+    expect(w.text()).not.toContain('待支付')
+  })
+
+  it('展示收款账户与提示语（FR-201）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.find('#offlinePay').exists()).toBe(true)
+    expect(w.text()).toContain('[[收款户名占位]]')
+    expect(w.text()).toContain('[[收款账号占位]]')
+    expect(w.text()).toContain('[[开户行占位]]')
+    expect(w.text()).toContain('请在转账附言里写订单号')
+    // 「确认到账后发货」的说明 —— 客户得知道打款之后会发生什么
+    expect(w.text()).toContain('确认到账')
+  })
+
+  it('**不出现任何在线支付入口**（FR-201：防重复付款）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.find('#payOrder').exists()).toBe(false)
+    expect(w.find('.pay-channels').exists()).toBe(false)
+    expect(submitPay).not.toHaveBeenCalled()
+  })
+
+  it('**不显示「无需支付」** —— 对公单恰好命中那条既有判断（R47）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.text()).not.toContain('无需支付')
+  })
+
+  it('**「取消订单」入口仍在** —— 打款前反悔走的就是它（spec Edge Case）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.find('.cancel-order').exists()).toBe(true)
+  })
+
+  it('「取消订单」在**状态行内**，且**没有单独的操作条**（所有者 2026-10-16 指定的版式）', async () => {
+    // 待收款单只有这一个动作（没有任何在线支付入口，FR-201），所以它跟着状态走；
+    // 否则页面上会剩一个只装一颗按钮的空白操作条（改之前就是这样）
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.get('.od-status-row').find('.cancel-order').exists()).toBe(true)
+    expect(w.find('.od-actions').exists()).toBe(false)
+  })
+
+  it('**普通待支付订单的版式不受影响**：操作条还在、取消订单也还在（FR-211）', async () => {
+    const w = await mountDetail(detail())
+
+    expect(w.find('.od-actions').exists()).toBe(true)
+    expect(w.find('.od-actions .cancel-order').exists()).toBe(true)
+    expect(w.find('#payOrder').exists()).toBe(true)
+  })
+
+  it('**不显示支付截止时间**（对公单不参与超时自动取消，FR-212）', async () => {
+    // 既有的「支付截止 …，逾期订单将自动取消」对公单**是错的** —— 它根本不会被自动取消。
+    // ⚠️ 只断言「支付截止 / 逾期」不出现：这一页**另外有一句正确的**「确认到账前订单
+    //    不会自动取消」（那是刻意写的安抚），别把它一起断言掉。
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.find('.od-deadline').exists()).toBe(false)
+    expect(w.text()).not.toContain('支付截止')
+    expect(w.text()).not.toContain('逾期')
+  })
+
+  it('已确认收款后（`waiting=false`）：走既有的已支付版式，不再显示收款账户', async () => {
+    const w = await mountDetail(
+      detail({
+        status: OrderStatus.UNDELIVERED,
+        payOrderId: 9001,
+        offlinePay: { ...OFFLINE, waiting: false },
+      }),
+    )
+
+    expect(w.find('#offlinePay').exists()).toBe(false)
+    expect(w.text()).not.toContain('待收款')
+  })
+
+  it('**普通订单（`offlinePay` 为 null）完全不受影响** —— 仍是「待支付」+ 支付入口', async () => {
+    const w = await mountDetail(detail())
+
+    expect(w.get('.ml-pill').text()).toBe('待支付')
+    expect(w.find('#payOrder').exists()).toBe(true)
+    expect(w.find('#offlinePay').exists()).toBe(false)
+  })
+
+  it('**payPrice=0 的普通订单照旧「无需支付」** —— 这条不能被对公转账改掉（FR-037 / FR-211）', async () => {
+    const w = await mountDetail(
+      detail({ payOrderId: null, payPrice: 0, couponPrice: 10000, deliveryPrice: 0, offlinePay: null }),
+    )
+
+    expect(w.text()).toContain('无需支付')
+    expect(w.find('#payOrder').exists()).toBe(false)
   })
 })

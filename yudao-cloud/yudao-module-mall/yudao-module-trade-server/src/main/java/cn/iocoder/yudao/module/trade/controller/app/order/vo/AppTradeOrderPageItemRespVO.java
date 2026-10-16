@@ -64,4 +64,18 @@ public class AppTradeOrderPageItemRespVO {
     @Schema(description = "开票状态：0 待开票，10 已开票，20 已作废；未申请为 null", example = "0")
     private Integer invoiceStatus;
 
+    /**
+     * 是不是**还没确认收款的对公转账单**（008 / FR-200）
+     *
+     * = 是对公单 **且** 订单还没付、也没确认收款。
+     *
+     * ⚠️ 客户侧靠它把列表上的状态显示成「**待收款**」而不是「待支付」，
+     * **并去掉「立即支付」入口** —— 对公单在客户侧没有任何在线支付入口（FR-201），
+     * 留个「立即支付」只会把人送到一个没有支付按钮的详情页。
+     * 底层状态仍是 {@link cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum#UNPAID}，
+     * 所以列表的**筛选**照旧按「待支付」筛。
+     */
+    @Schema(description = "是否待收款（对公转账单且未确认收款）", example = "false")
+    private Boolean offlineWaiting;
+
 }

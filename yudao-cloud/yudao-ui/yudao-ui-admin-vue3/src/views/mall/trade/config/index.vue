@@ -71,6 +71,39 @@
             <el-switch v-model="formData.deliveryPickUpEnabled" style="user-select: none" />
           </el-form-item>
         </el-tab-pane>
+        <!--
+          对公转账（008 / FR-210）。收款账户信息**必须可配置** —— 换开户行、换账号
+          不该改代码重新发版。
+          ⚠️ **户名 / 账号 / 开户行是业务事实**：这里留空就好，由使用者自己填；
+              没填的话客户在订单详情看到的收款账户就是空的（quickstart §零.2）。
+          ⚠️ 关掉开关**只挡新下单**：已经产生的待收款订单**照旧能确认收款、能取消**（FR-210）。
+        -->
+        <el-tab-pane label="对公转账">
+          <el-form-item label="启用对公转账" prop="offlinePayEnabled">
+            <el-switch v-model="formData.offlinePayEnabled" style="user-select: none" />
+            <el-text class="w-full" size="small" type="info">
+              开启后结算页会多出「对公转账」这一支付方式；关掉只影响新下单，已产生的待收款订单不受影响
+            </el-text>
+          </el-form-item>
+          <el-form-item label="收款户名" prop="offlinePayAccountName">
+            <el-input v-model="formData.offlinePayAccountName" maxlength="128" placeholder="公司账户的户名" />
+          </el-form-item>
+          <el-form-item label="收款账号" prop="offlinePayAccountNo">
+            <el-input v-model="formData.offlinePayAccountNo" maxlength="64" placeholder="对公账户的账号" />
+          </el-form-item>
+          <el-form-item label="开户行" prop="offlinePayBankName">
+            <el-input v-model="formData.offlinePayBankName" maxlength="128" placeholder="例如：中国银行 xx 支行" />
+          </el-form-item>
+          <el-form-item label="给客户的提示" prop="offlinePayTip">
+            <el-input
+              v-model="formData.offlinePayTip"
+              maxlength="255"
+              type="textarea"
+              :rows="2"
+              placeholder="例如：请在转账附言里写订单号，方便我们核对到账"
+            />
+          </el-form-item>
+        </el-tab-pane>
         <!-- 分销 -->
         <el-tab-pane label="分销">
           <el-form-item label="分佣启用" prop="brokerageEnabled">
@@ -228,7 +261,12 @@ const formData = ref<ConfigApi.ConfigVO>({
   brokerageWithdrawMinPrice: 0,
   brokerageWithdrawFeePercent: 0,
   brokerageFrozenDays: 0,
-  brokerageWithdrawTypes: []
+  brokerageWithdrawTypes: [],
+  offlinePayEnabled: false,
+  offlinePayAccountName: '',
+  offlinePayAccountNo: '',
+  offlinePayBankName: '',
+  offlinePayTip: ''
 })
 const formRules = reactive({
   deliveryExpressFreePrice: [{ required: true, message: '满额包邮不能为空', trigger: 'blur' }],

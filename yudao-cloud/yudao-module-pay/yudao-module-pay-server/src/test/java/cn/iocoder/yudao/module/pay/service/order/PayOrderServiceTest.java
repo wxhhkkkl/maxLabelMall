@@ -253,6 +253,62 @@ public class PayOrderServiceTest extends BaseDbAndRedisUnitTest {
         assertPojoEquals(dbOrder, order);
     }
 
+    // ==================== 对公转账：直接建一张「已支付」的 offline 支付单（008 / T465 / R43）===
+
+    /**
+     * 「确认收款」用的能力：**一步造出一张对得上的已支付单**。
+     *
+     * 三件事缺一不可（漏一件，订单要么进不了「待发货」，要么退款链路断）：
+     * ① 支付单**直接是 SUCCESS**（钱由财务线下核实，不存在"等待支付"）；
+     * ② **产出 `pay_order_extension`** —— 既有的成功路径是按 `outTradeNo` 查它的
+     *    （`orderExtensionMapper.selectByNo`），没有它当场抛 `PAY_ORDER_EXTENSION_NOT_FOUND`；
+     * ③ **建支付通知任务** —— 贸易端是靠这条回调把订单推进「待发货」的，
+     *    绕过它直接改订单状态，退款就没地方挂了（R43）。
+     */
+    @Test
+    public void testCreatePaidOfflineOrder_success() {
+        // mock 参数
+        PayOrderCreateReqDTO reqDTO = randomPojo(PayOrderCreateReqDTO.class,
+                o -> o.setAppKey("mall").setMerchantOrderId("900")
+                        .setPrice(10800).setSubject("订单 900").setBody("标签纸 x1")); // 金额/商户单号对不上，updateOrderPaid 会拒
+        // mock 方法
+        PayAppDO app = randomPojo(PayAppDO.class, o -> o.setId(1L).setOrderNotifyUrl("http://127.0.0.1"));
+        when(appService.validPayApp(eq(reqDTO.getAppKey()))).thenReturn(app);
+        PayChannelDO channel = randomPojo(PayChannelDO.class, o -> o.setId(20L).setAppId(1L)
+                .setCode(PayChannelEnum.OFFLINE.getCode()).setFeeRate(0D));
+        when(channelService.validPayChannel(eq(1L), eq(PayChannelEnum.OFFLINE.getCode())))
+                .thenReturn(channel);
+        when(channelService.getPayClient(eq(20L))).thenReturn(mock(PayClient.class));
+
+        // 调用
+        Long orderId = orderService.createPaidOfflineOrder(reqDTO);
+
+        // 断言①：支付单已经是「已支付」，且金额 / 商户单号与贸易订单**严格对齐**（R43）
+        PayOrderDO order = orderMapper.selectById(orderId);
+        assertPojoEquals(order, reqDTO);
+        assertEquals(1L, order.getAppId());
+        assertEquals(PayOrderStatusEnum.SUCCESS.getStatus(), order.getStatus());
+        assertEquals(PayChannelEnum.OFFLINE.getCode(), order.getChannelCode());
+        assertEquals(20L, order.getChannelId());
+        assertEquals(10800, order.getPrice());
+        assertEquals("900", order.getMerchantOrderId());
+        assertNotNull(order.getSuccessTime());
+
+        // 断言②：extension 必须存在且已成功
+        List<PayOrderExtensionDO> extensions = orderExtensionMapper.selectListByOrderId(orderId);
+        assertEquals(1, extensions.size());
+        PayOrderExtensionDO extension = extensions.get(0);
+        assertEquals(PayOrderStatusEnum.SUCCESS.getStatus(), extension.getStatus());
+        assertEquals(PayChannelEnum.OFFLINE.getCode(), extension.getChannelCode());
+        // 支付单的 no / channelOrderNo 都取自扩展单（成功路径写回的）
+        assertEquals(extension.getNo(), order.getNo());
+        assertEquals("OFFLINE-" + extension.getNo(), order.getChannelOrderNo());
+        assertNotNull(extension.getChannelNotifyData());
+
+        // 断言③：建了支付通知任务 —— 订单转「待发货」靠它
+        verify(notifyService).createPayNotifyTask(eq(PayNotifyTypeEnum.ORDER.getType()), eq(orderId));
+    }
+
     @Test
     public void testSubmitOrder_notFound() {
         // 准备参数

@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.alipay.*;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.wallet.WalletPayClient;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.weixin.*;
 import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.mock.MockPayClient;
+import cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.offline.OfflinePayClient;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Type;
@@ -59,6 +60,8 @@ public class PayClientFactoryImpl implements PayClientFactory {
         clientClass.put(WALLET, WalletPayClient.class);
         // Mock 支付客户端
         clientClass.put(MOCK, MockPayClient.class);
+        // 对公转账（线下打款）客户端 —— 008
+        clientClass.put(OFFLINE, OfflinePayClient.class);
     }
 
     @Override

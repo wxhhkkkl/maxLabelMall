@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderExtensionDO;
 import cn.iocoder.yudao.module.pay.dal.mysql.order.PayOrderExtensionMapper;
 import cn.iocoder.yudao.module.pay.dal.mysql.order.PayOrderMapper;
 import cn.iocoder.yudao.module.pay.dal.redis.no.PayNoRedisDAO;
+import cn.iocoder.yudao.module.pay.enums.PayChannelEnum;
 import cn.iocoder.yudao.module.pay.enums.notify.PayNotifyTypeEnum;
 import cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum;
 import cn.iocoder.yudao.module.pay.framework.pay.config.PayProperties;
@@ -135,6 +136,45 @@ public class PayOrderServiceImpl implements PayOrderService {
                 // 退款相关字段
                 .setRefundPrice(0);
         orderMapper.insert(order);
+        return order.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createPaidOfflineOrder(PayOrderCreateReqDTO reqDTO) {
+        // 1. 校验 App，并取到 offline 渠道
+        PayAppDO app = appService.validPayApp(reqDTO.getAppKey());
+        PayChannelDO channel = validateChannelCanSubmit(app.getId(), PayChannelEnum.OFFLINE.getCode());
+
+        // 2. 建支付单 —— 形态与 createOrder 相同，**唯一区别是"一开始就带渠道"**
+        //    （它是一笔"已经付掉了"的单，渠道在下单那一刻就定了）
+        PayOrderDO order = PayOrderConvert.INSTANCE.convert(reqDTO).setAppId(app.getId())
+                .setNotifyUrl(app.getOrderNotifyUrl())
+                .setStatus(PayOrderStatusEnum.WAITING.getStatus())
+                .setRefundPrice(0)
+                .setChannelId(channel.getId()).setChannelCode(channel.getCode());
+        orderMapper.insert(order);
+
+        // 3. 建 PayOrderExtensionDO —— ⚠️ **必须建**：既有的成功路径 `updateOrderSuccess(notify)`
+        //    是**按 `outTradeNo` 去查它**的（`orderExtensionMapper.selectByNo`），
+        //    没有它直接抛 `PAY_ORDER_EXTENSION_NOT_FOUND`。（在线支付里这步在 submitOrder 中。）
+        String no = noRedisDAO.generate(payProperties.getOrderNoPrefix());
+        PayOrderExtensionDO orderExtension = new PayOrderExtensionDO()
+                .setOrderId(order.getId()).setNo(no)
+                .setChannelId(channel.getId()).setChannelCode(channel.getCode())
+                .setUserIp(reqDTO.getUserIp())
+                .setStatus(PayOrderStatusEnum.WAITING.getStatus());
+        orderExtensionMapper.insert(orderExtension);
+
+        // 4. **不调 `client.unifiedOrder`** —— 对公转账的钱不经过任何支付平台
+        //    （`OfflinePayClient.doUnifiedOrder` 就是因此抛异常的）。
+        //    直接合成一个"支付成功"的通知，走**既有的** `notifyOrderSuccess`：
+        //      ① 把 extension 置成功
+        //      ② 把支付单置成功，并把渠道写回订单 → 订单的 `pay_channel_code` 因此成为 `offline`
+        //      ③ **建支付通知任务** → 贸易端 `/trade/order/update-paid` 回调 → 订单进「待发货」
+        //    ⚠️ 第 ③ 步是关键：**不要**绕过它去直接改订单状态（退款挂在支付单上，绕开就没退款链路了）。
+        getSelf().notifyOrder(channel, PayOrderRespDTO.successOf(
+                "OFFLINE-" + no, "", LocalDateTime.now(), no, "OFFLINE"));
         return order.getId();
     }
 

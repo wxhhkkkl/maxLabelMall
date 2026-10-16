@@ -115,4 +115,32 @@ public class TradeConfigDO extends BaseDO {
     @TableField(typeHandler = IntegerListTypeHandler.class)
     private List<Integer> brokerageWithdrawTypes;
 
+    // ==================== 对公转账（008） ====================
+
+    /**
+     * 是否启用「对公转账」这种支付方式
+     *
+     * ⚠️ **关闭只挡"新下单"**：已经产生的待收款订单**不受影响**（照旧能确认收款、能取消，FR-210）——
+     * 否则运营一关开关，等于把在途的订单卡死。
+     */
+    private Boolean offlinePayEnabled;
+    /**
+     * 收款户名
+     *
+     * ⚠️ **业务事实**：由所有者在后台填，代码与规格里一律留占位符，**不得编造**（宪法 FR-054~056）
+     */
+    private String offlinePayAccountName;
+    /**
+     * 收款账号
+     */
+    private String offlinePayAccountNo;
+    /**
+     * 开户行
+     */
+    private String offlinePayBankName;
+    /**
+     * 给客户的提示（如"请在转账附言里写上订单号"）
+     */
+    private String offlinePayTip;
+
 }

@@ -23,6 +23,15 @@ public class TradeOrderPageItemRespVO extends TradeOrderBaseVO {
     @Schema(description = "推广人信息")
     private MemberUserRespVO brokerageUser;
 
+    /**
+     * 是不是**待收款**的对公转账单（008 / FR-209）
+     *
+     * 列表上把它显示成「待收款」而不是「待支付」，财务一眼能看出"这单在等打款"。
+     * ⚠️ 这个字段分不出来就得靠 `payChannelCode`，可那一列在**确认收款前是空的**。
+     */
+    @Schema(description = "是否待收款（对公转账单且未确认收款）", example = "true")
+    private Boolean offlineWaiting;
+
     @Schema(description = "管理后台 - 交易订单的分页项的订单项目")
     @Data
     public static class Item extends TradeOrderItemBaseVO {

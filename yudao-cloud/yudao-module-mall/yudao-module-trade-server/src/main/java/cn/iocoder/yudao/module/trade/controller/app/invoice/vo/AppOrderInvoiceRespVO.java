@@ -25,6 +25,12 @@ public class AppOrderInvoiceRespVO {
     @Schema(description = "发票类型名（由后端枚举给出，前端不自行命名）", example = "电子增值税专用发票")
     private String typeName;
 
+    @Schema(description = "抬头类型：1 企业，2 个人", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Integer titleKind;
+
+    @Schema(description = "抬头类型名（由后端枚举给出，前端不自行命名）", example = "企业")
+    private String titleKindName;
+
     @Schema(description = "抬头名称", example = "南京路桥机械有限公司")
     private String titleName;
 

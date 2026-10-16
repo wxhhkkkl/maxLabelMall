@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.invoice.TradeOrderInvoiceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
@@ -60,11 +61,22 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         return order;
     }
 
+    /** 一张**企业**普票（绝大多数用例的前提） */
     private AppInvoiceApplyBaseVO normalInvoice() {
         AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
         invoice.setType(InvoiceTypeEnum.E_NORMAL.getType());
+        invoice.setTitleKind(InvoiceTitleKindEnum.COMPANY.getKind());
         invoice.setTitleName("南京路桥机械有限公司");
         invoice.setTaxNo("91320104660690975E");
+        return invoice;
+    }
+
+    /** 一张**个人**普票，只填名称（Q38） */
+    private AppInvoiceApplyBaseVO personalInvoice() {
+        AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
+        invoice.setType(InvoiceTypeEnum.E_NORMAL.getType());
+        invoice.setTitleKind(InvoiceTitleKindEnum.PERSONAL.getKind());
+        invoice.setTitleName("张三");
         return invoice;
     }
 
@@ -91,6 +103,20 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         // 未开具
         assertNull(invoice.getInvoiceFileUrl());
         assertNull(invoice.getIssueTime());
+    }
+
+    @Test
+    public void testCreateInvoice_personalTitle_snapshot() {
+        // Q38：个人抬头**只要名称**，一样能产生申请；抬头类型是**快照**的一部分
+        // —— 后台工作台靠它区分个人票，而不是去猜"税号怎么空着"
+        TradeOrderDO order = createOrder(7800);
+
+        Long id = invoiceService.createInvoice(order, personalInvoice());
+
+        TradeOrderInvoiceDO invoice = invoiceMapper.selectById(id);
+        assertEquals(InvoiceTitleKindEnum.PERSONAL.getKind(), invoice.getTitleKind());
+        assertEquals("张三", invoice.getTitleName());
+        assertNull(invoice.getTaxNo());
     }
 
     @Test
@@ -166,6 +192,7 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         AppTradeOrderInvoiceCreateReqVO reqVO = new AppTradeOrderInvoiceCreateReqVO();
         reqVO.setOrderId(orderId);
         reqVO.setType(InvoiceTypeEnum.E_NORMAL.getType());
+        reqVO.setTitleKind(InvoiceTitleKindEnum.COMPANY.getKind());
         reqVO.setTitleName("南京路桥机械有限公司");
         reqVO.setTaxNo("91320104660690975E");
         return reqVO;

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.dal.dataobject.invoice;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -51,6 +52,15 @@ public class TradeInvoiceTitleDO extends BaseDO {
      * 枚举 {@link InvoiceTypeEnum}
      */
     private Integer type;
+    /**
+     * 抬头类型：开给公司还是开给个人（Q38）
+     *
+     * 企业要「名称 + 税号」，个人**只要名称**（个人本来就没有纳税人识别号）。
+     * ⚠️ 个人抬头**只能开普票** —— "个人 + 专票"在 `InvoiceValidator` 就被拒。
+     *
+     * 枚举 {@link InvoiceTitleKindEnum}
+     */
+    private Integer titleKind;
     /**
      * 抬头名称（公司名或个人名）
      */

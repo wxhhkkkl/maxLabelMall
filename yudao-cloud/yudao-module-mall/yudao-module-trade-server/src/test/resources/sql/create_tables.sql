@@ -254,6 +254,8 @@ CREATE TABLE IF NOT EXISTS "trade_order_invoice"
     "order_no"         varchar  NOT NULL,
     "user_id"          bigint   NOT NULL,
     "type"             int      NOT NULL,
+    -- Q38（2026-10-15）：抬头类型是**申请时快照**的一部分（1 企业 / 2 个人）
+    "title_kind"       int      NOT NULL DEFAULT 1,
     "status"           int      NOT NULL DEFAULT 0,
     "amount"           int      NOT NULL,
     "title_name"       varchar  NOT NULL,
@@ -283,6 +285,8 @@ CREATE TABLE IF NOT EXISTS "trade_invoice_title"
     "user_id"        bigint   NOT NULL,
     -- Q36（2026-10-15）：一条抬头只服务一种票（1 普票 / 2 专票）
     "type"           int      NOT NULL DEFAULT 1,
+    -- Q38（2026-10-15）：抬头类型（1 企业 / 2 个人）；个人只要名称，且只能开普票
+    "title_kind"     int      NOT NULL DEFAULT 1,
     "title_name"     varchar  NOT NULL,
     "tax_no"         varchar,
     "title_address"  varchar,

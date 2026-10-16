@@ -38,6 +38,12 @@ public class TradeOrderInvoiceRespVO {
     @Schema(description = "发票类型名", example = "电子增值税专用发票")
     private String typeName;
 
+    @Schema(description = "抬头类型：1 企业，2 个人", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Integer titleKind;
+
+    @Schema(description = "抬头类型名", example = "企业")
+    private String titleKindName;
+
     @Schema(description = "状态：0 待开票，10 已开票，20 已作废", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
     private Integer status;
 

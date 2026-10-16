@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.invoice.TradeOrderInvoiceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import jakarta.annotation.Resource;
@@ -47,10 +48,14 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
         return buildTitle(name, InvoiceTypeEnum.E_NORMAL.getType());
     }
 
-    /** ⚠️ 抬头**带票种**（Q36）：普票只要名称，专票要五项全填 */
+    /**
+     * ⚠️ 抬头**带票种**（Q36）与**抬头类型**（Q38）：这里是**企业**抬头 ——
+     * 名称与税号都必填（Q37）。个人抬头是另一档，见 {@link #buildPersonalTitle(String)}
+     */
     private AppInvoiceTitleSaveReqVO buildTitle(String name, Integer type) {
         AppInvoiceTitleSaveReqVO reqVO = new AppInvoiceTitleSaveReqVO();
         reqVO.setType(type);
+        reqVO.setTitleKind(InvoiceTitleKindEnum.COMPANY.getKind());
         reqVO.setTitleName(name);
         reqVO.setTaxNo("91320104660690975E");
         if (InvoiceTypeEnum.E_SPECIAL.getType().equals(type)) {
@@ -58,6 +63,15 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
             reqVO.setTitlePhone("18913984596");
             reqVO.setBankName("工商银行南京分行 6222");
         }
+        return reqVO;
+    }
+
+    /** 个人 + 普票，**只填名称**（Q38：个人没有纳税人识别号） */
+    private AppInvoiceTitleSaveReqVO buildPersonalTitle(String name) {
+        AppInvoiceTitleSaveReqVO reqVO = new AppInvoiceTitleSaveReqVO();
+        reqVO.setType(InvoiceTypeEnum.E_NORMAL.getType());
+        reqVO.setTitleKind(InvoiceTitleKindEnum.PERSONAL.getKind());
+        reqVO.setTitleName(name);
         return reqVO;
     }
 
@@ -146,11 +160,36 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
 
     @Test
     public void testCreate_titleNameRequired() {
-        // 普票抬头：名称是唯一的必填项（专票抬头才要那四项 —— Q36）
+        // 名称是**所有抬头**唯一的必填项（其余按票种/抬头类型而定）
         AppInvoiceTitleSaveReqVO reqVO = buildTitle("   ");
         ServiceException e = assertThrows(ServiceException.class,
                 () -> titleService.createInvoiceTitle(88L, reqVO));
         assertEquals(INVOICE_TITLE_FIELD_REQUIRED.getCode(), e.getCode());
+    }
+
+    // ==================== 个人抬头（Q38） ====================
+
+    @Test
+    public void testCreate_personalTitle_onlyName() {
+        // Q38 的全部意义：个人客户**没有纳税人识别号**，只填名称也要能存下来，
+        // 而且抬头类型要**真的落库**（后台靠它区分个人票）
+        Long id = titleService.createInvoiceTitle(88L, buildPersonalTitle("张三"));
+
+        TradeInvoiceTitleDO saved = titleService.getInvoiceTitleList(88L).get(0);
+        assertEquals(id, saved.getId());
+        assertEquals("张三", saved.getTitleName());
+        assertNull(saved.getTaxNo());
+        assertEquals(InvoiceTitleKindEnum.PERSONAL.getKind(), saved.getTitleKind());
+    }
+
+    @Test
+    public void testCreate_personalTitle_withSpecialType_fail() {
+        // 个人只能开普票 —— 抬头簿里连存都不该存得下"个人抬头的专票"
+        AppInvoiceTitleSaveReqVO reqVO = buildPersonalTitle("张三");
+        reqVO.setType(InvoiceTypeEnum.E_SPECIAL.getType());
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> titleService.createInvoiceTitle(88L, reqVO));
+        assertEquals(INVOICE_TITLE_KIND_PERSONAL_SPECIAL.getCode(), e.getCode());
     }
 
     // ==================== SC-061：改 / 删抬头不影响历史申请 ====================
@@ -169,6 +208,7 @@ public class TradeInvoiceTitleServiceImplTest extends BaseDbUnitTest {
         orderMapper.insert(order);
         AppInvoiceApplyBaseVO apply = new AppInvoiceApplyBaseVO();
         apply.setType(InvoiceTypeEnum.E_NORMAL.getType());
+        apply.setTitleKind(InvoiceTitleKindEnum.COMPANY.getKind());
         apply.setTitleName("南京路桥机械有限公司");
         apply.setTaxNo("91320104660690975E");
         Long invoiceId = invoiceService.createInvoice(order, apply);

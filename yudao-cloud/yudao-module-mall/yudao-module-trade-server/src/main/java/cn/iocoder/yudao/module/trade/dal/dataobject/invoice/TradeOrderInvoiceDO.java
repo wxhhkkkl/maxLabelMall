@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.dal.dataobject.invoice;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
@@ -62,6 +63,15 @@ public class TradeOrderInvoiceDO extends BaseDO {
      * 枚举 {@link InvoiceTypeEnum}
      */
     private Integer type;
+    /**
+     * 抬头类型：开给公司还是开给个人（Q38）
+     *
+     * ⚠️ 与抬头五件套一样是**申请时的快照**（FR-158）—— 后台工作台靠它区分个人票，
+     * 不用去猜"税号怎么空着"。
+     *
+     * 枚举 {@link InvoiceTitleKindEnum}
+     */
+    private Integer titleKind;
     /**
      * 状态
      *

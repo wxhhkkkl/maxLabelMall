@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoi
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppOrderInvoiceRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
 
@@ -36,6 +37,8 @@ public final class InvoiceConvert {
         respVO.setFileUrl(invoice.getInvoiceFileUrl());
         InvoiceTypeEnum type = InvoiceTypeEnum.valueOf(invoice.getType());
         respVO.setTypeName(type != null ? type.getName() : "");
+        InvoiceTitleKindEnum titleKind = InvoiceTitleKindEnum.valueOf(invoice.getTitleKind());
+        respVO.setTitleKindName(titleKind != null ? titleKind.getName() : "");
         return respVO;
     }
 
@@ -49,6 +52,8 @@ public final class InvoiceConvert {
         TradeOrderInvoiceRespVO respVO = BeanUtils.toBean(invoice, TradeOrderInvoiceRespVO.class);
         InvoiceTypeEnum type = InvoiceTypeEnum.valueOf(invoice.getType());
         respVO.setTypeName(type != null ? type.getName() : "");
+        InvoiceTitleKindEnum titleKind = InvoiceTitleKindEnum.valueOf(invoice.getTitleKind());
+        respVO.setTitleKindName(titleKind != null ? titleKind.getName() : "");
         TradeOrderInvoiceStatusEnum status = TradeOrderInvoiceStatusEnum.valueOf(invoice.getStatus());
         respVO.setStatusName(status != null ? status.getName() : "");
         if (order != null) {

@@ -19,6 +19,7 @@
   { "id": 77, "orderId": 1001, "orderNo": "NO-20261015-0001",
     "userId": 88, "userNickname": "张三",          // 来自 MemberUserApi.getUserMap（既有做法）
     "type": 2, "typeName": "电子增值税专用发票",
+    "titleKind": 1, "titleKindName": "企业",          // Q38：个人抬头时税号本来就是空的
     "status": 0, "statusName": "待开票",
     "amount": 7800,                                  // 开票金额快照，分（= 申请时的订单实付）
     "orderPayPrice": 7800,                           // 订单**当前**实付，分
@@ -94,8 +95,8 @@
 | 文件 | 内容 |
 |---|---|
 | `src/api/mall/trade/invoice/index.ts` | 两个函数 + 两个 VO 类型（照 `api/mall/trade/afterSale/index.ts`） |
-| `src/views/mall/trade/invoice/index.vue` | 列表：`ContentWrap` + `el-table` + `Pagination` + 状态下拉筛选；操作列「开具 / 重新上传」用 `v-hasPermi="['trade:order-invoice:issue']"`；抬头五列在表格里可展开或走 `el-descriptions`（照售后详情的做法） |
-| `src/views/mall/trade/invoice/InvoiceIssueForm.vue` | 弹窗：`Dialog` + `UploadFile`（`:file-type="['pdf','jpg','jpeg','png']"`、`:limit="1"`）+ `defineExpose({ open })` + `emit('success')`（照 `AfterSaleDisagreeForm.vue` + `FmsVoucherAttachmentForm.vue`） |
+| `src/views/mall/trade/invoice/index.vue` | 列表：`ContentWrap` + `el-table` + `Pagination` + 状态下拉筛选；操作列「开具 / 重新上传」用 `v-hasPermi="['trade:order-invoice:issue']"`；抬头五列在表格里可展开或走 `el-descriptions`（照售后详情的做法）；另加**抬头类型**一列（Q38） |
+| `src/views/mall/trade/invoice/InvoiceIssueForm.vue` | 弹窗：`Dialog` + `UploadFile`（`:file-type="['pdf','jpg','jpeg','png']"`、`:limit="1"`）+ `defineExpose({ open })` + `emit('success')`（照 `AfterSaleDisagreeForm.vue` + `FmsVoucherAttachmentForm.vue`）；只读信息里有**抬头类型**一行（Q38） |
 
 **本期不做**（明确）：从申请跳到订单的**页面跳转**只做"点击订单号 → 打开订单详情"（FR-173 已满足），
 不做"在申请页里内嵌订单卡片"；订单详情页**不加**开票信息（运营要走申请菜单，那是 FR-167 要求它的理由）。

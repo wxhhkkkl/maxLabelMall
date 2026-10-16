@@ -264,13 +264,46 @@ description: "Task list for 订单开票（下单申请 · 后台开具上传 ·
 
 ---
 
+## Phase 9: Q38 —— 发票加「个人抬头」（2026-10-15）
+
+> 背景：Q37 之后抬头的必填是「名称 + 税号」两项，而**个人客户开普票没有纳税人识别号** ——
+> 这类客户连抬头都存不下来。本相位给发票加一维**抬头类型**（企业 / 个人）。
+> 仓库里已有一个**未接线的半成品**（`010-invoice-title-kind.sql` 只加了抬头簿那一列 +
+> 一个没人引用的 `InvoiceTitleKindEnum`），本相位把它补完并贯穿四端。
+
+- [x] T433 [P] **SQL** `yudao-cloud/sql/mysql/010-invoice-title-kind.sql`：给**两张表**各加
+      `title_kind`（1 企业 / 2 个人，`NOT NULL DEFAULT 1`）—— 抬头簿与**开票申请**都要，
+      后者是"快照"的一部分，后台靠它区分个人票；沿用 009 的 `information_schema` 幂等写法。
+      ⚠️ **同时补 `trade-server/src/test/resources/sql/create_tables.sql` 的两张表** ——
+      漏了它，本模块**所有**新测试类**启动就挂**（与 T373 同一条坑）
+- [x] T434 [P] [服务端] `InvoiceTitleKindEnum` 口径收口（个人 = 只要名称、税号**选填不是禁止**）；
+      `ErrorCodeConstants` 加两条（`INVOICE_TITLE_KIND_INVALID` / `INVOICE_TITLE_KIND_PERSONAL_SPECIAL`）；
+      `InvoiceValidator`：类型合法性 → **「个人 + 专票」拒** → **企业**才 `requireText(税号)`；
+      `InvoiceValidatorTest` 覆盖六条新断言（含"个人填了税号仍走格式校验"）
+- [x] T435 [服务端] 字段贯通：`AppInvoiceApplyBaseVO`（**继承它的三处一次到位**：下单子对象 / 补开 / 抬头簿）、
+      `TradeInvoiceTitleDO` 与 `TradeOrderInvoiceDO`、三个 RespVO、`InvoiceConvert` 派生 `titleKindName`；
+      `TradeInvoiceTitleServiceImplTest` / `TradeOrderInvoiceServiceImplTest` 各补个人抬头用例
+      （**含"抬头类型确实落库"**，别只断言请求体）
+- [x] T436 [P] [C端] `types/invoice.ts`（`InvoiceTitleKind` + `titleKind` 进 `InvoiceTitleFields`）、
+      `utils/invoice.ts`（选项 + `invoiceFieldError` 分支）、`InvoiceFieldsForm`（抬头类型单选 +
+      **两个选择器互为约束**）、以及**所有显式列举字段的拷贝点**（`fillFrom` / `emptyForm` / `payload` /
+      `onSetDefault`）—— ⚠️ 漏掉 `InvoiceTitleView.onSetDefault` 会让"设为默认"直接报错；
+      `CheckoutView.spec.ts` 的**接线断言**要跟着带上 `titleKind`
+- [x] T437 [P] [管理端] 列表加「抬头类型」列（`titleKindName`）、开具弹窗只读信息加一行、
+      `api/mall/trade/invoice/index.ts` 的 VO 补字段、`InvoiceIssueForm.spec.ts` 补断言
+- [x] T438 文档：spec 的 **Q38** 决策段 + **FR-155 的 📌 取代说明**（顺带点掉 Q37 遗留的陈旧矩阵）、
+      data-model §1/§2/§4/§5、contracts 两端、quickstart（§零 迁移、§一/§二/§三/§四 的个人抬头各条）、plan
+- [ ] T439 手工验收 quickstart 新增各条（§一.4 / 4b / 4c、§三.6~8、§四.8）
+
+---
+
 ## 需求 → 任务 对照
 
 | 需求 | 任务 |
 |---|---|
 | FR-153 结算页发票区块（默认不开票） | T382, T389 |
 | FR-154 两种电子票 | T374, T383, T388 |
-| FR-155 字段随票种 | T378, T380, T383, T388 |
+| FR-155 字段随**抬头类型**（Q37/Q38：企业=名称+税号，个人=只要名称） | T378, T380, T383, T388, **T433~T437** |
 | FR-156 必填不全阻止提交 | T378, T382, T393 |
 | FR-157 当场填 or 选已存 | T387, T426 |
 | FR-158 下单快照 | T379, T384 |
@@ -362,6 +395,7 @@ Phase 1 + 2 + **US19** 就是一个完整可交付的增量：客户能在下单
 | ③ T398~T410 | US21 | 运营有列表、能上传、状态流转、退款/取消自动作废 |
 | ④ T411~T417 | US22 | 客户自己下载（**闭环**） |
 | ⑤ T418~T427 | US23 | 抬头簿，少填几次 |
+| ⑥ T433~T439 | Q38 | **个人抬头**能存能开（在此之前个人客户无路可走） |
 
 ### 本清单里要特别当心的六条
 

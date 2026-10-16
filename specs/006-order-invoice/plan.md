@@ -135,7 +135,7 @@ yudao-cloud/                                              # ① 服务端
     │   ├── service/invoice/
     │   │   ├── TradeOrderInvoiceService.java / Impl       # 新增：申请创建、作废、开具
     │   │   ├── TradeInvoiceTitleService.java / Impl       # 新增：抬头簿 CRUD + 默认唯一
-    │   │   └── InvoiceValidator.java                      # 新增：按票种校验必填与税号格式（**唯一一处**）
+    │   │   └── InvoiceValidator.java                      # 新增：按**票种 + 抬头类型**校验必填与税号格式（**唯一一处**）
     │   ├── service/order/handler/TradeInvoiceOrderHandler.java   # 新增：afterCancelOrder → 作废（Q30）
     │   ├── service/order/TradeOrderUpdateServiceImpl.java  # 改动：createOrder 内加一行（同事务）
     │   ├── convert/invoice/TradeOrderInvoiceConvert.java   # 新增（MapStruct）
@@ -165,7 +165,7 @@ storefront/                                                 # ③ C 端前台
 ├── src/
 │   ├── api/invoice.ts                                      # 新增：抬头簿 CRUD + 补开
 │   ├── types/invoice.ts                                    # 新增：InvoiceTitle / OrderInvoice / 票种常量
-│   ├── utils/invoice.ts                                    # 新增：按票种的必填校验（纯函数，先写测试）
+│   ├── utils/invoice.ts                                    # 新增：按票种 + 抬头类型的必填校验（纯函数，先写测试）
 │   ├── components/InvoiceTitleDialog.vue                   # 新增：新增/编辑抬头（照 AddressFormDialog）
 │   ├── components/CheckoutInvoiceCard.vue                  # 新增：结算页发票卡片
 │   ├── views/InvoiceTitleView.vue                          # 新增：个人中心・发票抬头
@@ -197,9 +197,11 @@ storefront/                                                 # ③ C 端前台
 
 1. **建表**：`sql/mysql/007-order-invoice.sql`（2 张表 + 索引，见 [data-model.md](./data-model.md) §1/§2）；
    在开发库执行，并**同步补进 `trade-server/src/test/resources/sql/create_tables.sql`** —— 否则新单测跑不起来。
+   后续加列走增量脚本：`009-invoice-title-type.sql`（Q36 票种）、`010-invoice-title-kind.sql`（Q38 抬头类型）——
+   **每一次加列都必须同时补 `create_tables.sql`**（漏了就整模块测试启动即挂）。
 2. **先写测试**（服务端，本模块首批）：
-   - `InvoiceValidator`：按票种的必填矩阵（普票只要求抬头名称；专票五项全要）；税号位数与字符校验；
-     **"普票只填名称"必须通过、"专票只填名称"必须被拒**（Q27 的可执行定义）。
+   - `InvoiceValidator`：按**抬头类型**的必填矩阵（**企业**要名称 + 税号；**个人**只要名称，
+     税号选填不是禁止）（Q37 + Q38）；「个人 + 专票」必须被拒；税号位数与字符校验。
    - `TradeOrderInvoiceService`：下单创建（1:1）；**同一订单第二次创建必须被拒**（FR-160）。
    - `TradeInvoiceTitleService`：默认抬头唯一（设新的默认要清旧的）；**删除抬头后历史申请的开票信息逐字段不变**（FR-166/SC-061）。
 3. 实现枚举、两个 DO、两个 Mapper、两个 Service、`InvoiceValidator`、convert。
@@ -267,8 +269,9 @@ storefront/                                                 # ③ C 端前台
 
 ① **服务端 JUnit（本模块**首次**，照 product 模块的 `BaseDbUnitTest` + H2）**
 
-- **必填矩阵**（**Q37**，取代 Q27/Q36）：两种票都**只必填「名称 + 税号」**；
-  地址 / 电话 / 开户行选填（填了要合法）；税号格式非法要拒。
+- **必填矩阵**（**Q37 + Q38**，取代 Q27/Q36）：**企业**要「名称 + 税号」，**个人只要名称**；
+  地址 / 电话 / 开户行一律选填（填了要合法）；税号格式非法要拒；
+  **「个人 + 专票」必须被拒**（专票按税法只能开给企业）。
 - **1:1 唯一**：同一订单创建第二条申请被拒（FR-160）；重复提交不产生第二条。
 - **快照不可回溯**（FR-158/SC-061）：改 / 删抬头后，历史申请的开票信息**逐字段比对不变**。
 - **作废只发生在取消**（Q30/FR-184）：待开票的被取消订单 → 已作废；**已开票的 MUST NOT 被动**；
@@ -281,7 +284,7 @@ storefront/                                                 # ③ C 端前台
 - **兼容性**：不传 `invoice` 下单时，落库与改动前**逐字段一致**（FR-162 的证据）。
 
 ② **C 端 Vitest 单测**
-- `api/invoice.ts`：请求路径与参数形态；`utils/invoice.ts`：按票种的必填判定（FR-155/156）纯函数。
+- `api/invoice.ts`：请求路径与参数形态；`utils/invoice.ts`：按票种 + 抬头类型的必填判定（FR-155/156）纯函数。
 - `types/invoice.ts` 的票种常量与后端枚举值对齐（2 个值，写一条断言钉住）。
 
 ③ **C 端 Vitest 组件 / 接线**

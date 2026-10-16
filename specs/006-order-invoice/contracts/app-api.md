@@ -16,25 +16,40 @@ C 端（`storefront`）本期新增与改动的接口。所有路径以 `/app-ap
 > **Q36（2026-10-15）起抬头带票种**：`type` 必填，一条抬头**只服务一种票** ——
 > 前端按它把列表分成"普票 / 专票"两段，结算/补开时**只列与所选票种相符**的那些。
 > 默认抬头的唯一性也随之变成**按会员 + 票种**各一条。
+>
+> **Q38（2026-10-15）起还带抬头类型**：`titleKind` 必填（1 企业 / 2 个人）——
+> **企业**要「名称 + 税号」，**个人只要名称**。个人抬头只可能出现在普票那一段里
+> （个人开不了专票，见 §2 的校验）。
 
 ```jsonc
 { "code": 0, "data": [
-  { "id": 3, "type": 1, "titleName": "南京路桥机械有限公司", "taxNo": "91320104660690975E",
+  { "id": 3, "type": 1, "titleKind": 1, "titleName": "南京路桥机械有限公司", "taxNo": "91320104660690975E",
     "titleAddress": "南京市…", "titlePhone": "18913984596", "bankName": "工商银行南京分行 6222…",
-    "defaultStatus": true }
+    "defaultStatus": true },
+  { "id": 5, "type": 1, "titleKind": 2, "titleName": "张三", "taxNo": null,
+    "titleAddress": null, "titlePhone": null, "bankName": null, "defaultStatus": false }
 ], "msg": "" }
 ```
 
 ### 1.2 `POST /trade/invoice-title/create`
 
 ```jsonc
-// 请求（`titleName` 必填，其余选填 —— 抬头可以不完整，缺项在选专票时才被拒，见 data-model §4）
-// `type` 必填（1 普票 / 2 专票，Q36）；**必填只有「抬头名称 + 税号」两项**（Q37），
-// 地址 / 电话 / 开户行及账号选填（普票的界面不显示那三栏）
-{ "type": 1, "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…", "defaultStatus": false }
+// 请求
+// `type` 必填（1 普票 / 2 专票，Q36）；`titleKind` 必填（1 企业 / 2 个人，Q38）
+// **企业**：`titleName` + `taxNo` 都必填；**个人**：**只要 `titleName`**（税号选填，
+// 自然人可以用身份证号当纳税人识别号 —— 是"选填"不是"禁止"）
+// 地址 / 电话 / 开户行及账号一律选填（见 data-model §4）
+{ "type": 1, "titleKind": 1, "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…", "defaultStatus": false }
 // 响应：新抬头的 id
 { "code": 0, "data": 4, "msg": "" }
 ```
+
+**服务端 MUST 拒绝的两种请求**（`InvoiceValidator`，与下单 / 补开**同一套**）：
+
+| 请求 | 拒绝理由 |
+|---|---|
+| `titleKind` 缺失 / 0 / 99 | 「抬头类型不正确」 |
+| `titleKind = 2`（个人）且 `type = 2`（专票） | 「增值税专用发票只能开给企业，个人抬头请改选电子普通发票」 |
 
 ### 1.3 `PUT /trade/invoice-title/update`
 
@@ -58,10 +73,12 @@ body 为 `{ id, ...同 create }`，响应 `data: true`。
 ### 2.1 `POST /trade/order-invoice/create`
 
 ```jsonc
-// 请求（没有 titleId —— R27：提交的就是快照本身）
-{ "orderId": 1001, "type": 2,
+// 请求（没有 titleId —— R27：提交的就是快照本身；字段与下单的 `invoice` 子对象**逐字相同**）
+{ "orderId": 1001, "type": 2, "titleKind": 1,
   "titleName": "南京路桥机械有限公司", "taxNo": "91320104660690975E",
   "titleAddress": "南京市…", "titlePhone": "18913984596", "bankName": "工商银行南京分行 6222…" }
+// 个人 + 普票（Q38）：只要名称，`taxNo` 可省
+// { "orderId": 1001, "type": 1, "titleKind": 2, "titleName": "张三" }
 // 响应：新申请的 id
 { "code": 0, "data": 77, "msg": "" }
 ```
@@ -76,7 +93,8 @@ body 为 `{ id, ...同 create }`，响应 `data: true`。
 | 4 | 订单**实付金额 > 0** | 业务异常「本单实付金额为 0，无需开票」（spec Edge Case：全额抵扣的订单没有可开票金额） |
 | 5 | 订单**未取消**（`status ≠ CANCELED`） | 业务异常「订单已取消，无法申请开票」 |
 | 6 | 该订单**尚无申请**（`uk_order_id`） | 业务异常「该订单已提交过开票申请」 |
-| 7 | 按 `type` 校验抬头字段（data-model §4） | 业务异常，**指明缺哪一项** |
+| 7 | `titleKind` 合法（1 / 2）且**不是「个人 + 专票」**（Q38） | 业务异常「抬头类型不正确」/「增值税专用发票只能开给企业…」 |
+| 8 | 按 `titleKind` 校验抬头字段（data-model §4） | 业务异常，**指明缺哪一项** |
 
 **金额不由请求决定**：`amount` 取服务端读到的订单实付金额（FR-161）。
 
@@ -90,7 +108,7 @@ body 为 `{ id, ...同 create }`，响应 `data: true`。
 {
   "items": [{ "skuId": 1, "count": 2 }], "addressId": 9, "couponId": null,
   "pointStatus": false, "deliveryType": 1, "remark": "",
-  "invoice": { "type": 1, "titleName": "张三", "taxNo": "", "titleAddress": "",
+  "invoice": { "type": 1, "titleKind": 1, "titleName": "张三", "taxNo": "", "titleAddress": "",
                "titlePhone": "", "bankName": "" }
 }
 ```
@@ -112,6 +130,7 @@ body 为 `{ id, ...同 create }`，响应 `data: true`。
   "invoice": {
     "status": 0,                 // 0 待开票 / 10 已开票 / 20 已作废
     "type": 2, "typeName": "电子增值税专用发票",
+    "titleKind": 1, "titleKindName": "企业",   // Q38：个人抬头时税号本来就是空的
     "titleName": "…", "taxNo": "…", "titleAddress": "…", "titlePhone": "…", "bankName": "…",
     "amount": 7800,              // 分
     "fileUrl": null,             // 已开票才有值（公网可读，见 spec 的 Assumptions）

@@ -33,6 +33,8 @@ const ROW = {
   id: 77,
   orderNo: 'NO-20261015-0001',
   titleName: '南京路桥机械有限公司',
+  titleKind: 1,
+  titleKindName: '企业',
   amount: 7800,
   status: INVOICE_STATUS.WAITING
 }
@@ -72,6 +74,13 @@ describe('开具发票弹窗', () => {
 
     expect(issueInvoice).toHaveBeenCalledWith(77, 'https://img.yuwangchenfa.com/invoice/77.pdf')
     expect(w.emitted('success')).toHaveLength(1)
+  })
+
+  it('只读信息里带上**抬头类型**（Q38：个人抬头没有税号，财务一眼看得出）', async () => {
+    const w = await mountForm()
+
+    expect(w.text()).toContain('抬头类型')
+    expect(w.text()).toContain('企业')
   })
 
   it('**没有开具权限时，上传控件不可用**（后端还有一道 @PreAuthorize）', async () => {

@@ -7,6 +7,10 @@
       <el-form-item label="抬头">
         <span>{{ formData.titleName }}</span>
       </el-form-item>
+      <!-- 抬头类型（Q38）：开给个人时税号本来就是空的，标注出来省得运营去猜 -->
+      <el-form-item label="抬头类型">
+        <span>{{ formData.titleKindName || '—' }}</span>
+      </el-form-item>
       <el-form-item label="开票金额">
         <span>{{ fenToYuan(formData.amount) }} 元</span>
       </el-form-item>

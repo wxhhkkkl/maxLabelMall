@@ -38,6 +38,8 @@
       <el-table-column label="订单号" prop="orderNo" min-width="170" />
       <el-table-column label="下单客户" prop="userNickname" min-width="110" />
       <el-table-column label="发票类型" prop="typeName" min-width="170" />
+      <!-- 抬头类型（Q38）：个人抬头没有税号，财务不用靠"税号怎么空着"去猜 -->
+      <el-table-column label="抬头类型" prop="titleKindName" min-width="100" />
       <el-table-column label="抬头" prop="titleName" min-width="170" show-overflow-tooltip />
       <!--
         开票金额是**申请时**的快照；订单实付 / 已退是**当前**的数。

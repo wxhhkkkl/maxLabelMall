@@ -16,6 +16,8 @@ export interface TradeOrderInvoiceVO {
   userNickname?: string // 会员昵称（后端回填）
   type?: number // 发票类型：1 电子普通发票，2 电子增值税专用发票
   typeName?: string // 发票类型名（后端给，前端不自行命名）
+  titleKind?: number // 抬头类型：1 企业，2 个人（Q38）
+  titleKindName?: string // 抬头类型名（后端给）
   status?: number // 状态：0 待开票，10 已开票，20 已作废
   statusName?: string // 状态名（后端给）
   amount?: number // 开票金额（申请时的订单实付快照），单位：分

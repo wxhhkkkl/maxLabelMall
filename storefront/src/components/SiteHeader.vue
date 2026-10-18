@@ -233,9 +233,10 @@ function isActive(name: string): boolean {
 
     <div class="header-right">
       <HeaderCart />
-      <!-- 已登录：入口变为个人中心，并显示昵称或脱敏手机号（FR-016）
+      <!-- 已登录：入口变为个人中心，并显示**脱敏手机号**（所有者 2026-10-16 指定；
+           脱敏是 FR-016 的 MUST —— 完整号码在别人能瞥见的屏幕上等于泄露账号）。
            未登录：点它打开登录弹层（全站唯一实例） -->
-      <!-- ⚠️ 兜底文案不能省：`displayName` 在"有令牌但会员信息还没回来/拉不到"时是空的，
+      <!-- ⚠️ 兜底文案不能省：`headerLabel` 在"有令牌但会员信息还没回来/拉不到"时是空的，
            没有兜底就会渲染成一个 **0×0 的空白链接** —— 用户看到的是"个人中心不见了"
            （实测过：`a` 标签、文字为空、宽高 0）。移动端那处一直有兜底，桌面端漏了。 -->
       <div
@@ -245,9 +246,9 @@ function isActive(name: string): boolean {
         <RouterLink
           class="login"
           to="/account"
-          :title="userStore.displayName || '个人中心'"
+          :title="userStore.headerLabel || '个人中心'"
         >
-          {{ userStore.displayName || '个人中心' }}
+          {{ userStore.headerLabel || '个人中心' }}
         </RouterLink>
         <RouterLink
           class="header-member-level"
@@ -301,7 +302,7 @@ function isActive(name: string): boolean {
           class="m-login"
           to="/account"
         >
-          {{ userStore.displayName || '个人中心' }}
+          {{ userStore.headerLabel || '个人中心' }}
         </RouterLink>
         <RouterLink
           class="header-member-level"

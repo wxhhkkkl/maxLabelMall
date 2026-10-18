@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearWxPayPending,
+  closeWeixinWindow,
   invokeWxPay,
   isWechatBrowser,
   markWxPayPending,
@@ -148,6 +149,42 @@ describe('invokeWxPay —— 唤起微信收银台', () => {
     } finally {
       delete g.WeixinJSBridge
     }
+  })
+})
+
+describe('closeWeixinWindow —— 手机端回跳页收尾时把这一页关掉', () => {
+  it('在微信里调 bridge 的 closeWindow，并报「已发起」', async () => {
+    const bridge = fakeBridge('closeWindow:ok')
+    await expect(closeWeixinWindow({ bridge, whenReady: (cb) => cb() })).resolves.toBe(true)
+    expect(bridge.invoke).toHaveBeenCalledTimes(1)
+    expect(bridge.invoke.mock.calls[0][0]).toBe('closeWindow')
+  })
+
+  it('拿不到 bridge（不在微信里）→ false 且**不抛** —— 调用方靠它决定留不留那句提示', async () => {
+    await expect(closeWeixinWindow({ whenReady: (cb) => cb() })).resolves.toBe(false)
+  })
+
+  it('bridge 晚于页面脚本注入 → 等 ready 之后再调，别抢跑', async () => {
+    const bridge = fakeBridge()
+    let fire: (() => void) | null = null
+    const promise = closeWeixinWindow({
+      bridge,
+      whenReady: (cb) => {
+        fire = cb
+      },
+    })
+    expect(bridge.invoke).not.toHaveBeenCalled()
+    fire!()
+    await expect(promise).resolves.toBe(true)
+  })
+
+  it('个别微信版本不认这个 API（invoke 直接抛）→ false，不冒泡出去', async () => {
+    const bridge = {
+      invoke: vi.fn(() => {
+        throw new Error('unsupported')
+      }),
+    } as unknown as WxBridge
+    await expect(closeWeixinWindow({ bridge, whenReady: (cb) => cb() })).resolves.toBe(false)
   })
 })
 

@@ -162,7 +162,8 @@ describe('SiteHeader —— 静态结构', () => {
     const w = await mountLoggedIn()
     const mLogin = w.find('.mobile-nav .m-login')
     expect(mLogin.attributes('href')).toBe('/account')
-    expect(mLogin.text()).toContain('张三')
+    // 顶栏按**脱敏手机号**展示（所有者 2026-10-16 指定；脱敏是 FR-016 的 MUST）
+    expect(mLogin.text()).toContain('138****8888')
   })
 
   it('渲染汉堡按钮，点击切换 body 的 nav-open（沿用设计稿机制）', async () => {
@@ -203,9 +204,11 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     expect(w.get('.header').element.contains(modal.element)).toBe(false)
   })
 
-  it('**已登录时显示昵称，入口变为个人中心**（FR-016 / FR-014）', async () => {
+  it('**已登录时显示脱敏手机号，入口变为个人中心**（FR-016 / FR-014）', async () => {
+    // 会员**有昵称**（'张三'）时也显示手机号 —— 这正是本次改动的点
     const w = await mountLoggedIn()
-    expect(w.get('.login').text()).toContain('张三')
+    expect(w.get('.login').text()).toContain('138****8888')
+    expect(w.get('.login').text()).not.toContain('张三')
     expect(w.get('.login').attributes('href')).toBe('/account')
   })
 
@@ -217,7 +220,7 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     setTokens('at-1', 'rt-1')
     const w = mountHeader()
     await flushPromises()
-    expect(w.get('.login').text()).toBe('张三')
+    expect(w.get('.login').text()).toBe('138****8888')
   })
 
   it('**有令牌但会员信息暂时拉不到时，入口也不能是空文本**', async () => {
@@ -242,10 +245,10 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     expect(w.get('.login').attributes('href')).not.toBe('/account')
   })
 
-  it('昵称为空时显示脱敏手机号，旁边展示后台等级', async () => {
-    getMemberUser.mockResolvedValue({ id: 1, nickname: '  ', mobile: '13800008888', level: { id: 2, name: '黄金会员' } })
+  it('**没有手机号时**回落昵称（不会渲染成空白），旁边展示后台等级', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '', level: { id: 2, name: '黄金会员' } })
     const w = await mountLoggedIn()
-    expect(w.get('.header-member .login').text()).toBe('138****8888')
+    expect(w.get('.header-member .login').text()).toBe('张三')
     expect(w.get('.header-member-level').text()).toBe('黄金会员')
     expect(w.get('.mobile-member .header-member-level').text()).toBe('黄金会员')
   })

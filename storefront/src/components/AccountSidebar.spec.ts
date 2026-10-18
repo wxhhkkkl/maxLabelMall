@@ -53,7 +53,7 @@ describe('AccountSidebar —— 按主题分三组', () => {
 
   it('**入口归属正确**（这是"整理排布"的实质）', async () => {
     const w = await mountAt('/account')
-    expect(labelsOf('账户资料', w)).toEqual(['个人中心', '收货地址'])
+    expect(labelsOf('账户资料', w)).toEqual(['个人中心', '收货地址', '发票抬头'])
     expect(labelsOf('我的交易', w)).toEqual(['我的订单', '我的售后'])
     expect(labelsOf('我的权益', w)).toEqual(['我的券', '领券中心', '积分与等级'])
   })

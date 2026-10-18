@@ -68,6 +68,17 @@ export interface OrderVO {
   }
   // 订单操作日志
   logs?: OrderLogRespVO[]
+
+  // ========== 008 对公转账 ==========
+  /**
+   * 是不是**待收款**的对公转账单（= 是对公单 且 未支付 且 财务还没确认）
+   *
+   * ⚠️ 别想用 `payChannelCode === 'offline'` 判 —— 对公单在**确认收款前**那一列是**空的**
+   * （它记的是"支付成功的渠道"）。判定由服务端给。
+   */
+  offlineWaiting?: boolean
+  /** 对公转账收款信息；**不是对公单时为 null** */
+  offlinePayment?: OrderOfflinePaymentVO | null
 }
 
 export interface OrderLogRespVO {
@@ -187,4 +198,45 @@ export const getOrderByPickUpVerifyCode = async (pickUpVerifyCode: string) => {
     url: `/trade/order/get-by-pick-up-verify-code`,
     params: { pickUpVerifyCode }
   })
+}
+
+// ==================== 008 对公转账 ====================
+
+/** 对公转账收款信息（确认收款后才有内容） */
+export interface OrderOfflinePaymentVO {
+  bankSerialNo?: string // 银行流水号
+  payerName?: string // 打款方名称
+  paidTime?: Date | null // 到账时间
+  remark?: string // 备注
+  confirmUserId?: number // 确认人（后台用户编号）
+  confirmTime?: Date | null // 确认时间；为空表示还没确认
+}
+
+/** 确认对公转账收款 */
+export interface OfflineConfirmVO {
+  id?: number // 订单编号
+  bankSerialNo: string // 银行流水号（**必填**，FR-204）
+  payerName?: string // 打款方名称（选填）
+  paidTime?: Date | null // 到账时间（选填）
+  remark?: string // 备注（选填）
+}
+
+/**
+ * 确认**对公转账收款**（008 / FR-203）
+ *
+ * ⚠️ 权限点是 **`trade:order:confirm-paid`**（独立），与「取消订单」不共用。
+ * 它是**资金动作**：确认即生效、无二级复核（Q42），所以流水号必填、确认人由服务端记录。
+ */
+export const confirmOfflinePaid = async (data: OfflineConfirmVO) => {
+  return await request.put({ url: `/trade/order/confirm-offline-paid`, data })
+}
+
+/**
+ * 后台**取消订单**（008 / FR-213）
+ *
+ * ⚠️ 只能取消**未支付**订单：已支付的要走**退款**（取消不改金额，账对不上）。
+ * 对公转账单**不参与超时自动取消**（FR-212），弃单只能靠这个入口清。
+ */
+export const cancelOrder = async (data: { id: number; reason?: string }) => {
+  return await request.put({ url: `/trade/order/cancel`, data })
 }

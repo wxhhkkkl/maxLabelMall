@@ -25,4 +25,8 @@ public class AppMemberUserUpdateReqVO {
     @Schema(description = "性别", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer sex;
 
+    @Schema(description = "公司名称", example = "某某印刷厂")
+    @Size(max = 64, message = "公司名称长度不能超过 64 个字符")
+    private String company;
+
 }

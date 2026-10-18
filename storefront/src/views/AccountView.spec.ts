@@ -104,6 +104,7 @@ describe('AccountView —— 侧栏入口（T113 / T125）', () => {
     expect(labels).toEqual([
       '个人中心',
       '收货地址',
+      '发票抬头',
       '我的订单',
       '我的售后',
       '我的券',

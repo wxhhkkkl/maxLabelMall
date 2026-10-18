@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.system.service.social;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.social.vo.user.SocialUserPageReqVO;
@@ -34,6 +35,20 @@ public interface SocialUserService {
      * @return 社交用户 openid
      */
     String bindSocialUser(@Valid SocialUserBindReqDTO reqDTO);
+
+    /**
+     * 绑定社交用户（**按 openid**，不解除该会员已有的绑定）
+     *
+     * 与 {@link #bindSocialUser(SocialUserBindReqDTO)} 的两点关键区别：
+     * 1. 入参直接给 openid，不用 code+state —— 因为调用方（微信扫码登录的补全页）拿到 openid 时，
+     *    微信的授权码可能早已失效（一次性且短命）
+     * 2. **不做无条件解绑**：该会员已绑过同类型的另一个账号时**直接拒绝**，
+     *    绝不静默顶掉先绑的那个（Q21=C / FR-146）
+     *
+     * @param reqDTO 绑定请求
+     * @return openid
+     */
+    String bindSocialUserByOpenid(@Valid SocialUserBindByOpenidReqDTO reqDTO);
 
     /**
      * 取消绑定社交用户

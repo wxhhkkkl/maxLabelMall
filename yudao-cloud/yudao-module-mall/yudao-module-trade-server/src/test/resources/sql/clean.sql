@@ -1,3 +1,5 @@
+DELETE FROM trade_order_invoice;
+DELETE FROM trade_invoice_title;
 DELETE FROM trade_order;
 DELETE FROM trade_order_item;
 DELETE FROM trade_after_sale;

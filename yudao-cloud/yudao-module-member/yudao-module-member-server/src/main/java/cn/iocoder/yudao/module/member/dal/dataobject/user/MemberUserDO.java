@@ -91,6 +91,15 @@ public class MemberUserDO extends TenantBaseDO {
     private String avatar;
 
     /**
+     * 公司名称
+     *
+     * 来源是**微信扫码登录首次补全资料**时的选填项（`specs/005-wechat-scan-login` Q24 / FR-138）。
+     *
+     * ⚠️ **可空**：它是选填的，而且存量会员全都没有这一项 —— 不要按 NOT NULL 用。
+     */
+    private String company;
+
+    /**
      * 真实名字
      */
     private String name;

@@ -8,6 +8,7 @@ import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/s
 import AccountSidebar from '@/components/AccountSidebar.vue'
 import CommentCreateDialog from '@/components/CommentCreateDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import InvoiceApplyDialog from '@/components/InvoiceApplyDialog.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
 import MlModal from '@/components/base/MlModal.vue'
@@ -15,11 +16,12 @@ import MlPill from '@/components/base/MlPill.vue'
 import QrPayDialog from '@/components/QrPayDialog.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
 import type { OrderDetail } from '@/types'
-import { OrderStatus, PayOrderStatus } from '@/types'
+import { InvoiceStatus, OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
+import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan, reconcile } from '@/utils/money'
-import { canCommentItem, orderStatusText } from '@/utils/orderStatus'
+import { OFFLINE_WAITING_TEXT, canCommentItem, orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
 import { formatDateTime, toMillis } from '@/utils/time'
 import {
@@ -127,13 +129,72 @@ const wxOpenid = ref('')
 const channelOptions = ref<ChannelOption[]>([])
 const selectedChannel = ref('')
 
-const statusText = computed(() => (order.value ? orderStatusText(order.value.status) : ''))
+/**
+ * 是不是**还没确认收款的对公转账单**（008 / FR-200）。
+ *
+ * ⚠️ 判定**只认后端的 `offlinePay.waiting`** —— 它的定义是"是对公单 **且** 订单还没付"，
+ * 与下面 `needsNoPay` 的条件（未支付 + 没有支付单）**正好重合**，这是本页最容易出错的地方（R47）。
+ */
+const offlineWaiting = computed(() => order.value?.offlinePay?.waiting === true)
+
+const statusText = computed(() =>
+  order.value
+    ? offlineWaiting.value
+      ? OFFLINE_WAITING_TEXT
+      : orderStatusText(order.value.status)
+    : '',
+)
 const isUnpaid = computed(() => order.value?.status === OrderStatus.UNPAID)
+
+/**
+ * 补开票弹层（US20 / FR-163）。
+ *
+ * 入口条件：**已支付 + 未取消 + 尚无申请** —— 三条缺一不可，
+ * 与后端 `createInvoiceByMember` 的校验一一对应（后端仍是权威，这里只是不显示"点了必被拒"的按钮）。
+ */
+const invoiceApplyOpen = ref(false)
+const canApplyInvoice = computed(() => {
+  const o = order.value
+  if (!o || o.invoice) return false
+  // 与后端 `createInvoiceByMember` 的四条校验一一对应（后端仍是权威，这里只是不显示"点了必被拒"的按钮）：
+  // 未支付 / 已取消 / 实付 0 元，三种情况都不给入口
+  return o.status !== OrderStatus.UNPAID
+    && o.status !== OrderStatus.CANCELED
+    && o.payPrice > 0
+})
+
+/** 补开成功：**重新拉一次详情**，而不是本地把状态改掉 —— 状态一律以后端为准（FR-039） */
+async function onInvoiceApplied() {
+  await load()
+}
+
+/** 发票状态的说明文案（FR-176：每种状态都要如实说清现在能做什么） */
+const invoiceStatusHint = computed(() => {
+  const o = order.value
+  const status = o?.invoice?.status
+  if (status === InvoiceStatus.WAITING) {
+    // 申请已提交但订单还没付款 —— 这时说"开具中"是骗人的（后台不会给未支付的订单开票）
+    return o?.status === OrderStatus.UNPAID
+      ? '订单付款后开具，开出后可在这里下载。'
+      : '发票正在开具中，开出后可在这里下载。'
+  }
+  if (status === InvoiceStatus.ISSUED) return '发票已开出。'
+  if (status === InvoiceStatus.CANCELED) return '订单已退款或取消，该开票申请已作废。'
+  return ''
+})
 /**
  * 全额抵扣（`payPrice === 0`）的订单后端**不创建支付单**，`payOrderId` 为 null ——
  * 此时没有任何 id 可以提交支付，所以不给支付入口（FR-037）。
+ *
+ * ⚠️ **必须排除对公待收款单**（R47）：对公单**也没有在线支付单**，条件完全重合，
+ * 不排除就会把"请打款"显示成"**无需支付**"（FR-201/202）。
  */
-const needsNoPay = computed(() => isUnpaid.value && !order.value?.payOrderId)
+const needsNoPay = computed(() => isUnpaid.value && !order.value?.payOrderId && !offlineWaiting.value)
+
+/** 能不能提交在线支付：要**有支付单**，且不是对公待收款单（对公单没有任何在线支付入口，FR-201） */
+const canPayOnline = computed(
+  () => isUnpaid.value && !!order.value?.payOrderId && !offlineWaiting.value,
+)
 // 详情的金额字段是**平铺**在返回对象上的，结构上即 OrderPrice
 const amountConsistent = computed(() => (order.value ? reconcile(order.value) : true))
 /** 券名后端未返回（`AppTradeOrderDetailRespVO` 只有 couponId/couponPrice） */
@@ -147,6 +208,15 @@ const STATUS_HINT: Record<number, string> = {
   [OrderStatus.COMPLETED]: '订单已完成，感谢购买。',
   [OrderStatus.CANCELED]: '订单已取消，商品库存与所用优惠券已释放。',
 }
+
+/**
+ * 状态下面那句说明。⚠️ 对公待收款单**不能沿用**「请尽快完成支付，**超时未支付订单将自动取消**」
+ * —— 它没有在线支付入口（FR-201），也**不会被超时自动取消**（FR-212），两句都是错的。
+ */
+const statusHint = computed(() => {
+  if (offlineWaiting.value) return '请按下方收款账户完成转账，我们确认到账后即安排发货。'
+  return order.value ? (STATUS_HINT[order.value.status] ?? '') : ''
+})
 
 /**
  * `sync = true` 让后端**主动同步支付渠道**再返回 —— 支付后确认状态就靠它
@@ -542,16 +612,153 @@ onMounted(async () => {
         <div class="ml-card od-status">
           <div class="od-status-row">
             <span class="od-status-text">{{ statusText }}</span>
-            <MlPill :status="order.status" />
+            <!-- 对公待收款单：底层仍是「未支付」，只是说辞不同（008 / FR-200） -->
+            <MlPill
+              :status="order.status"
+              :text="offlineWaiting ? OFFLINE_WAITING_TEXT : undefined"
+            />
+            <!--
+              待收款单**只有「取消订单」这一个动作**（没有任何在线支付入口，FR-201），
+              所以把它放在状态行末尾 —— 否则下面会剩一个只装一颗按钮的空白操作条。
+              打在款前反悔走的就是它（008 spec 的 Edge Case）。
+            -->
+            <button
+              v-if="offlineWaiting"
+              class="btn-cart cancel-order od-cancel-inline"
+              type="button"
+              @click="cancelOpen = true"
+            >
+              取消订单
+            </button>
           </div>
-          <p class="ml-hint">{{ STATUS_HINT[order.status] ?? '' }}</p>
-          <p v-if="isUnpaid" class="od-deadline">
+          <p class="ml-hint">{{ statusHint }}</p>
+          <!-- ⚠️ 对公待收款单**没有支付截止**：它不参与超时自动取消（FR-212），
+               写了「逾期将自动取消」就是骗客户 -->
+          <p v-if="isUnpaid && !offlineWaiting" class="od-deadline">
             支付截止 {{ formatDateTime(order.payExpireTime) }}，逾期订单将自动取消
           </p>
         </div>
 
-        <!-- 收货信息 -->
-        <div class="ml-card">
+        <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货）。
+             排在收货信息**之前** —— 待支付时用户要办的是「怎么付」 -->
+        <!-- ⚠️ 待收款单**不渲染这一条**：它没有在线支付入口，唯一的动作「取消订单」
+             已经放在上面的状态行里了（见那里的说明） -->
+        <div v-if="isUnpaid && !offlineWaiting" class="od-actions">
+          <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
+               后台配好后不用改代码就会变成可选 -->
+          <div v-if="canPayOnline && channelOptions.length" class="pay-channels">
+            <button
+              v-for="c in channelOptions"
+              :key="c.code"
+              :data-channel="c.code"
+              class="pay-channel"
+              :class="{ 'is-disabled': !c.enabled, 'is-active': c.code === selectedChannel }"
+              type="button"
+              :disabled="!c.enabled"
+              @click="selectedChannel = c.code"
+            >
+              {{ c.label }}
+              <span v-if="c.comingSoon" class="pay-channel-soon">即将上线</span>
+            </button>
+          </div>
+
+          <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037）。
+               ⚠️ 对公待收款单**不落到这里**（`needsNoPay` 已排除它）—— 它要显示的是
+               收款账户，不是"无需支付"（R47）。 -->
+          <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
+          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
+            取消订单
+          </button>
+          <!-- 对公待收款单**没有任何在线支付入口**（FR-201：防重复付款） -->
+          <button
+            v-if="canPayOnline"
+            id="payOrder"
+            class="btn-buy"
+            type="button"
+            :disabled="paying || !selectedChannel || qrOpen"
+            @click="onPay"
+          >
+            {{ paying ? '支付中…' : '立即支付' }}
+          </button>
+        </div>
+
+        <!--
+          对公转账「待收款」区块（008 / FR-201）。**收款账户只在这里给** ——
+          结算响应里没有（契约 §2：客户还没下单时看不到完整账号）。
+          ⚠️ 它由 `offlinePay.waiting` 驱动，而不是 `payOrderId` 是否为空 ——
+          后者对公单与"全额抵扣"完全一样，分不出来（R47）。
+        -->
+        <div v-if="offlineWaiting" id="offlinePay" class="ml-card">
+          <div class="ml-card-title">待收款 · 请对公转账</div>
+          <div class="dl-table">
+            <div class="dl-row">
+              <span class="dl-name">收款户名</span>
+              <span class="dl-val">{{ order.offlinePay?.accountName || '—' }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">收款账号</span>
+              <span class="dl-val">{{ order.offlinePay?.accountNo || '—' }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">开户行</span>
+              <span class="dl-val">{{ order.offlinePay?.bankName || '—' }}</span>
+            </div>
+          </div>
+          <p v-if="order.offlinePay?.tip" class="od-text">{{ order.offlinePay.tip }}</p>
+          <p class="ml-hint">
+            转账后我们核对到账即安排发货。确认到账前订单不会自动取消，有问题请
+            <RouterLink to="/support/contact">联系我们</RouterLink>。
+          </p>
+        </div>
+
+        <!--
+          发票（006）。四态见 FR-176：未支付 / 已取消且没申请 → 整块不渲染；
+          已支付未申请 → 给申请入口；待开票 → 只显示状态、**不给下载入口**；已开票 → 信息 + 下载。
+        -->
+        <div v-if="order.invoice" class="ml-card invoice-card">
+          <div class="ml-card-title">发票</div>
+          <p class="od-text">状态：{{ invoiceStatusName(order.invoice.status) }}</p>
+          <!--
+            ⚠️ **已作废（订单退款 / 取消）时不再展示任何发票内容**（2026-10-15 所有者口径：
+            退款了票就要撤回）—— 只说明状态，抬头 / 金额 / 税号一律不露面。
+          -->
+          <template v-if="order.invoice.status !== InvoiceStatus.CANCELED">
+            <p class="od-text">类型：{{ order.invoice.typeName }}</p>
+            <!-- 抬头类型（Q38）：个人抬头没有税号，标出来客户就不会以为"怎么没开全" -->
+            <p class="od-text">抬头类型：{{ order.invoice.titleKindName }}</p>
+            <p class="od-text">抬头：{{ order.invoice.titleName }}</p>
+            <p class="od-text">金额：{{ formatYuan(order.invoice.amount) }}</p>
+          </template>
+          <p class="ml-hint">{{ invoiceStatusHint }}</p>
+          <!--
+            已开票才有下载入口。**入口旁常驻求助路径**（R10 的缓解措施）——
+            那个文件域没有 CORS 头，前端读不到请求结果，所以"当场告知文件失效"做不到，
+            只能保证"不静默、有地方问"。别把这行当成冗余删掉。
+          -->
+          <template v-if="order.invoice.status === InvoiceStatus.ISSUED && order.invoice.fileUrl">
+            <a
+              id="downloadInvoice"
+              class="btn-cart"
+              :href="order.invoice.fileUrl"
+              target="_blank"
+              rel="noopener"
+            >下载发票</a>
+            <p class="ml-hint">
+              文件打不开？可能是已失效，请<RouterLink to="/support/contact">联系我们</RouterLink>或致电 010-88613986。
+            </p>
+          </template>
+        </div>
+        <div v-else-if="canApplyInvoice" class="ml-card">
+          <div class="ml-card-title">发票</div>
+          <p class="od-text">这笔订单还没有申请开票。需要发票可以现在提交，开出后在这里下载。</p>
+          <button id="applyInvoice" class="btn-cart" type="button" @click="invoiceApplyOpen = true">申请开票</button>
+        </div>
+
+        <!--
+          收货信息 —— **虚拟商品单（软件等）没有收货信息**（007）：后台不给它存 receiver*，
+          整块会是一片空白。所以按"有没有收货人"决定渲不渲染（自提单有联系人，照常显示）。
+        -->
+        <div v-if="order.receiverName" class="ml-card">
           <div class="ml-card-title">收货信息</div>
           <div class="addr-line">
             <b>{{ order.receiverName }}</b>
@@ -559,6 +766,18 @@ onMounted(async () => {
           </div>
           <p class="od-text">
             {{ order.receiverAreaName }} {{ order.receiverDetailAddress }}
+          </p>
+        </div>
+
+        <!--
+          买家留言：**下单时客户自己填的**（`trade_order.user_remark`），
+          与后台那个「商家备注」不是一回事 —— 所以这里只读展示，不给改（FR-182 同理）。
+          没填时整块不渲染 —— 空标题比没有更让人犯嘀咕。
+        -->
+        <div v-if="(order.userRemark ?? '').trim()" class="ml-card">
+          <div class="ml-card-title">买家留言</div>
+          <p class="od-text remark-text">
+            {{ order.userRemark }}
           </p>
         </div>
 
@@ -660,47 +879,13 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-
-        <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货） -->
-        </div>
-        <div v-if="isUnpaid" class="od-actions">
-          <!-- 渠道选择：可用性由后端给，前端只渲染。未开通的渠道置灰占位，
-               后台配好后不用改代码就会变成可选 -->
-          <div v-if="!needsNoPay && channelOptions.length" class="pay-channels">
-            <button
-              v-for="c in channelOptions"
-              :key="c.code"
-              :data-channel="c.code"
-              class="pay-channel"
-              :class="{ 'is-disabled': !c.enabled, 'is-active': c.code === selectedChannel }"
-              type="button"
-              :disabled="!c.enabled"
-              @click="selectedChannel = c.code"
-            >
-              {{ c.label }}
-              <span v-if="c.comingSoon" class="pay-channel-soon">即将上线</span>
-            </button>
-          </div>
-
-          <!-- 全额抵扣的订单后端没有支付单，没有可提交的 id（FR-037） -->
-          <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
-          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
-            取消订单
-          </button>
-          <button
-            v-if="!needsNoPay"
-            id="payOrder"
-            class="btn-buy"
-            type="button"
-            :disabled="paying || !selectedChannel || qrOpen"
-            @click="onPay"
-          >
-            {{ paying ? '支付中…' : '立即支付' }}
-          </button>
         </div>
       </template>
     </div>
   </div>
+
+  <!-- 补开票弹层（US20）：`v-if` 兜住订单未加载时的渲染 -->
+  <InvoiceApplyDialog v-if="order" :open="invoiceApplyOpen" :order-id="order.id" @close="invoiceApplyOpen = false" @submitted="onInvoiceApplied" />
 
   <MlModal :open="cancelOpen" title="取消订单" @close="cancelOpen = false">
     <p class="ml-hint">
@@ -791,6 +976,13 @@ onMounted(async () => {
   gap: 12px;
   flex-wrap: wrap;
 }
+/* 状态行末尾的那颗「取消订单」（仅待收款单）：推到最右，与原来的操作条视觉一致 */
+.od-cancel-inline {
+  margin-left: auto;
+  width: auto;
+  font-size: 13px;
+  padding: 10px 20px;
+}
 .od-status-text {
   font-size: 22px;
   font-weight: 700;
@@ -815,6 +1007,8 @@ onMounted(async () => {
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
+/* 买家留言是两行的输入框，客户敲的换行要原样保留（长串撑破的问题 .od-text 已处理） */
+.remark-text { white-space: pre-wrap; }
 .od-item {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto auto;

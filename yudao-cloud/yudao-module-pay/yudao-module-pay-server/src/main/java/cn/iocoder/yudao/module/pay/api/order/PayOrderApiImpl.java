@@ -26,6 +26,11 @@ public class PayOrderApiImpl implements PayOrderApi {
     }
 
     @Override
+    public CommonResult<Long> createPaidOfflineOrder(PayOrderCreateReqDTO reqDTO) {
+        return success(payOrderService.createPaidOfflineOrder(reqDTO));
+    }
+
+    @Override
     public CommonResult<PayOrderRespDTO> getOrder(Long id) {
         PayOrderDO order = payOrderService.getOrder(id);
         return success(PayOrderConvert.INSTANCE.convert2(order));

@@ -120,7 +120,20 @@ def columns_of(conn, table):
 
 
 def verify(conn, expect_tables):
-    """执行后的校验。**不靠"命令没报错"当成功** —— 回查表与列。"""
+    """执行后的校验。**不靠"命令没报错"当成功** —— 回查表与列。
+
+    `expect_tables` 为空（用 `--file` 跑别的迁移、又没给 `--expect-tables`）时**不校验**：
+    没有"期望的表"，就无从查起。
+
+    ⚠️ **这里必须提前返回** —— 空列表会让 `_query_table_names` 拼出 `IN ()`，
+    MySQL 报 1064 语法错。而那时**迁移早就执行完并提交了**，于是整条命令以
+    一大段 traceback 收场，**看起来像迁移失败**（2026-10-16 修：那次就是被它误导，
+    跑去查库才确认没事）。
+    """
+    if not expect_tables:
+        print('  （本次没给 --expect-tables，跳过表/列校验 —— 迁移本身已执行并提交）')
+        return []
+
     problems = []
     present = set(_query_table_names(conn, expect_tables))
     for table in expect_tables:
@@ -159,7 +172,7 @@ def main():
             before = _query_table_names(conn, expect_tables)
             print(f'\n执行前已存在的表：{before or "（无）"}')
         else:
-            print('\n（数据类迁移，没有"执行前已存在的表"可报；下面会逐条打印影响行数）')
+            print('\n（本次没给 --expect-tables：不报"执行前已存在的表"，执行后也不做表/列校验）')
 
         if dry_run:
             print('\n--dry-run：不执行。将按顺序执行上面那些语句。')
@@ -177,7 +190,8 @@ def main():
             print('\n'.join(problems))
             print('\n⚠️ 校验未通过 —— 请人工介入，不要当成成功。')
             sys.exit(1)
-        print('\n✅ 三张表都已建好，关键列齐全。')
+        if expect_tables:
+            print('\n✅ 关键表都已建好，关键列齐全。')
     finally:
         conn.close()
         tunnel = getattr(conn, '_tunnel', None)

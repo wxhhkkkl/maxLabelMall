@@ -37,7 +37,7 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `POST` | `/product/filter-dimension/create` | `{ categoryId, name, sort?, remark? }` |
-| `PUT` | `/product/filter-dimension/update` | `{ id, name, sort?, remark? }`（**不改 `categoryId`** —— 挪分类等于换一套继承关系，本期不支持） |
+| `PUT` | `/product/filter-dimension/update` | `{ id, **categoryId**, name, sort?, remark? }`（**不改 `categoryId`** —— 挪分类等于换一套继承关系，本期不支持）<br>📌 **2026-10-16 修正**：上面原本写的是 `{ id, name, sort?, remark? }`（**没有 `categoryId`**），前端照着做 → 改名与排序**全都在参数校验就被拦掉**（前端只看到 `Uncaught (in promise) error`）。<br>原因：后端 update 与 create **共用** `ProductFilterDimensionSaveReqVO`，而 `categoryId` 在那上面是 `@NotNull("归属分类不能为空")` —— **后端不读它、却强制要传**（`updateDimension` 的重名校验用的是库里那条记录的分类）。<br>所以请求体**必须带上原分类的 `categoryId`**（值不变） |
 | `DELETE` | `/product/filter-dimension/delete?id=` | **级联删除其下全部可选值及商品关联** |
 | `DELETE` | `/product/filter-dimension/delete-list?ids=` | 批量 |
 

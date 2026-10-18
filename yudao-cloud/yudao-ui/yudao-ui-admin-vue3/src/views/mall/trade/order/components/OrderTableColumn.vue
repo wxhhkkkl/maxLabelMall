@@ -40,8 +40,8 @@
         <el-table-column min-width="300" prop="spuName">
           <template #header>
             <div
-              class="h-[35px] flex items-center -mx-[10px] px-[20px]"
-              style="background-color: var(--app-content-bg-color)"
+              class="h-[28px] flex items-center -mx-[10px] px-[20px]"
+              style="background-color: #f1f706"
             >
               <span class="mr-20px">订单号：{{ scope.row.no }} </span>
               <span class="mr-20px">下单时间：{{ formatDate(scope.row.createTime) }}</span>
@@ -63,24 +63,10 @@
             </div>
           </template>
           <template #default="{ row }">
-            <div class="flex flex-wrap">
-              <div class="mb-[10px] mr-[10px] flex items-start">
-                <div class="mr-[10px]">
-                  <el-image
-                    :src="row.picUrl"
-                    class="!h-[45px] !w-[45px]"
-                    fit="contain"
-                    @click="imagePreview(row.picUrl)"
-                  >
-                    <template #error>
-                      <div class="image-slot">
-                        <icon icon="ep:picture" />
-                      </div>
-                    </template>
-                  </el-image>
-                </div>
+            <div class="flex flex-wrap items-center">
+              <div class="mr-[8px] flex items-start">
                 <ElTooltip :content="row.spuName" placement="top">
-                  <span class="overflow-ellipsis max-h-[45px] overflow-hidden">
+                  <span class="overflow-ellipsis max-h-[38px] overflow-hidden leading-[19px]">
                     {{ row.spuName }}
                   </span>
                 </ElTooltip>
@@ -88,7 +74,8 @@
               <el-tag
                 v-for="property in row.properties"
                 :key="property.propertyId"
-                class="mb-[10px] mr-[10px]"
+                size="small"
+                class="mb-[2px] mr-[6px]"
               >
                 {{ property.propertyName }}: {{ property.valueName }}
               </el-tag>
@@ -126,6 +113,13 @@
                 {{ scope.row.receiverAreaName }} {{ scope.row.receiverDetailAddress }}
               </span>
             </div>
+            <!-- 虚拟商品（软件等）：没有收货人，只显示买家（007） -->
+            <div
+              v-if="scope.row.deliveryType === DeliveryTypeEnum.VIRTUAL.type"
+              class="flex flex-col"
+            >
+              <span>买家：{{ scope.row.user?.nickname }}</span>
+            </div>
             <!-- 自提  -->
             <div
               v-if="scope.row.deliveryType === DeliveryTypeEnum.PICK_UP.type"
@@ -153,7 +147,14 @@
         </el-table-column>
         <el-table-column align="center" label="订单状态" width="120">
           <template #default>
-            <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="scope.row.status" />
+            <!--
+              对公转账「待收款」（008 / FR-200 的运营侧）：状态值仍是「未支付」，
+              但运营要一眼看出"这单在等打款"，不能与普通待支付混在一起 ——
+              ⚠️ 判定由服务端给（`offlineWaiting`），前端**不看** `payChannelCode`
+              （对公单确认收款前那一列是空的）。
+            -->
+            <el-tag v-if="scope.row.offlineWaiting" type="warning">待收款</el-tag>
+            <dict-tag v-else :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="scope.row.status" />
           </template>
         </el-table-column>
         <el-table-column align="center" fixed="right" label="操作" width="160">
@@ -174,7 +175,6 @@ import { floatToFixed2 } from '@/utils'
 import * as TradeOrderApi from '@/api/mall/trade/order'
 import { OrderVO } from '@/api/mall/trade/order'
 import type { TableColumnCtx, TableInstance } from 'element-plus'
-import { createImageViewer } from '@/components/ImageViewer'
 import type { DeliveryPickUpStoreVO } from '@/api/mall/trade/delivery/pickUpStore'
 
 defineOptions({ name: 'OrderTableColumn' })
@@ -289,16 +289,40 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
-
-/** 商品图预览 */
-const imagePreview = (imgUrl: string) => {
-  createImageViewer({
-    urlList: [imgUrl]
-  })
-}
 </script>
 <style lang="scss" scoped>
 :deep(.order-table-col > .cell) {
+  padding: 0;
+}
+</style>
+
+<!--
+  紧凑化：一页尽量多看几条订单。
+
+  ⚠️ 这段**不能加 scoped**，是刻意的。`.order-table-col` 来自 `el-table-column` 的
+  `class-name`，它被打在**外层表格的 `<td>` 上**，而那个 `<td>` 是 el-table 自己渲染的、
+  不属于本组件的模板，拿不到本组件的 scope id。加了 scoped 就会编译成
+  `[data-v-x] .order-table-col ...`，要求有一个带本组件 scope id 的祖先 —— **永远匹配不到**
+  （上面那条 `:deep(.order-table-col > .cell)` 就是这种情况，是死代码）。
+  选择器已由 `.order-table-col` 限定，不会外溢到别的页面。
+-->
+<style lang="scss">
+/*
+ * 外层格子上下各 8px 的内边距是大头（每个订单都白占 16px）。
+ * 用 !important 是因为要压过 EP 的 `.el-table td.el-table__cell`：
+ * 两者特异性相同，靠加载顺序决定胜负，不稳。
+ */
+.order-table-col {
+  padding: 3px 0 !important;
+}
+
+/* 内层表格的行同样压一遍（8px → 3px） */
+.order-table-col .el-table tr > .el-table__cell {
+  padding: 3px 0;
+}
+
+/* 内层表头那一格整格就是「订单号 / 下单时间」信息条，上下内边距全去掉 */
+.order-table-col .el-table__header-wrapper tr > .el-table__cell {
   padding: 0;
 }
 </style>

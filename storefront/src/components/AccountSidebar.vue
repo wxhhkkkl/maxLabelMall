@@ -22,6 +22,7 @@ const GROUPS = [
     items: [
       { to: '/account', label: '个人中心' },
       { to: '/account/address', label: '收货地址' },
+      { to: '/account/invoice', label: '发票抬头' },
     ],
   },
   {

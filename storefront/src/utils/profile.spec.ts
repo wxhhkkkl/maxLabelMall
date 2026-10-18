@@ -16,6 +16,8 @@ const CURRENT = {
   avatar: 'https://img.example.com/a.png',
   email: 'old@example.com',
   sex: 1,
+  // 2026-10-14 随微信扫码登录加的第五项（Q24 / FR-138）
+  company: '某某印刷厂',
 }
 
 describe('validateProfile —— 表单校验', () => {
@@ -50,6 +52,19 @@ describe('buildProfileUpdate —— 只提交改动过的字段', () => {
 
   it('**只改昵称 → body 只有 nickname**（这是 FR-011b 的核心约束）', () => {
     expect(buildProfileUpdate(CURRENT, { ...CURRENT, nickname: '李四' })).toEqual({ nickname: '李四' })
+  })
+
+  it('**只改公司名称 → body 只有 company**', () => {
+    expect(buildProfileUpdate(CURRENT, { ...CURRENT, company: '新公司' })).toEqual({ company: '新公司' })
+  })
+
+  it('**公司名称清空要提交空串**（与邮箱一条规矩：清不掉才是最烦的）', () => {
+    expect(buildProfileUpdate(CURRENT, { ...CURRENT, company: '' })).toEqual({ company: '' })
+  })
+
+  it('公司名称长度上限 64（与后端 @Size(max=64) 对齐）', () => {
+    expect(validateProfile({ nickname: '张三', company: 'a'.repeat(64) }).ok).toBe(true)
+    expect(validateProfile({ nickname: '张三', company: 'a'.repeat(65) }).ok).toBe(false)
   })
 
   it('改了头像与性别 → 只有这两项', () => {

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.api.social;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserUnbindReqDTO;
@@ -22,6 +23,11 @@ public class SocialUserApiImpl implements SocialUserApi {
     @Override
     public CommonResult<String> bindSocialUser(SocialUserBindReqDTO reqDTO) {
         return success(socialUserService.bindSocialUser(reqDTO));
+    }
+
+    @Override
+    public CommonResult<String> bindSocialUserByOpenid(SocialUserBindByOpenidReqDTO reqDTO) {
+        return success(socialUserService.bindSocialUserByOpenid(reqDTO));
     }
 
     @Override

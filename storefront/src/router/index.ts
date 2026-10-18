@@ -82,6 +82,7 @@ const router = createRouter({
         },
         { path: 'account', name: 'account', meta: { requiresAuth: true }, component: () => import('@/views/AccountView.vue') },
         { path: 'account/address', name: 'address', meta: { requiresAuth: true }, component: () => import('@/views/AddressView.vue') },
+        { path: 'account/invoice', name: 'account-invoice', meta: { requiresAuth: true }, component: () => import('@/views/InvoiceTitleView.vue') },
         {
           path: 'account/after-sale',
           name: 'after-sale',
@@ -117,6 +118,13 @@ const router = createRouter({
         { path: 'after-sales-policy', name: 'after-sales-policy', component: () => import('@/views/AfterSalesPolicyView.vue') },
         { path: 'news', name: 'news', component: () => import('@/views/NewsView.vue') },
         { path: 'contact', name: 'contact', component: () => import('@/views/ContactView.vue') },
+        {
+          // 微信授权的**回跳页**（跑在手机上）。**不标 requiresAuth** ——
+          // 客户正在登录中，这时当然还没有登录态。
+          path: 'wechat/callback',
+          name: 'wechat-callback',
+          component: () => import('@/views/WechatCallbackView.vue'),
+        },
         { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
       ],
     },

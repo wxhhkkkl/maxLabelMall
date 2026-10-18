@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.system.api.social;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserUnbindReqDTO;
@@ -24,6 +25,12 @@ public interface SocialUserApi {
     @PostMapping(PREFIX + "/bind")
     @Operation(summary = "绑定社交用户")
     CommonResult<String> bindSocialUser(@Valid @RequestBody SocialUserBindReqDTO reqDTO);
+
+    @PostMapping(PREFIX + "/bind-by-openid")
+    @Operation(summary = "绑定社交用户，基于 openid",
+            description = "与 /bind 的区别：**不解除该会员已有的绑定** —— 已绑过同类型的另一个账号时直接拒绝，"
+                    + "绝不静默顶掉（微信扫码登录 Q21=C / FR-146）")
+    CommonResult<String> bindSocialUserByOpenid(@Valid @RequestBody SocialUserBindByOpenidReqDTO reqDTO);
 
     @DeleteMapping(PREFIX + "/unbind")
     @Operation(summary = "取消绑定社交用户")

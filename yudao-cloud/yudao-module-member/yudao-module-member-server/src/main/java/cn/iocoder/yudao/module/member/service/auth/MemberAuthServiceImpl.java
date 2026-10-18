@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.member.service.auth;
 
 import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.TerminalEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
@@ -9,6 +10,7 @@ import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.module.member.controller.app.auth.vo.*;
 import cn.iocoder.yudao.module.member.convert.auth.AuthConvert;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.service.auth.bo.WechatLoginTicketBO;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import cn.iocoder.yudao.module.system.api.captcha.CaptchaApi;
 import cn.iocoder.yudao.module.system.api.captcha.dto.CaptchaVerificationReqDTO;
@@ -17,9 +19,12 @@ import cn.iocoder.yudao.module.system.api.logger.dto.LoginLogCreateReqDTO;
 import cn.iocoder.yudao.framework.common.biz.system.oauth2.OAuth2TokenCommonApi;
 import cn.iocoder.yudao.framework.common.biz.system.oauth2.dto.OAuth2AccessTokenCreateReqDTO;
 import cn.iocoder.yudao.framework.common.biz.system.oauth2.dto.OAuth2AccessTokenRespDTO;
+import cn.iocoder.yudao.module.member.controller.app.user.vo.AppMemberUserUpdateReqVO;
 import cn.iocoder.yudao.module.system.api.sms.SmsCodeApi;
+import cn.iocoder.yudao.module.system.api.sms.dto.code.SmsCodeUseReqDTO;
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.system.api.social.SocialUserApi;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindByOpenidReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxPhoneNumberInfoRespDTO;
@@ -34,6 +39,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
@@ -59,6 +66,9 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     private LoginLogApi loginLogApi;
     @Resource
     private SocialUserApi socialUserApi;
+
+    @Resource
+    private WechatLoginTicketService wechatLoginTicketService;
     @Resource
     private SocialClientApi socialClientApi;
     @Resource
@@ -134,6 +144,160 @@ public class MemberAuthServiceImpl implements MemberAuthService {
 
         // 创建 Token 令牌，记录登录日志
         return createTokenAfterLoginSuccess(user, user.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL, socialUser.getOpenid());
+    }
+
+    // ========== 微信扫码登录（specs/005-wechat-scan-login） ==========
+
+    /** 从微信授权地址里抠出 `state` —— 见 createWechatScanTicket 的说明 */
+    private static final Pattern AUTHORIZE_STATE = Pattern.compile("[?&]state=([^&#]+)");
+
+    @Override
+    public AppAuthWechatScanCreateRespVO createWechatScanTicket(String redirectUri) {
+        // 1. 先拿授权地址。
+        //    ⚠️ **justauth 在这一步会自己生成一个 state 并缓存起来**，回调时要按它比对。
+        //       所以 state 只能"用它给的"，**绝不能自己另生成一个去替换** ——
+        //       替换了的话，justauth 缓存的还是原来那个，回调回来的却是我们的，
+        //       它会直接抛 `Illegal state [WECHAT_MP]`（2026-10-14 线上实测踩过这一脚）。
+        String authorizeUri = socialClientApi.getAuthorizeUrl(SocialTypeEnum.WECHAT_MP.getType(),
+                UserTypeEnum.MEMBER.getValue(), redirectUri).getCheckedData();
+
+        // 2. 从地址里把它的 state 读出来，交给票据 —— 于是两边对得上：
+        //    微信把 state 原样带回给我回调，justauth 校验通过，我们也能按 state 找回票据。
+        Matcher matcher = AUTHORIZE_STATE.matcher(authorizeUri);
+        if (!matcher.find()) {
+            // 拿不到就说明授权地址的形状变了 —— 宁可当场炸，也别发一张注定回调失败出去的二维码
+            throw new IllegalStateException("微信授权地址里没有 state：" + authorizeUri);
+        }
+        WechatLoginTicketBO ticket = wechatLoginTicketService.create(matcher.group(1));
+
+        return new AppAuthWechatScanCreateRespVO(ticket.getTicket(), authorizeUri,
+                (int) wechatLoginTicketService.getTtlSeconds());
+    }
+
+    @Override
+    public void handleWechatCallback(AppAuthWechatCallbackReqVO reqVO) {
+        // 用 code 换 openid —— 复用既有能力。**这一步只换身份，不建号**
+        SocialUserRespDTO socialUser = socialUserApi.getSocialUserByCode(UserTypeEnum.MEMBER.getValue(),
+                SocialTypeEnum.WECHAT_MP.getType(), reqVO.getCode(), reqVO.getState()).getCheckedData();
+        if (socialUser == null) {
+            throw exception(AUTH_SOCIAL_USER_NOT_FOUND);
+        }
+
+        // 例外：该 openid **已经绑过会员**、且那个会员有手机号 → 直接完成登录，不再要求补全（FR-133）
+        //
+        // 先看"要不要走这条捷径"，再动票据 —— 顺序反了会在票据状态不对时白白签出一个令牌
+        if (socialUser.getUserId() != null) {
+            MemberUserDO user = userService.getUser(socialUser.getUserId());
+            if (user != null && StrUtil.isNotBlank(user.getMobile())) {
+                wechatLoginTicketService.markWaitingProfile(reqVO.getState(), socialUser.getOpenid(),
+                        socialUser.getNickname(), socialUser.getAvatar());
+                AppAuthLoginRespVO login = createTokenAfterLoginSuccess(user, user.getMobile(),
+                        LoginLogTypeEnum.LOGIN_SOCIAL, socialUser.getOpenid());
+                WechatLoginTicketBO ticket = wechatLoginTicketService.getByState(reqVO.getState());
+                wechatLoginTicketService.markCompleted(ticket.getTicket(), user.getId(),
+                        login.getAccessToken(), login.getRefreshToken());
+                return;
+            }
+        }
+
+        // 其余情况：**只把微信身份写进票据**。
+        //
+        // ⚠️⚠️ 这里 MUST NOT 建会员、MUST NOT 建绑定、MUST NOT 签发令牌（FR-132 / FR-150 / Q26）——
+        //       那些要等客户在补全页提交成功才做。这一行就是"延后建号"的全部秘密。
+        wechatLoginTicketService.markWaitingProfile(reqVO.getState(), socialUser.getOpenid(),
+                socialUser.getNickname(), socialUser.getAvatar());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeWechatScan(AppAuthWechatCompleteReqVO reqVO) {
+        // 1. 票据必须存在、且处于「待补全」
+        WechatLoginTicketBO ticket = wechatLoginTicketService.get(reqVO.getTicket());
+        if (ticket == null) {
+            throw exception(WECHAT_LOGIN_TICKET_NOT_EXISTS);
+        }
+        if (!WechatLoginTicketStatusEnum.WAITING_PROFILE.getStatus().equals(ticket.getStatus())) {
+            throw exception(WECHAT_LOGIN_TICKET_STATUS_INVALID);
+        }
+
+        // 2. 手机号**一律**先过短信验证码（FR-147 / Q22=A）—— 手打的号不等于客户拥有它。
+        //    复用**登录场景**（scene=1）：它的短信模板是现成的，不必让运营再去申请一个新场景的模板；
+        //    语义上也说得通 —— 这一步就是用短信证明"这个号是我的"。
+        String userIp = getClientIP();
+        smsCodeApi.useSmsCode(new SmsCodeUseReqDTO().setMobile(reqVO.getMobile())
+                .setCode(reqVO.getSmsCode()).setScene(SmsSceneEnum.MEMBER_LOGIN.getScene())
+                .setUsedIp(userIp)).checkError();
+
+        // 3. 手机号命中既有会员就复用，否则**此刻建号**（Q26：「延后建号」里那个"建"就是这里）
+        MemberUserDO user = userService.getUserByMobile(reqVO.getMobile());
+        if (user == null) {
+            user = userService.createUserIfAbsent(reqVO.getMobile(), userIp, getTerminal());
+            Assert.notNull(user, "获取用户失败，结果为空");
+            // 新号：把微信带来的昵称/头像与客户填的公司名字一并落上
+            userService.updateUser(user.getId(),
+                    buildProfileUpdate(ticket.getWxNickname(), ticket.getWxAvatar(), reqVO.getCompany()));
+        } else if (StrUtil.isNotBlank(reqVO.getCompany())) {
+            // 老客户：**只补公司名称** —— 绝不覆盖人家自己设过的昵称与头像
+            userService.updateUser(user.getId(), buildProfileUpdate(null, null, reqVO.getCompany()));
+        }
+
+        // 4. 校验账号状态（被禁用的挡在门外）
+        validateUserStatus(user, reqVO.getMobile(), LoginLogTypeEnum.LOGIN_SOCIAL);
+
+        // 5. 绑定微信身份。
+        //    ⚠️ 走的是**按 openid 绑定**：它会**拒绝**"该会员已绑过别的微信"（Q21=C / FR-146），
+        //       而不像既有的 bindSocialUser 那样把先绑的那个静默顶掉。
+        //       绑定失败会在这里抛出去 —— 于是**后面一个字节都不会执行**（不发令牌、不标完成）。
+        socialUserApi.bindSocialUserByOpenid(new SocialUserBindByOpenidReqDTO(user.getId(),
+                UserTypeEnum.MEMBER.getValue(), SocialTypeEnum.WECHAT_MP.getType(),
+                ticket.getOpenid())).checkError();
+
+        // 6. 到这一步才签发令牌，并把票据标成「已完成」—— 电脑端轮询就能取走它
+        AppAuthLoginRespVO login = createTokenAfterLoginSuccess(user, reqVO.getMobile(),
+                LoginLogTypeEnum.LOGIN_SOCIAL, ticket.getOpenid());
+        wechatLoginTicketService.markCompleted(ticket.getTicket(), user.getId(),
+                login.getAccessToken(), login.getRefreshToken());
+    }
+
+    /** 组装一个"只改想改的那几项"的资料更新（`updateUser` 走 `updateById`，null 项会被忽略） */
+    private static AppMemberUserUpdateReqVO buildProfileUpdate(String nickname, String avatar, String company) {
+        AppMemberUserUpdateReqVO updateVO = new AppMemberUserUpdateReqVO();
+        updateVO.setNickname(nickname);
+        updateVO.setAvatar(avatar);
+        updateVO.setCompany(company);
+        return updateVO;
+    }
+
+    @Override
+    public void abandonWechatScanTicket(String ticket) {
+        // 幂等：票据本来就过期了也算"已经作废"（FR-148）—— 客户关页面关得晚一点不该看到错误
+        wechatLoginTicketService.abandon(ticket);
+    }
+
+    @Override
+    public AppAuthWechatScanQueryRespVO queryWechatScanTicket(String ticket) {
+        WechatLoginTicketBO ticketBO = wechatLoginTicketService.get(ticket);
+        AppAuthWechatScanQueryRespVO resp = new AppAuthWechatScanQueryRespVO();
+        // 不存在 = 已过期（TTL 到了，或已被取走）—— 刻意不区分这两者，见 data-model.md §4
+        if (ticketBO == null) {
+            resp.setStatus(WechatLoginTicketStatusEnum.EXPIRED.getDescription());
+            return resp;
+        }
+        WechatLoginTicketStatusEnum status = WechatLoginTicketStatusEnum.of(ticketBO.getStatus());
+        resp.setStatus(status != null ? status.getDescription()
+                : WechatLoginTicketStatusEnum.EXPIRED.getDescription());
+        // 「待补全」→ 补全页的默认展示（微信昵称与头像）
+        if (WechatLoginTicketStatusEnum.WAITING_PROFILE == status) {
+            resp.setWxNickname(ticketBO.getWxNickname());
+            resp.setWxAvatar(ticketBO.getWxAvatar());
+        }
+        // 「已完成」→ 交出令牌，**并把票据删掉**（一次性，FR-149）
+        if (WechatLoginTicketStatusEnum.COMPLETED == status) {
+            resp.setAccessToken(ticketBO.getAccessToken());
+            resp.setRefreshToken(ticketBO.getRefreshToken());
+            wechatLoginTicketService.remove(ticket);
+        }
+        return resp;
     }
 
     @Override

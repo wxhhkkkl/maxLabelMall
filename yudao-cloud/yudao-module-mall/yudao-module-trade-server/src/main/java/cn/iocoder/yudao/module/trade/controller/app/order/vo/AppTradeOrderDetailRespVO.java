@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.app.order.vo;
 
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppOrderInvoiceRespVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemRespVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -24,6 +25,12 @@ public class AppTradeOrderDetailRespVO {
 
     @Schema(description = "下单时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
+
+    /**
+     * 对公转账信息（008）。**不是对公单时为 null** —— 前端据此渲染「待收款」区块
+     */
+    @Schema(description = "对公转账信息（不是对公单时为 null）")
+    private AppOrderOfflinePayRespVO offlinePay;
 
     @Schema(description = "用户备注", requiredMode = Schema.RequiredMode.REQUIRED, example = "你猜")
     private String userRemark;
@@ -147,5 +154,13 @@ public class AppTradeOrderDetailRespVO {
      * 订单项数组
      */
     private List<AppTradeOrderItemRespVO> items;
+
+    /**
+     * 开票信息（006）
+     *
+     * ⚠️ **没有申请开票时为 `null`**（不是空对象）—— 前端据此决定"整块不渲染"
+     * 还是"给申请开票入口"（FR-176 的四态）
+     */
+    private AppOrderInvoiceRespVO invoice;
 
 }

@@ -114,7 +114,18 @@ async function onRenameDimension(dimension: FilterDimensionVO) {
     inputPattern: /\S/,
     inputErrorMessage: '名称不能为空'
   })
-  await updateDimension({ id: dimension.id, name: value, sort: dimension.sort })
+  // ⚠️ **必须带上 `categoryId`**，哪怕后端根本不用它 —— `ProductFilterDimensionSaveReqVO`
+  // 上挂着 `@NotNull("归属分类不能为空")`，而它与"新增"共用一个 VO；
+  // 后端的 `updateDimension` 只用**库里那条记录**的分类做重名校验、**不读请求里的这个值**
+  // （它自己的注释就写着"本接口不接受改分类"）。
+  // 不传的后果：**在进业务代码之前**就被参数校验拦掉，前端只看到 `Uncaught (in promise) error`
+  //（2026-10-16 线上：改名与排序都点不动）。
+  await updateDimension({
+    id: dimension.id,
+    categoryId: props.categoryId!,
+    name: value,
+    sort: dimension.sort
+  })
   message.success('已保存')
   await load()
 }
@@ -128,8 +139,19 @@ async function onMoveDimension(index: number, offset: number) {
   }
   const current = list[index]
   const other = list[target]
-  await updateDimension({ id: current.id, name: current.name, sort: target + 1 })
-  await updateDimension({ id: other.id, name: other.name, sort: index + 1 })
+  // 同 `onRenameDimension`：`categoryId` 是"共用 VO 的必填项"，不传会在参数校验就被拦下
+  await updateDimension({
+    id: current.id,
+    categoryId: props.categoryId!,
+    name: current.name,
+    sort: target + 1
+  })
+  await updateDimension({
+    id: other.id,
+    categoryId: props.categoryId!,
+    name: other.name,
+    sort: index + 1
+  })
   await load()
 }
 

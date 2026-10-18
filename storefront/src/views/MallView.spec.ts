@@ -203,6 +203,24 @@ describe('MallView —— 排序（FR-004）', () => {
 })
 
 describe('MallView —— 分类筛选（FR-002）', () => {
+  it('商城首页左侧目录：悬停一级分类展开二级分类，点二级分类按它查询', async () => {
+    // `buildCategoryTree` 在本文件里是恒等映射，所以直接给带 children 的一级分类
+    const nested = [{ ...CATS[0]!, children: [{ ...CATS[1]!, children: [] }] }, { ...CATS[2]!, children: [] }]
+    pageProducts.mockResolvedValue({ list: [spu(1)], total: 1 })
+    listCategories.mockResolvedValue(nested)
+    const w = mount(MallView, { global: { plugins: [router, createPinia()] } })
+    await flushPromises()
+    // 类名以 `origin/main` 上那版实现为准（`.mall-directory-item` / `.mall-category-flyout`）——
+    // 首页悬停分类这条线在主干上另有更完整的一版（延迟收起 / Esc / aria-controls），
+    // 本文件不再断言它的内部结构，只钉**接线**：浮层里点二级分类，列表要按它查询
+    await w.findAll('.mall-directory-item')[0]!.trigger('mouseenter')
+    await w.get('.mall-category-flyout-links button').trigger('click')
+    await flushPromises()
+    expect(lastParams().categoryId).toBe(11)
+    expect(listFilterDimensions).toHaveBeenLastCalledWith(11)
+    expect(router.currentRoute.value.query.category).toBe('11')
+  })
+
   it('一级分类显示二级选项，二级才加载维度，返回一级清除维度选择', async () => {
     const w = await mountMall()
     listFilterDimensions.mockResolvedValue(DIMENSIONS)

@@ -4,17 +4,27 @@ import { useRouter } from 'vue-router'
 
 import { listAddress } from '@/api/address'
 import { listCart } from '@/api/cart'
-import { createOrder, settlement, type TradeOrderInput } from '@/api/order'
+import {
+  DELIVERY_TYPE_VIRTUAL,
+  PAY_CHANNEL_OFFLINE,
+  createOrder,
+  settlement,
+  type TradeOrderInput,
+} from '@/api/order'
+import CheckoutInvoiceCard from '@/components/CheckoutInvoiceCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlAmountRow from '@/components/base/MlAmountRow.vue'
+import MlField from '@/components/base/MlField.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlSteps from '@/components/base/MlSteps.vue'
 import AddressFormDialog from '@/components/AddressFormDialog.vue'
 import { useToasts } from '@/components/base/useToasts'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
-import type { Address, CartItem, SettlementCoupon, SettlementResp } from '@/types'
+import type { Address, CartItem, InvoiceApplyForm, SettlementCoupon, SettlementResp } from '@/types'
+import { InvoiceTitleKind, InvoiceType } from '@/types'
+import { invoiceFieldError } from '@/utils/invoice'
 import { reconcile } from '@/utils/money'
 
 /**
@@ -48,6 +58,22 @@ const loading = ref(true)
 const error = ref(false)
 const data = ref<SettlementResp | null>(null)
 
+/**
+ * 选了「对公转账」吗（008 / FR-199）。默认**在线支付** —— 与改动前的行为一致（FR-211）。
+ *
+ * ⚠️ 这是个**下单那一刻的决定**，不是"支付时再挑渠道"：选了它，订单会进「待收款」
+ * 且**不生成在线支付单**（Q41）。下单后想改只能取消重下（FR-202）。
+ */
+const offlinePayChosen = ref(false)
+
+/**
+ * 要不要让客户看到「对公转账」这个选项。
+ *
+ * ⚠️ **只看结算响应里那一个布尔**（`trade_config.offline_pay_enabled`，FR-210 的可配开关）——
+ * 前端不自己判断，更不去猜收款账户（明细在订单详情里给，契约 §2）。
+ */
+const offlinePayAvailable = computed(() => data.value?.offlinePayEnabled === true)
+
 const addresses = ref<Address[]>([])
 const addressId = ref<number | null>(null)
 const couponId = ref<number | undefined>(undefined)
@@ -64,6 +90,31 @@ const submitError = ref('')
 /** 价格变动待确认：置为 true 后按钮变为「确认并提交」 */
 const priceChangePending = ref(false)
 
+/**
+ * 买家留言（选填）。上限与 `trade_order.user_remark` 的列宽一致（varchar(200)），
+ * 后端 `AppTradeOrderCreateReqVO` 上也有同值的 `@Size` —— 前端这层只是不让客户白填一遍。
+ */
+const REMARK_MAX = 200
+const remark = ref('')
+
+/**
+ * 发票（006 / US19）。默认**不开票** —— 不勾选时下单请求里没有 `invoice` 字段。
+ *
+ * ⚠️ 抬头是**下单那一刻的快照**（FR-158），所以提交后改抬头簿不会影响这笔订单；
+ * 客户要复用，得在自己的抬头簿里存一条（US23）。
+ */
+const invoiceEnabled = ref(false)
+const invoiceForm = ref<InvoiceApplyForm>({
+  type: InvoiceType.NORMAL,
+  // 默认「企业」—— 与后端枚举的默认档一致；客户是个人就在卡片上改成「个人」（Q38）
+  titleKind: InvoiceTitleKind.COMPANY,
+  titleName: '',
+  taxNo: '',
+  titleAddress: '',
+  titlePhone: '',
+  bankName: '',
+})
+
 const price = computed(() => data.value?.price ?? null)
 const amountConsistent = computed(() => (price.value ? reconcile(price.value) : true))
 
@@ -75,6 +126,17 @@ const unavailableCoupons = computed<SettlementCoupon[]>(() =>
 )
 
 const currentAddress = computed(() => addresses.value.find((a) => a.id === addressId.value) ?? null)
+
+/**
+ * 本单是不是**整单虚拟商品**（软件等，007）。
+ *
+ * ⚠️ 判定**来自服务端的结算响应**（`deliveryType`），前端不自己猜 —— 购物车接口
+ * 根本不返回商品的配送方式，前端也无从猜起。
+ *
+ * 虚拟单不涉及物流：不渲染收货地址卡片、提交时不要求选地址、也不去挑默认地址算运费。
+ * （含实物的混买单会被服务端判成快递，所以照旧要地址。）
+ */
+const isVirtual = computed(() => data.value?.deliveryType === DELIVERY_TYPE_VIRTUAL)
 const currentCoupon = computed(
   () => (data.value?.coupons ?? []).find((c) => c.id === couponId.value) ?? null,
 )
@@ -99,13 +161,23 @@ function buildInput(): TradeOrderInput {
   return { items, addressId: addressId.value ?? undefined, couponId: couponId.value }
 }
 
+/**
+ * 下单时带的支付渠道。**没选对公转账就是 `undefined`** —— 后端把"没传"当在线支付，
+ * 于是老路径一个字节都没变（FR-211）。
+ */
+const submitPayChannelCode = computed(() =>
+  offlinePayChosen.value ? PAY_CHANNEL_OFFLINE : undefined,
+)
+
 async function load() {
   loading.value = true
   error.value = false
   try {
     data.value = await settlement(buildInput())
     // 首次进入时用默认地址重算一次运费（FR-028）
-    if (addressId.value === null) {
+    // ⚠️ 虚拟单**没有运费、也没有地址可选**（007），不要为了算运费去挑一个默认地址 ——
+    //    那会让"本不该出现地址"的单子上凭空多出一个已选地址。
+    if (addressId.value === null && !isVirtual.value) {
       const def = addresses.value.find((a) => a.defaultStatus) ?? addresses.value[0]
       if (def) {
         addressId.value = def.id
@@ -148,15 +220,41 @@ async function onAddressSaved(id: number) {
 async function onSubmit() {
   if (submitting.value) return
 
-  if (!addressId.value) {
+  // 虚拟商品（软件等）**不需要收货地址**（007）—— 判定来自服务端的结算响应，前端不自己猜。
+  // 混买单（软件 + 实物）会被服务端判成快递，所以这里照旧要地址。
+  if (!isVirtual.value && !addressId.value) {
     submitError.value = '请先选择收货地址'
     return
+  }
+
+  // 开票必填项：与卡片上的实时提示**同一个纯函数**（utils/invoice.ts），两处不会各说各话（FR-156）
+  if (invoiceEnabled.value) {
+    const invoiceError = invoiceFieldError(invoiceForm.value)
+    if (invoiceError) {
+      submitError.value = invoiceError
+      return
+    }
   }
 
   submitting.value = true
   submitError.value = ''
   try {
-    const res = await createOrder(buildInput())
+    // 开票信息只在**下单**时带上（结算不需要它）。不勾选时是 `undefined` ——
+    // **不是 `null` / 空对象**：后端把"有对象"当成"要开票"（FR-159 / contracts §3.1）
+    const res = await createOrder({
+      ...buildInput(),
+      // 配送方式**回传结算判定的那个**（007）：下单接口要求它非空，虚拟单也靠它免掉地址。
+      // 结算时不传它（交服务端判定），所以这里必须带上响应里的值。
+      deliveryType: data.value?.deliveryType,
+      // 支付方式（008）：只有选了「对公转账」才带 `offline`，否则是 undefined
+      // —— 那表示"在线支付"，后端一个字都不用变（FR-211）。
+      payChannelCode: submitPayChannelCode.value,
+      invoice: invoiceEnabled.value ? { ...invoiceForm.value } : undefined,
+      // 买家留言：**`buildInput()` 是结算也用的**，所以只在这里带（结算不需要它）。
+      // 空 / 纯空格一律发 undefined —— 别让库里出现一堆 `''` 与 `'   '`，
+      // 那会让"没留言"在数据里有好几种表示。
+      remark: remark.value.trim() || undefined,
+    })
 
     // 下单成功后同步角标（FR-031 / FR-019）。已结算条目的**删除由后端完成**，
     // 前端不再删一次 —— 见 store/cart.ts 的 onOrderPlaced。
@@ -242,8 +340,11 @@ watch(
 
     <div v-else-if="data" class="ml-2col">
       <div>
-        <!-- 收货地址 -->
-        <div class="ml-card">
+        <!--
+          收货地址 —— **整单虚拟商品时不渲染**（007）：软件不需要寄，地址卡片只会挡路。
+          判定来自服务端的 `deliveryType`（混买单是快递，所以照旧渲染）。
+        -->
+        <div v-if="!isVirtual" class="ml-card">
           <div class="ml-card-title">收货地址</div>
           <div v-if="currentAddress" class="addr-current">
             <div class="addr-line">
@@ -285,6 +386,45 @@ watch(
           </div>
         </div>
 
+        <!--
+          支付方式（008 / FR-199）。**后台没开对公转账时整块不渲染** —— 只有在线支付一种
+          时不该多出一个"选择"（那会把改动前的行为也变掉，FR-211）。
+          ⚠️ 这里**不给收款账户明细**（契约 §2）：客户还没下单，不需要看到完整账号，
+          而且那是要逐个订单对照的信息 —— 它在订单详情里给。
+        -->
+        <div v-if="offlinePayAvailable" class="ml-card">
+          <div class="ml-card-title">支付方式</div>
+          <div
+            id="payMethodOnline"
+            class="pm-option"
+            :class="{ 'is-active': !offlinePayChosen }"
+            @click="offlinePayChosen = false"
+          >
+            <b>在线支付</b>
+            <span>提交后选择支付宝等方式完成付款</span>
+          </div>
+          <div
+            id="payMethodOffline"
+            class="pm-option"
+            :class="{ 'is-active': offlinePayChosen }"
+            @click="offlinePayChosen = true"
+          >
+            <b>对公转账</b>
+            <span>提交后按订单页上的收款账户线下打款，我们确认到账后发货</span>
+          </div>
+          <p v-if="data.offlinePayTip" class="ml-hint">{{ data.offlinePayTip }}</p>
+        </div>
+
+        <!--
+          发票（006 / FR-153）。**实付 0 元时整块不渲染** —— 全额券抵扣的订单没有可开票金额
+          （spec 的 Edge Case）。金额判断放在这里而不是卡片里：卡片不该自己去算钱。
+        -->
+        <CheckoutInvoiceCard
+          v-if="(price?.payPrice ?? 0) > 0"
+          v-model:enabled="invoiceEnabled"
+          v-model:form="invoiceForm"
+        />
+
         <!-- 券选择入口 -->
         <div class="ml-card">
           <div class="ml-card-title">优惠券</div>
@@ -295,10 +435,32 @@ watch(
             <span class="arrow">›</span>
           </button>
         </div>
+
+        <!--
+          买家留言（选填）。与后台的「商家备注」是两个字段 —— 这一栏是**客户写给商家**的，
+          落 `trade_order.user_remark`（varchar(200)），下单后客户在订单详情能看回来。
+        -->
+        <div class="ml-card">
+          <div class="ml-card-title">买家留言</div>
+          <MlField :hint="`选填，最多 ${REMARK_MAX} 个字。下单后不可修改。`">
+            <textarea
+              id="orderRemark"
+              v-model="remark"
+              class="ml-textarea"
+              rows="2"
+              :maxlength="REMARK_MAX"
+              placeholder="给商家的话（选填），例如配送时间要求"
+            />
+          </MlField>
+        </div>
+
       </div>
 
-      <!-- 金额明细：逐行可核对 -->
-      <div>
+      <!--
+        金额明细 + 提交按钮：**跟着滚动**（`co-aside` 是 sticky，见样式里的说明）。
+        清单长的时候不用来回滚到底才能提交。
+      -->
+      <div class="co-aside">
         <div class="ml-amount-card">
           <MlAmountRow label="商品小计" :fen="data.price.totalPrice" />
           <MlAmountRow label="促销优惠" :fen="-data.price.discountPrice" cut />
@@ -449,6 +611,21 @@ watch(
   color: var(--ml-text-sub);
   margin-bottom: 10px;
 }
+/* 右侧那一列（金额明细 + 提交按钮）跟着滚轮走 ——
+   ⚠️ 三个前提缺一不可：
+   ① `.ml-2col` 是 `align-items: start`（栅格项没被拉伸），sticky 才有可移动的空间；
+   ② `top: 100px` = 站内惯例（顶栏 `.header` 高 76px + 24px 间隙，见 `.account-sidebar`）；
+   ③ **窄屏必须关掉** —— 1100px 以下栅格塌成单列，右列跑到清单下面，
+      这时再粘住会盖在内容上。 */
+.co-aside {
+  position: sticky;
+  top: 100px;
+}
+@media (max-width: 1100px) {
+  .co-aside {
+    position: static;
+  }
+}
 .coupon-trigger {
   display: flex;
   align-items: center;
@@ -503,6 +680,30 @@ watch(
   border-radius: var(--ml-radius-field);
   margin-bottom: 8px;
   cursor: pointer;
+}
+/* 支付方式选项（008）：与地址选项同一套形态，选中态也一致 */
+.pm-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-field);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.pm-option b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ml-text);
+}
+.pm-option span {
+  font-size: 12px;
+  color: var(--ml-text-sub);
+}
+.pm-option.is-active {
+  border-color: var(--ml-primary);
+  background: var(--ml-bg-soft);
 }
 .addr-option.is-active {
   border-color: var(--ml-primary);

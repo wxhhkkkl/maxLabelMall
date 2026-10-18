@@ -408,6 +408,11 @@ export const DeliveryTypeEnum = {
   PICK_UP: {
     type: 2,
     name: '到店自提'
+  },
+  /** 虚拟商品（软件等）：不涉及物流，下单不需要收货地址、不产生运费（007） */
+  VIRTUAL: {
+    type: 3,
+    name: '虚拟商品'
   }
 }
 /**

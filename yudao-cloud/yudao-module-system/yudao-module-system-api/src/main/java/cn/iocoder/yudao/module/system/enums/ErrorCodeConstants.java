@@ -120,6 +120,14 @@ public interface ErrorCodeConstants {
     // ========== 社交用户 1-002-018-000 ==========
     ErrorCode SOCIAL_USER_AUTH_FAILURE = new ErrorCode(1_002_018_000, "社交授权失败，原因是：{}");
     ErrorCode SOCIAL_USER_NOT_FOUND = new ErrorCode(1_002_018_001, "社交授权失败，找不到对应的用户");
+    /**
+     * 会员已经绑过**同类型的另一个**社交账号 —— 不许顶掉先绑的那个（微信扫码登录 Q21=C / FR-146）
+     */
+    ErrorCode SOCIAL_USER_MEMBER_BOUND_OTHER = new ErrorCode(1_002_018_002, "该账号已绑定其他微信");
+    /**
+     * 该微信已经绑过**另一个**会员 —— 一个微信只能属于一个账号
+     */
+    ErrorCode SOCIAL_USER_OPENID_BOUND_OTHER = new ErrorCode(1_002_018_003, "该微信已绑定其他账号");
 
     ErrorCode SOCIAL_CLIENT_WEIXIN_MINI_APP_PHONE_CODE_ERROR = new ErrorCode(1_002_018_200, "获得手机号失败");
     ErrorCode SOCIAL_CLIENT_WEIXIN_MINI_APP_QRCODE_ERROR = new ErrorCode(1_002_018_201, "获得小程序码失败");

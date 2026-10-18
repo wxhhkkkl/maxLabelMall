@@ -26,6 +26,16 @@
       <el-descriptions-item label="订单状态: ">
         <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
       </el-descriptions-item>
+      <!--
+        确认对公转账收款（008 / FR-203）。**独立权限点、独立一行** ——
+        它是**资金动作**，不是所有后台角色都该能做；塞进下面那行（trade:order:update）
+        会让"只有 confirm-paid 权限"的人看不到它。
+      -->
+      <el-descriptions-item v-hasPermi="['trade:order:confirm-paid']" label-class-name="no-colon">
+        <el-button v-if="formData.offlineWaiting" type="primary" @click="confirmOfflinePaid">
+          确认收款
+        </el-button>
+      </el-descriptions-item>
       <el-descriptions-item v-hasPermi="['trade:order:update']" label-class-name="no-colon">
         <el-button
           v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
@@ -35,11 +45,26 @@
           调整价格
         </el-button>
         <el-button type="primary" @click="remark">备注</el-button>
+        <!--
+          取消订单（008 / FR-213）。**只能取消未支付订单** —— 已支付（含已确认收款）的
+          必须走**退款**：取消不改金额，账对不上。后台此前根本没有这个入口，
+          对公转账单又不参与超时自动取消（FR-212），弃单就是靠它清掉的。
+        -->
+        <el-button
+          v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
+          type="danger"
+          @click="cancelOrder"
+        >
+          取消订单
+        </el-button>
         <!-- 待发货 -->
         <template v-if="formData.status! === TradeOrderStatusEnum.UNDELIVERED.status">
-          <!-- 快递发货 -->
+          <!--
+            快递要发货；**虚拟商品（软件等）也要**（007）—— 客服线下交付完，
+            运营点「发货 → 无需发货」把它推进到已发货。自提不走这里（另外的核销入口）。
+          -->
           <el-button
-            v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type"
+            v-if="formData.deliveryType !== DeliveryTypeEnum.PICK_UP.type"
             type="primary"
             @click="delivery"
           >
@@ -67,6 +92,34 @@
         买家付款成功后，货款将直接进入您的商户号（微信、支付宝）<br />
         请及时关注你发出的包裹状态，确保可以配送至买家手中 <br />
         如果买家表示没收到货或货物有问题，请及时联系买家处理，友好协商
+      </el-descriptions-item>
+    </el-descriptions>
+
+    <!--
+      对公转账（008）。**待收款**时提示财务去核对到账；已确认时把痕迹摆出来（FR-205）——
+      "凭哪笔流水、谁确认的、什么时候"，事后对账全靠这几行。
+      ⚠️ `offlinePayment` 为 null 时整块不渲染（不是对公单）。
+    -->
+    <el-descriptions v-if="formData.offlinePayment" :column="2" title="对公转账">
+      <el-descriptions-item label="收款状态: ">
+        <el-tag v-if="formData.offlineWaiting" type="warning">待收款</el-tag>
+        <el-tag v-else type="success">已确认收款</el-tag>
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.bankSerialNo" label="银行流水号: ">
+        {{ formData.offlinePayment.bankSerialNo }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.payerName" label="打款方: ">
+        {{ formData.offlinePayment.payerName }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.paidTime" label="到账时间: ">
+        {{ formatDate(formData.offlinePayment.paidTime) }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.remark" label="备注: ">
+        {{ formData.offlinePayment.remark }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.confirmTime" label="确认人 / 确认时间: ">
+        {{ formData.offlinePayment.confirmUserId }} /
+        {{ formatDate(formData.offlinePayment.confirmTime) }}
       </el-descriptions-item>
     </el-descriptions>
 
@@ -146,8 +199,15 @@
       <el-descriptions-item label="配送方式: ">
         <dict-tag :type="DICT_TYPE.TRADE_DELIVERY_TYPE" :value="formData.deliveryType!" />
       </el-descriptions-item>
-      <el-descriptions-item label="收货人: ">{{ formData.receiverName }}</el-descriptions-item>
-      <el-descriptions-item label="联系电话: ">{{ formData.receiverMobile }}</el-descriptions-item>
+      <!-- 虚拟商品单没有收货人（007），别摆两行空白让人以为数据丢了 -->
+      <el-descriptions-item
+        v-if="formData.deliveryType !== DeliveryTypeEnum.VIRTUAL.type"
+        label="收货人: "
+      >{{ formData.receiverName }}</el-descriptions-item>
+      <el-descriptions-item
+        v-if="formData.deliveryType !== DeliveryTypeEnum.VIRTUAL.type"
+        label="联系电话: "
+      >{{ formData.receiverMobile }}</el-descriptions-item>
       <!-- 快递配送 -->
       <div v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type">
         <el-descriptions-item v-if="formData.receiverDetailAddress" label="收货地址: ">
@@ -218,6 +278,7 @@
 
   <!-- 各种操作的弹窗 -->
   <OrderDeliveryForm ref="deliveryFormRef" @success="getDetail" />
+  <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getDetail" />
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getDetail" />
   <OrderUpdateAddressForm ref="updateAddressFormRef" @success="getDetail" />
   <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getDetail" />
@@ -229,6 +290,7 @@ import { formatDate } from '@/utils/formatTime'
 import { DICT_TYPE, getDictLabel, getDictObj } from '@/utils/dict'
 import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
+import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateAddressForm from '@/views/mall/trade/order/form/OrderUpdateAddressForm.vue'
 import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
@@ -279,6 +341,40 @@ const updateAddress = () => {
 const updatePriceFormRef = ref() // 订单调价表单 Ref
 const updatePrice = () => {
   updatePriceFormRef.value?.open(formData.value)
+}
+
+/** 确认收款表单 Ref（008 / FR-203） */
+const offlineConfirmFormRef = ref()
+const confirmOfflinePaid = () => {
+  offlineConfirmFormRef.value?.open(formData.value)
+}
+
+/**
+ * 后台取消订单（008 / FR-213）
+ *
+ * ⚠️ 两次 try/catch **刻意分开**：弹层那次是"用户点了再想想"（正常操作，静默返回），
+ * 接口那次是真出错（必须让 message 的全局报错冒出来）。合成一个 catch 会把接口失败也吞掉。
+ */
+const cancelOrder = async () => {
+  let reason = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '取消后商品库存与所用优惠券会释放，订单**不可恢复**。',
+      '取消订单',
+      {
+        confirmButtonText: '确认取消',
+        cancelButtonText: '再想想',
+        inputPlaceholder: '取消原因（选填，会记进商家备注）',
+        type: 'warning'
+      }
+    )
+    reason = value ?? ''
+  } catch {
+    return // 用户点了「再想想」
+  }
+  await TradeOrderApi.cancelOrder({ id: formData.value.id!, reason: reason || undefined })
+  message.success('订单已取消')
+  await getDetail()
 }
 
 /** 核销 */

@@ -101,6 +101,8 @@
       <el-table-column align="center" label="手机号" prop="mobile" width="120px" />
       <el-table-column align="center" label="邮箱" prop="email" width="180px" />
       <el-table-column align="center" label="昵称" prop="nickname" width="80px" />
+      <!-- 公司名称：微信扫码登录的补全页采集，选填 —— 存量会员全为空，别显示成异常（Q24） -->
+      <el-table-column align="center" label="公司名称" prop="company" width="140px" show-overflow-tooltip />
       <el-table-column align="center" label="等级" prop="levelName" width="100px" />
       <el-table-column align="center" label="分组" prop="groupName" width="100px" />
       <el-table-column

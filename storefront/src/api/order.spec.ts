@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { InvoiceApplyForm } from '@/types/invoice'
+
 const get = vi.fn()
 const post = vi.fn()
 const del = vi.fn()
@@ -11,6 +13,7 @@ vi.mock('@/config/http', () => ({
 }))
 
 const {
+  PAY_CHANNEL_OFFLINE,
   buildSettlementQuery,
   cancelOrder,
   createOrder,
@@ -75,9 +78,11 @@ describe('buildSettlementQuery —— 手工拼数组参数', () => {
     expect(q).toContain('pointStatus=false')
   })
 
-  it('本期固定按快递：deliveryType 传快递值', () => {
+  it('**结算不传 deliveryType** —— 由服务端按商品判定（007）', () => {
+    // 传了的话前端就得自己知道"这单算不算虚拟"，而购物车接口根本不返回商品的配送方式。
+    // 服务端判完会把结果放在结算响应的 `deliveryType` 里，前端只负责照着用。
     const q = buildSettlementQuery({ items: [{ skuId: 11, count: 1 }] })
-    expect(q).toMatch(/deliveryType=\d+/)
+    expect(q).not.toContain('deliveryType')
   })
 
   it('选了券时带 couponId，没选则不带', () => {
@@ -131,10 +136,44 @@ describe('下单', () => {
     expect(body.addressId).toBe(7)
   })
 
+  it('带开票信息时原样透传（不做任何加工，票据由后端校验）', async () => {
+    post.mockResolvedValue({ id: 1, payOrderId: 2 })
+    const invoice: InvoiceApplyForm = { type: 2, titleKind: 1, titleName: '南京路桥机械有限公司', taxNo: '91320104660690975E' }
+    await createOrder({ items: [{ skuId: 11, count: 1 }], addressId: 7, invoice })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.invoice).toEqual(invoice)
+  })
+
+  it('**不开票时 `invoice` 是 undefined，JSON 序列化后不出现在请求体里**（FR-159）', async () => {
+    // 这条钉的是"默认行为与改动前逐字一致"：多一个 `"invoice":null` 都是语义漂移
+    // （后端会把 null 当成"没传"吗？——不赌这个，干脆不上线）
+    post.mockResolvedValue({ id: 1, payOrderId: 2 })
+    await createOrder({ items: [{ skuId: 11, count: 1 }] })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.invoice).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('invoice')
+  })
+
   it('下单响应里的 payOrderId 可能是 null（全额券抵扣的订单没有支付单）', async () => {
     post.mockResolvedValue({ id: 1, payOrderId: null })
     const res = await createOrder({ items: [{ skuId: 11, count: 1 }] })
     expect(res.payOrderId).toBeNull()
+  })
+
+  it('选对公转账时原样透传 `payChannelCode: "offline"`（008 / FR-199）', async () => {
+    post.mockResolvedValue({ id: 1, payOrderId: null })
+    await createOrder({ items: [{ skuId: 11, count: 1 }], payChannelCode: PAY_CHANNEL_OFFLINE })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.payChannelCode).toBe('offline')
+  })
+
+  it('**在线支付时 `payChannelCode` 不出现在请求体里** —— 与改动前逐字一致（FR-211）', async () => {
+    // 与上面 `invoice` 那条同一个套路：多一个 `"payChannelCode":null` 都是语义漂移
+    post.mockResolvedValue({ id: 1, payOrderId: 2 })
+    await createOrder({ items: [{ skuId: 11, count: 1 }] })
+    const body = post.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(body.payChannelCode).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('payChannelCode')
   })
 })
 

@@ -17,16 +17,25 @@ import type { ProfileUpdateReq } from '@/types'
  * （**Swagger 文档注解**）误读成了校验注解 —— 见 spec 的 Clarifications 订正条。
  */
 
-/** 表单里可编辑的那四个字段 */
+/**
+ * 表单里可编辑的五个字段。
+ *
+ * `company`（公司名称）是 2026-10-14 随微信扫码登录一起加的（Q24 / FR-138）：
+ * 首次微信登录的补全页会采集它，之后就在这里可看可改。
+ */
 export interface ProfileForm {
   nickname: string
   avatar: string
   email: string
   sex: number | undefined
+  company: string
 }
 
 /** 邮箱长度上限 —— 与后端 `@Size(max = 50)` 对齐 */
 const EMAIL_MAX = 50
+
+/** 公司名称长度上限 —— 与后端 `@Size(max = 64)` 对齐 */
+const COMPANY_MAX = 64
 
 /** 刻意放宽：只要求「有 @ 且 @ 后有 .」这类最低限度，真正的把关交给后端 `@Email` */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -47,7 +56,11 @@ export function sexLabel(sex?: number | null): string {
 }
 
 /** 校验表单。`ok=false` 时 `message` 是给用户看的文案 */
-export function validateProfile(form: { nickname?: string; email?: string }): {
+export function validateProfile(form: {
+  nickname?: string
+  email?: string
+  company?: string
+}): {
   ok: boolean
   message: string
 } {
@@ -61,6 +74,10 @@ export function validateProfile(form: { nickname?: string; email?: string }): {
   }
   if (email.length > EMAIL_MAX) {
     return { ok: false, message: `邮箱长度不能超过 ${EMAIL_MAX} 个字符` }
+  }
+  // 公司名称是选填的，空值合法；只卡长度
+  if ((form.company ?? '').trim().length > COMPANY_MAX) {
+    return { ok: false, message: `公司名称长度不能超过 ${COMPANY_MAX} 个字符` }
   }
   return { ok: true, message: '' }
 }
@@ -95,6 +112,12 @@ export function buildProfileUpdate(
 
   if (next.sex !== current.sex) {
     body.sex = next.sex
+  }
+
+  // 公司名称同样是选填：空串 = 清空（与邮箱一条规矩）
+  const company = next.company.trim()
+  if (company !== (current.company ?? '').trim()) {
+    body.company = company
   }
 
   return body

@@ -62,6 +62,14 @@ public interface ErrorCodeConstants {
     ErrorCode AFTER_SALE_CANCEL_FAIL_STATUS_NOT_APPLY_OR_AGREE_OR_BUYER_DELIVERY =
             new ErrorCode(1_011_000_115, "取消售后单失败，售后单状态不是【待审核】或【卖家同意】或【商家待收货】");
     ErrorCode AFTER_SALE_CREATE_FAIL_ORDER_STATUS_COMBINATION_IN_PROGRESS = new ErrorCode(1_011_000_116, "订单拼团中，无法申请售后");
+    // 008 对公转账：下单时只需要判"要不要走线下"，别的渠道是**支付时**才选的
+    ErrorCode ORDER_CREATE_FAIL_PAY_CHANNEL_CODE_INVALID = new ErrorCode(1_011_000_117, "支付渠道不正确：下单时仅支持「对公转账」，其余渠道请在支付时选择");
+    ErrorCode ORDER_CREATE_FAIL_OFFLINE_PAY_DISABLED = new ErrorCode(1_011_000_118, "对公转账已关闭，暂时无法使用");
+    // 008 确认收款（财务动作）
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_NOT_OFFLINE_ORDER = new ErrorCode(1_011_000_119, "该订单不是对公转账订单，无法确认收款");
+    /** 已收款（含重复提交）—— 幂等的边界：第二次提交就该报这个，而不是再记一遍 */
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_ALREADY_PAID = new ErrorCode(1_011_000_120, "该订单已收款，请勿重复确认");
+    ErrorCode ORDER_CONFIRM_OFFLINE_PAID_FAIL_CANCELED = new ErrorCode(1_011_000_121, "订单已取消，无法确认收款");
 
     // ========== Cart 模块 1-011-002-000 ==========
     ErrorCode CARD_ITEM_NOT_FOUND = new ErrorCode(1_011_002_000, "购物车项不存在");
@@ -114,5 +122,25 @@ public interface ErrorCodeConstants {
     ErrorCode BROKERAGE_WITHDRAW_UPDATE_STATUS_FAIL_PAY_PRICE_NOT_MATCH = new ErrorCode(1_011_008_007, "提现单更新转账状态失败，转账单金额不匹配");
     ErrorCode BROKERAGE_WITHDRAW_UPDATE_STATUS_FAIL_PAY_MERCHANT_EXISTS = new ErrorCode(1_011_008_008, "提现单更新转账状态失败，转账单的商户订单不匹配");
     ErrorCode BROKERAGE_WITHDRAW_UPDATE_STATUS_FAIL_PAY_CHANNEL_NOT_MATCH = new ErrorCode(1_011_008_009, "提现单更新转账状态失败，转账渠道不匹配");
+
+    // ========== 开票 模块 1-011-009-000 ==========
+    // 申请：下单时提交 / 订单详情补开，两处共用同一套校验（InvoiceValidator）
+    ErrorCode INVOICE_ORDER_NOT_PAID = new ErrorCode(1_011_009_000, "订单还未支付，付款后可申请开票");
+    ErrorCode INVOICE_ORDER_CANCELED = new ErrorCode(1_011_009_001, "订单已取消，无法申请开票");
+    ErrorCode INVOICE_ORDER_AMOUNT_ZERO = new ErrorCode(1_011_009_002, "本单实付金额为 0，无需开票");
+    ErrorCode INVOICE_ORDER_EXISTS = new ErrorCode(1_011_009_003, "该订单已提交过开票申请");
+    ErrorCode INVOICE_TYPE_INVALID = new ErrorCode(1_011_009_004, "发票类型不正确");
+    /** 必填项缺失，占位符是字段名（例如「纳税人识别号」）—— 报错要**指明缺哪一项**（FR-156） */
+    ErrorCode INVOICE_TITLE_FIELD_REQUIRED = new ErrorCode(1_011_009_005, "{} 不能为空");
+    ErrorCode INVOICE_TAX_NO_INVALID = new ErrorCode(1_011_009_006, "纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）");
+    ErrorCode INVOICE_TITLE_KIND_INVALID = new ErrorCode(1_011_009_007, "抬头类型不正确");
+    ErrorCode INVOICE_TITLE_KIND_PERSONAL_SPECIAL = new ErrorCode(1_011_009_008, "增值税专用发票只能开给企业，个人抬头请改选电子普通发票");
+    // 抬头簿
+    ErrorCode INVOICE_TITLE_NOT_FOUND = new ErrorCode(1_011_009_020, "发票抬头不存在");
+    // 后台开具
+    ErrorCode INVOICE_NOT_FOUND = new ErrorCode(1_011_009_040, "开票申请不存在");
+    ErrorCode INVOICE_ISSUE_FAIL_STATUS_CANCELED = new ErrorCode(1_011_009_041, "该开票申请已作废，不能开具");
+    ErrorCode INVOICE_FILE_TYPE_NOT_ALLOWED = new ErrorCode(1_011_009_042, "发票文件格式不支持，只允许 PDF 或图片（jpg / jpeg / png）");
+    ErrorCode INVOICE_ISSUE_FAIL_ORDER_NOT_PAID = new ErrorCode(1_011_009_043, "订单还未支付，不能开具发票");
 
 }

@@ -131,7 +131,8 @@
           :type="queryType.queryParam === 'userId' ? 'number' : 'text'"
           class="!w-280px"
           clearable
-          placeholder="请输入"
+          :disabled="!queryType.queryParam"
+          :placeholder="queryType.queryParam ? '请输入' : '请先选择搜索类型'"
         >
           <template #prepend>
             <el-select
@@ -190,16 +191,44 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <!-- 如果是【快递】，并且【未发货】，则展示【发货】按钮 -->
+                  <!--
+                    【未发货】时展示【发货】：快递要发货；**虚拟商品（软件等）也要**（007）——
+                    客服线下交付完，运营点「发货 → 无需发货」把它推进到已发货。
+                    自提不走这里（它有专门的核销入口）。
+                  -->
                   <el-dropdown-item
                     v-if="
-                      row.deliveryType === DeliveryTypeEnum.EXPRESS.type &&
+                      row.deliveryType !== DeliveryTypeEnum.PICK_UP.type &&
                       row.status === TradeOrderStatusEnum.UNDELIVERED.status
                     "
                     command="delivery"
                   >
                     <Icon icon="ep:takeaway-box" />
                     发货
+                  </el-dropdown-item>
+                  <!--
+                    确认收款（008 / FR-203）：只对**待收款**的对公单出现。
+                    ⚠️ 它挂在 `trade:order:update` 的下拉里，所以这里**再加一层权限判断** ——
+                    没有 `trade:order:confirm-paid` 的人不该看到它（资金动作）。
+                    详情页那颗按钮同样是独立权限点。
+                  -->
+                  <el-dropdown-item
+                    v-if="canConfirmOfflinePaid(row)"
+                    command="confirmOfflinePaid"
+                  >
+                    <Icon icon="ep:money" />
+                    确认收款
+                  </el-dropdown-item>
+                  <!--
+                    取消订单（008 / FR-213）：只能取消**未支付**订单；
+                    已支付（含已确认收款）的要走**退款**，取消不改金额、账对不上。
+                  -->
+                  <el-dropdown-item
+                    v-if="row.status === TradeOrderStatusEnum.UNPAID.status"
+                    command="cancel"
+                  >
+                    <Icon icon="ep:circle-close" />
+                    取消订单
                   </el-dropdown-item>
                   <el-dropdown-item command="remark">
                     <Icon icon="ep:chat-line-square" />
@@ -224,21 +253,25 @@
   <!-- 各种操作的弹窗 -->
   <OrderDeliveryForm ref="deliveryFormRef" @success="getList" />
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getList" />
+  <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getList" />
 </template>
 
 <script lang="ts" setup>
 import type { FormInstance } from 'element-plus'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
+import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
 import * as TradeOrderApi from '@/api/mall/trade/order'
 import * as PickUpStoreApi from '@/api/mall/trade/delivery/pickUpStore'
 import { DICT_TYPE, getIntDictOptions, getStrDictOptions } from '@/utils/dict'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import { DeliveryTypeEnum, TradeOrderStatusEnum } from '@/utils/constants'
+import { checkPermi } from '@/utils/permission'
 import { OrderTableColumn } from './components'
 
 defineOptions({ name: 'TradeOrder' })
 
+const message = useMessage() // 消息弹窗
 const { currentRoute, push } = useRouter() // 路由跳转
 const loading = ref(true) // 列表的加载中
 const total = ref(2) // 列表的总页数
@@ -286,6 +319,11 @@ const inputChangeSelect = (val: string) => {
 const getList = async () => {
   loading.value = true
   try {
+    // ⚠️ 聚合搜索**没选搜索类型**时，上面那个输入框的 v-model 键是空串（`queryParams['']`），
+    // 序列化出来就是 `?pageNo=1&pageSize=10&=%E6%9D%8Esir` —— **空参数名会让 Tomcat
+    // 直接拒掉整个查询串**，前端只看得到「系统异常」（2026-10-16 线上就是这个问题）。
+    // 输入框已改成"没选类型就禁用"，这里再兜一道：万一键还在，发请求前一定清掉。
+    delete queryParams.value['']
     const data = await TradeOrderApi.getOrderPage(unref(queryParams))
     list.value = data.list
     total.value = data.total
@@ -327,6 +365,40 @@ const openDetail = (id: number) => {
 /** 操作分发 */
 const deliveryFormRef = ref()
 const updateRemarkForm = ref()
+const offlineConfirmFormRef = ref() // 确认收款弹层（008）
+
+/**
+ * 能不能在这行上「确认收款」（008 / FR-203）
+ *
+ * 两个条件：**是待收款的对公单**（服务端给的 `offlineWaiting`）+ **有资金动作权限**。
+ * ⚠️ 只看前端标识还不够 —— 接口那边也有 `@PreAuthorize`，两边都不能少。
+ */
+const canConfirmOfflinePaid = (row: TradeOrderApi.OrderVO) =>
+  row.offlineWaiting && checkPermi(['trade:order:confirm-paid'])
+
+/** 取消订单（008 / FR-213）。两次 try/catch 分开：弹层那次是"再想想"，接口那次是真出错 */
+const cancelOrder = async (row: TradeOrderApi.OrderVO) => {
+  let reason = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '取消后商品库存与所用优惠券会释放，订单**不可恢复**。',
+      `取消订单 ${row.no}`,
+      {
+        confirmButtonText: '确认取消',
+        cancelButtonText: '再想想',
+        inputPlaceholder: '取消原因（选填，会记进商家备注）',
+        type: 'warning'
+      }
+    )
+    reason = value ?? ''
+  } catch {
+    return // 用户点了「再想想」
+  }
+  await TradeOrderApi.cancelOrder({ id: row.id!, reason: reason || undefined })
+  message.success('订单已取消')
+  await getList()
+}
+
 const handleCommand = (command: string, row: TradeOrderApi.OrderVO) => {
   switch (command) {
     case 'remark':
@@ -334,6 +406,12 @@ const handleCommand = (command: string, row: TradeOrderApi.OrderVO) => {
       break
     case 'delivery':
       deliveryFormRef.value?.open(row)
+      break
+    case 'confirmOfflinePaid':
+      offlineConfirmFormRef.value?.open(row)
+      break
+    case 'cancel':
+      cancelOrder(row)
       break
   }
 }

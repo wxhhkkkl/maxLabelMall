@@ -29,6 +29,17 @@ public class TradePriceCalculateRespBO {
     private Integer type;
 
     /**
+     * 本单**实际采用**的配送方式
+     *
+     * ⚠️ 不等于请求里传的那个：请求没传时，由商品自动判定
+     * （全是虚拟商品 → VIRTUAL，否则 → EXPRESS，见 `TradePriceServiceImpl#resolveDeliveryType`）。
+     * 结算响应把它回传前端，前端据此决定"要不要收货地址"。
+     *
+     * 枚举 {@link cn.iocoder.yudao.module.trade.enums.delivery.DeliveryTypeEnum}
+     */
+    private Integer deliveryType;
+
+    /**
      * 订单价格
      */
     private Price price;

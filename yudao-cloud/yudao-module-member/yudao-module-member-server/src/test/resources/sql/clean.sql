@@ -3,3 +3,7 @@ DELETE FROM "member_address";
 DELETE FROM "member_tag";
 DELETE FROM "member_level";
 DELETE FROM "member_group";
+DELETE FROM "maxlabel_print_record";
+DELETE FROM "maxlabel_shared_template";
+DELETE FROM "maxlabel_label_template";
+DELETE FROM "member_subscription";

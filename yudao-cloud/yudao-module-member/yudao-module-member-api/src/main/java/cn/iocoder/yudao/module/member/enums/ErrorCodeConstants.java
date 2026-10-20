@@ -61,4 +61,15 @@ public interface ErrorCodeConstants {
     ErrorCode WECHAT_LOGIN_TICKET_NOT_EXISTS = new ErrorCode(1_004_013_000, "本次登录已过期，请重新扫码");
     ErrorCode WECHAT_LOGIN_TICKET_STATUS_INVALID = new ErrorCode(1_004_013_001, "登录状态不正确，请重新扫码");
 
+    //========== MaxLabel 会员体系 1-004-014-000 ==========
+    ErrorCode MEMBER_SUBSCRIPTION_REQUIRED = new ErrorCode(1_004_014_000, "会员订阅未生效或已过期");
+    ErrorCode MEMBER_TEMPLATE_NOT_FOUND = new ErrorCode(1_004_014_001, "模板不存在或无权限");
+    ErrorCode MEMBER_TEMPLATE_TOO_LARGE = new ErrorCode(1_004_014_002, "模板超过 16 MB 限制");
+    ErrorCode MEMBER_TEMPLATE_QUOTA_EXCEEDED = new ErrorCode(1_004_014_003, "云端模板数量或容量超过上限");
+    ErrorCode MEMBER_TEMPLATE_INVALID = new ErrorCode(1_004_014_004, "模板内容或字段不合法");
+    ErrorCode MEMBER_SHARED_TEMPLATE_NOT_FOUND = new ErrorCode(1_004_014_005, "共享模板不存在或未通过审核");
+    ErrorCode MEMBER_SHARED_TEMPLATE_INVALID_STATUS = new ErrorCode(1_004_014_006, "共享模板当前状态不允许该操作");
+    ErrorCode MEMBER_PRINT_RECORD_INVALID = new ErrorCode(1_004_014_007, "打印记录字段不合法");
+    ErrorCode MEMBER_SUBSCRIPTION_PERIOD_INVALID = new ErrorCode(1_004_014_008, "会员订阅周期不合法");
+
 }

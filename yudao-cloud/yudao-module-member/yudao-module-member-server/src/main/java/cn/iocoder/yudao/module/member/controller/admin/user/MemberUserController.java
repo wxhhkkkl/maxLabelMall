@@ -8,11 +8,13 @@ import cn.iocoder.yudao.module.member.convert.user.MemberUserConvert;
 import cn.iocoder.yudao.module.member.dal.dataobject.group.MemberGroupDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.level.MemberLevelDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.tag.MemberTagDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.subscription.MemberSubscriptionDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
 import cn.iocoder.yudao.module.member.enums.point.MemberPointBizTypeEnum;
 import cn.iocoder.yudao.module.member.service.group.MemberGroupService;
 import cn.iocoder.yudao.module.member.service.level.MemberLevelService;
 import cn.iocoder.yudao.module.member.service.point.MemberPointRecordService;
+import cn.iocoder.yudao.module.member.service.subscription.MemberSubscriptionService;
 import cn.iocoder.yudao.module.member.service.tag.MemberTagService;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,8 +26,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,6 +54,8 @@ public class MemberUserController {
     private MemberGroupService memberGroupService;
     @Resource
     private MemberPointRecordService memberPointRecordService;
+    @Resource
+    private MemberSubscriptionService memberSubscriptionService;
 
     @PutMapping("/update")
     @Operation(summary = "更新会员用户")
@@ -117,7 +123,22 @@ public class MemberUserController {
         // 处理用户分组返显
         List<MemberGroupDO> groups = memberGroupService.getGroupList(
                 convertSet(pageResult.getList(), MemberUserDO::getGroupId));
-        return success(MemberUserConvert.INSTANCE.convertPage(pageResult, tags, levels, groups));
+        PageResult<MemberUserRespVO> result = MemberUserConvert.INSTANCE.convertPage(pageResult, tags, levels, groups);
+        // 批量填充订阅状态，避免 N+1
+        Map<Long, MemberSubscriptionDO> subscriptions = memberSubscriptionService.getLatestByMemberIds(
+                convertSet(pageResult.getList(), MemberUserDO::getId));
+        LocalDateTime now = LocalDateTime.now();
+        result.getList().forEach(vo -> {
+            MemberSubscriptionDO subscription = subscriptions.get(vo.getId());
+            if (subscription == null) {
+                vo.setSubscriptionActive(false);
+                return;
+            }
+            vo.setSubscriptionActive(subscription.getEndTime().isAfter(now));
+            vo.setSubscriptionEndTime(subscription.getEndTime());
+            vo.setSubscriptionEndDate(subscription.getEndTime().toLocalDate().minusDays(1));
+        });
+        return success(result);
     }
 
 }

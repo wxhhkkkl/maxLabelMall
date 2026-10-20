@@ -49,4 +49,15 @@ public class MemberUserRespVO extends MemberUserBaseVO {
     @Schema(description = "用户经验值", requiredMode  = Schema.RequiredMode.REQUIRED, example = "200")
     private Integer experience;
 
+    // ========== MaxLabel 会员订阅 ==========
+
+    @Schema(description = "是否有效订阅", example = "true")
+    private Boolean subscriptionActive;
+
+    @Schema(description = "最后有效自然日", example = "2027-10-20")
+    private java.time.LocalDate subscriptionEndDate;
+
+    @Schema(description = "订阅排他到期时间（最后有效日次日 00:00）")
+    private java.time.LocalDateTime subscriptionEndTime;
+
 }

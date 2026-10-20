@@ -73,4 +73,12 @@ public interface ErrorCodeConstants {
      */
     ErrorCode FILTER_VALUE_MULTI_IN_DIMENSION = new ErrorCode(1_008_009_006, "筛选维度【{}】下只能选择 1 个值");
 
+    //========== MaxLabel 会员授权商品 1-008-010-000 ==========
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_NOT_EXISTS = new ErrorCode(1_008_010_000, "会员授权商品计划不存在");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_DUPLICATE = new ErrorCode(1_008_010_001, "该 SKU 已配置会员授权计划");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_PRICE_ZERO = new ErrorCode(1_008_010_002, "会员授权 SKU 价格必须大于 0");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_NOT_VIRTUAL = new ErrorCode(1_008_010_003, "会员授权商品必须是虚拟商品");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_MULTI_SPU = new ErrorCode(1_008_010_004, "同一租户只能配置一个启用的会员商品 SPU");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_INVALID_PERIOD = new ErrorCode(1_008_010_005, "会员授权周期必须在 1-120 个月之间");
+
 }

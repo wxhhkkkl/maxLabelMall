@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
 import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
 import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
 import cn.iocoder.yudao.module.member.api.point.MemberPointApi;
+import cn.iocoder.yudao.module.member.api.subscription.MemberSubscriptionApi;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.refund.PayRefundApi;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.product.api.category.ProductCategoryApi;
 import cn.iocoder.yudao.module.product.api.comment.ProductCommentApi;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.api.bargain.BargainActivityApi;
 import cn.iocoder.yudao.module.promotion.api.bargain.BargainRecordApi;
 import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
@@ -33,7 +35,9 @@ import org.springframework.context.annotation.Configuration;
         BargainActivityApi.class, BargainRecordApi.class, CombinationRecordApi.class,
         CouponApi.class, DiscountActivityApi.class, RewardActivityApi.class, SeckillActivityApi.class, PointActivityApi.class,
         MemberUserApi.class, MemberPointApi.class, MemberLevelApi.class, MemberAddressApi.class, MemberConfigApi.class,
+        MemberSubscriptionApi.class,
         ProductSpuApi.class, ProductSkuApi.class, ProductCommentApi.class, ProductCategoryApi.class,
+        ProductSubscriptionPlanApi.class,
         PayOrderApi.class, PayRefundApi.class, PayTransferApi.class, PayWalletApi.class,
         AdminUserApi.class, NotifyMessageSendApi.class, SocialClientApi.class, SocialUserApi.class
 })

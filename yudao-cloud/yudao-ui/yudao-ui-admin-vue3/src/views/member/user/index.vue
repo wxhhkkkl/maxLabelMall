@@ -118,6 +118,19 @@
         </template>
       </el-table-column>
       <el-table-column align="center" label="积分" prop="point" width="100px" />
+      <el-table-column align="center" label="订阅状态" width="110px">
+        <template #default="scope">
+          <el-tag v-if="scope.row.subscriptionActive" type="success">有效</el-tag>
+          <el-tag v-else-if="scope.row.subscriptionEndDate" type="info">已过期</el-tag>
+          <span v-else>未订阅</span>
+        </template>
+      </el-table-column>
+      <el-table-column
+        align="center"
+        label="订阅到期日"
+        prop="subscriptionEndDate"
+        width="130px"
+      />
       <el-table-column align="center" label="状态" prop="status" width="100px">
         <template #default="scope">
           <dict-tag :type="DICT_TYPE.COMMON_STATUS" :value="scope.row.status" />

@@ -44,6 +44,7 @@ const router = createRouter({
           props: true,
         },
         { path: 'software', name: 'software', component: () => import('@/views/SoftwareView.vue') },
+        { path: 'membership', name: 'membership', component: () => import('@/views/MembershipView.vue') },
         { path: 'print-management', name: 'print-management', component: () => import('@/views/PrintManagementView.vue') },
         { path: 'solutions', alias: '/solution', name: 'solutions', component: () => import('@/views/SolutionsView.vue') },
         { path: 'solutions/:industry', alias: '/solution/:industry', name: 'solution-detail', component: () => import('@/views/IndustrySolutionView.vue') },

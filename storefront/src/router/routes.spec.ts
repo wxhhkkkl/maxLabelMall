@@ -72,7 +72,7 @@ const ALL_PATHS = [
 ]
 
 describe('路由表', () => {
-  it('声明了 33 条路径（含打印管理系统介绍页、售后政策页、个人中心新增页、支持详情页、行业详情、商品评价页与微信回跳页）', () => {
+  it('声明了 34 条路径（含打印管理系统介绍页、会员授权页、售后政策页、个人中心新增页、支持详情页、行业详情、商品评价页与微信回跳页）', () => {
     const paths: string[] = []
     const walk = (routes: Array<{ path: string; children?: unknown[] }>, prefix = '') => {
       for (const r of routes) {
@@ -93,7 +93,8 @@ describe('路由表', () => {
     //             · 售后政策页 /after-sales-policy（30 → 31）
     //             · 订单开票的 /account/invoice（个人中心 · 发票抬头）（31 → 32）
     // 2026-10-16：main 上并行的打印管理系统介绍页 /print-management（32 → 33）
-    expect(paths).toHaveLength(33)
+    // 2026-10-20：MaxLabel 会员体系新增 /membership（33 → 34）
+    expect(paths).toHaveLength(34)
     expect(paths).toContain('/')
   })
 

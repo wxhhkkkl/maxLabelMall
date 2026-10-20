@@ -66,6 +66,7 @@ const NEW_PAGE_VIEWS = [
   'AfterSaleListView',
   'PointsRecordView',
   'ProductCommentListView',
+  'MembershipView',
 ]
 
 /**

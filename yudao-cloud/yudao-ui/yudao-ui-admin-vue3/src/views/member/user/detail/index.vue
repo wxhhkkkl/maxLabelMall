@@ -48,6 +48,15 @@
           <el-tab-pane label="订单管理" lazy>
             <UserOrderList :user-id="id" />
           </el-tab-pane>
+          <el-tab-pane label="订阅" lazy>
+            <UserSubscriptionList :user-id="id" />
+          </el-tab-pane>
+          <el-tab-pane label="标签模板" lazy>
+            <UserLabelTemplateList :user-id="id" />
+          </el-tab-pane>
+          <el-tab-pane label="打印记录" lazy>
+            <UserPrintRecordList :user-id="id" />
+          </el-tab-pane>
           <el-tab-pane label="售后管理" lazy>
             <UserAfterSaleList :user-id="id" />
           </el-tab-pane>
@@ -80,6 +89,9 @@ import UserBrokerageList from './UserBrokerageList.vue'
 import UserCouponList from './UserCouponList.vue'
 import UserExperienceRecordList from './UserExperienceRecordList.vue'
 import UserOrderList from './UserOrderList.vue'
+import UserSubscriptionList from './UserSubscriptionList.vue'
+import UserLabelTemplateList from './UserLabelTemplateList.vue'
+import UserPrintRecordList from './UserPrintRecordList.vue'
 import UserPointList from './UserPointList.vue'
 import UserSignList from './UserSignList.vue'
 import UserFavoriteList from './UserFavoriteList.vue'

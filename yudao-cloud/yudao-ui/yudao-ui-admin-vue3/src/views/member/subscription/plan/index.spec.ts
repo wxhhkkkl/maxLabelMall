@@ -2,6 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/api/mall/product/spu', () => ({
+  getSpuSimpleList: vi.fn(async () => []),
+  getSpu: vi.fn()
+}))
 vi.mock('@/api/mall/product/subscriptionPlan', () => ({
   getSubscriptionPlanPage: vi.fn(),
   updateSubscriptionPlan: vi.fn()

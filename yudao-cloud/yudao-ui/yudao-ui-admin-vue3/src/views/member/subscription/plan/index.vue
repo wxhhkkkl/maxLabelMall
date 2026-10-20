@@ -7,14 +7,21 @@
       class="-mb-15px"
       label-width="88px"
     >
-      <el-form-item label="SPU 编号" prop="spuId">
-        <el-input-number
+      <el-form-item label="商品 SPU" prop="spuId">
+        <el-select
           v-model="queryParams.spuId"
-          :controls="false"
-          class="!w-180px"
-          placeholder="全部"
+          class="!w-320px"
           clearable
-        />
+          filterable
+          placeholder="全部"
+        >
+          <el-option
+            v-for="spu in spuOptions"
+            :key="spu.id"
+            :label="`${spu.name}（ID ${spu.id}）`"
+            :value="spu.id"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item label="启用" prop="enabled">
         <el-select v-model="queryParams.enabled" class="!w-160px" clearable placeholder="全部">
@@ -98,6 +105,7 @@ import {
   updateSubscriptionPlan,
   type SubscriptionPlanVO
 } from '@/api/mall/product/subscriptionPlan'
+import { getSpuSimpleList } from '@/api/mall/product/spu'
 import { dateFormatter } from '@/utils/formatTime'
 import PlanForm from './PlanForm.vue'
 
@@ -109,6 +117,7 @@ const list = ref<SubscriptionPlanVO[]>([])
 const total = ref(0)
 const queryFormRef = ref()
 const formRef = ref()
+const spuOptions = ref<Array<{ id: number; name: string }>>([])
 const queryParams = reactive<{
   pageNo: number
   pageSize: number
@@ -170,5 +179,13 @@ const disable = async (row: SubscriptionPlanVO) => {
   await getList()
 }
 
-onMounted(getList)
+const loadSpuOptions = async () => {
+  const data = await getSpuSimpleList()
+  spuOptions.value = Array.isArray(data) ? data : (data?.list ?? [])
+}
+
+onMounted(() => {
+  void loadSpuOptions()
+  getList()
+})
 </script>

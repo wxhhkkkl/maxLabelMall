@@ -7,23 +7,42 @@
       :rules="formRules"
       label-width="110px"
     >
-      <el-form-item label="SPU 编号" prop="spuId">
-        <el-input-number
+      <el-form-item label="商品 SPU" prop="spuId">
+        <el-select
           v-model="formData.spuId"
           :disabled="!!formData.id"
-          :min="1"
-          :controls="false"
-          class="!w-240px"
-        />
+          :loading="spuLoading"
+          class="!w-400px"
+          clearable
+          filterable
+          placeholder="搜索并选择商品"
+          @change="handleSpuChange"
+        >
+          <el-option
+            v-for="spu in spuOptions"
+            :key="spu.id"
+            :label="spuOptionLabel(spu)"
+            :value="spu.id"
+          />
+        </el-select>
       </el-form-item>
-      <el-form-item label="SKU 编号" prop="skuId">
-        <el-input-number
+      <el-form-item label="商品 SKU" prop="skuId">
+        <el-select
           v-model="formData.skuId"
-          :disabled="!!formData.id"
-          :min="1"
-          :controls="false"
-          class="!w-240px"
-        />
+          :disabled="!!formData.id || !formData.spuId"
+          :loading="skuLoading"
+          class="!w-480px"
+          clearable
+          filterable
+          placeholder="先选 SPU，再选择 SKU"
+        >
+          <el-option
+            v-for="sku in skuOptions"
+            :key="sku.id"
+            :label="skuOptionLabel(sku)"
+            :value="sku.id"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item label="授予周期（月）" prop="periodMonths">
         <el-input-number v-model="formData.periodMonths" :min="1" :max="120" class="!w-240px" />
@@ -56,6 +75,7 @@ import {
   updateSubscriptionPlan,
   type SubscriptionPlanSaveVO
 } from '@/api/mall/product/subscriptionPlan'
+import { getSpu, getSpuSimpleList, type Sku } from '@/api/mall/product/spu'
 
 const emit = defineEmits(['success'])
 const message = useMessage()
@@ -72,10 +92,55 @@ const formData = reactive<SubscriptionPlanSaveVO>({
   sort: 0
 })
 const formRules = reactive({
-  spuId: [{ required: true, message: 'SPU 编号不能为空', trigger: 'blur' }],
-  skuId: [{ required: true, message: 'SKU 编号不能为空', trigger: 'blur' }],
+  spuId: [{ required: true, message: '请选择商品 SPU', trigger: 'change' }],
+  skuId: [{ required: true, message: '请选择商品 SKU', trigger: 'change' }],
   periodMonths: [{ required: true, message: '授予周期不能为空', trigger: 'blur' }]
 })
+
+interface SpuOption {
+  id: number
+  name: string
+  price?: number
+}
+const spuOptions = ref<SpuOption[]>([])
+const skuOptions = ref<Sku[]>([])
+const spuLoading = ref(false)
+const skuLoading = ref(false)
+const spuOptionLabel = (spu: SpuOption) => `${spu.name}（ID ${spu.id}）`
+const skuOptionLabel = (sku: Sku) => {
+  const spec = (sku.properties ?? []).map((property) => property.valueName).filter(Boolean).join(' / ') || '默认'
+  return `ID ${sku.id} · ${spec} · ¥${((Number(sku.price) || 0) / 100).toFixed(2)} · 库存 ${sku.stock ?? 0}`
+}
+
+const loadSpuOptions = async () => {
+  if (spuOptions.value.length) return
+  spuLoading.value = true
+  try {
+    const data = await getSpuSimpleList()
+    spuOptions.value = Array.isArray(data) ? data : (data?.list ?? [])
+  } finally {
+    spuLoading.value = false
+  }
+}
+
+const loadSkuOptions = async (spuId?: number) => {
+  if (!spuId) {
+    skuOptions.value = []
+    return
+  }
+  skuLoading.value = true
+  try {
+    const spu = await getSpu(spuId)
+    skuOptions.value = spu?.skus ?? []
+  } finally {
+    skuLoading.value = false
+  }
+}
+
+const handleSpuChange = async (spuId?: number) => {
+  formData.skuId = undefined as never
+  await loadSkuOptions(spuId)
+}
 const coverageHint = computed(() => {
   if (!formData.enabled) return ''
   if (formData.periodMonths === 1 || formData.periodMonths === 12) return ''
@@ -96,10 +161,12 @@ const open = async (id?: number) => {
   dialogVisible.value = true
   dialogTitle.value = id ? '编辑会员授权计划' : '新增会员授权计划'
   resetForm()
+  await loadSpuOptions()
   if (!id) return
   formLoading.value = true
   try {
     Object.assign(formData, await getSubscriptionPlan(id))
+    await loadSkuOptions(formData.spuId)
   } finally {
     formLoading.value = false
   }

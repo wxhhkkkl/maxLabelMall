@@ -73,9 +73,8 @@ async function onToggleSelected(item: CartItem, next: boolean) {
   }
 }
 
-async function onStepQty(item: CartItem, delta: number) {
-  const next = item.count + delta
-  if (next < 1) return
+async function setQty(item: CartItem, next: number) {
+  if (!Number.isInteger(next) || next < 1 || next === item.count) return
   const before = item.count
   item.count = next
   message.value = ''
@@ -87,6 +86,25 @@ async function onStepQty(item: CartItem, delta: number) {
     item.count = before
     message.value = (e as { message?: string })?.message || '数量超出可售库存'
   }
+}
+
+async function onStepQty(item: CartItem, delta: number) {
+  await setQty(item, item.count + delta)
+}
+
+/**
+ * 手动输入数量：`change` 在失焦/回车时触发。
+ * 非法值（空、0、负数、小数）直接回退到原数量，不调后端；
+ * 合法值走与 +/- 相同的乐观更新与失败回退。
+ */
+function onQtyInput(item: CartItem, event: Event) {
+  const input = event.target as HTMLInputElement
+  const next = Number(input.value)
+  if (!Number.isInteger(next) || next < 1) {
+    input.value = String(item.count)
+    return
+  }
+  void setQty(item, next)
 }
 
 async function onRemove(item: CartItem) {
@@ -171,7 +189,16 @@ onMounted(load)
           <div class="cart-price" data-label="单价">{{ formatYuan(item.sku.price) }}</div>
           <div class="cart-qty">
             <span class="cart-qty-minus qty-btn" @click="onStepQty(item, -1)">−</span>
-            <span class="cart-qty-num qty-num">{{ item.count }}</span>
+            <input
+              class="cart-qty-num qty-num"
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              aria-label="数量"
+              :value="item.count"
+              @change="onQtyInput(item, $event)"
+            >
             <span class="cart-qty-plus qty-btn plus" @click="onStepQty(item, 1)">+</span>
           </div>
           <div class="cart-subtotal" data-label="总计">{{ formatYuan(item.sku.price * item.count) }}</div>
@@ -311,8 +338,24 @@ onMounted(load)
   user-select: none;
 }
 .cart-qty .qty-num {
-  width: 34px;
+  width: 44px;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: center;
+  -moz-appearance: textfield;
+}
+.cart-qty .qty-num::-webkit-outer-spin-button,
+.cart-qty .qty-num::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+.cart-qty .qty-num:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--ml-primary);
 }
 .cart-remove {
   grid-column: 7;

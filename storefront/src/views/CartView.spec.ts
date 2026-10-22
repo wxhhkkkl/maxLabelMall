@@ -85,7 +85,7 @@ describe('CartView —— 条目展示（FR-020）', () => {
     expect(w.text()).toContain('真实商品 1')
     expect(w.text()).toContain('版本：规格 1')
     expect(w.text()).toContain('¥12.90')
-    expect(w.get('.cart-qty-num').text()).toBe('2')
+    expect((w.get('.cart-qty-num').element as HTMLInputElement).value).toBe('2')
     expect(w.text()).toContain('¥25.80') // 小计 = 12.90 × 2
   })
 
@@ -130,6 +130,25 @@ describe('CartView —— 勾选与改量（后端持久化）', () => {
     await w.get('.cart-qty-minus').trigger('click')
     await flushPromises()
     expect(updateCartCount).not.toHaveBeenCalled()
+  })
+
+  it('手动输入数量后调用 update-count', async () => {
+    const w = await mountCart([item(1, { count: 1 })])
+    const input = w.get('.cart-qty-num')
+    await input.setValue('7')
+    await input.trigger('change')
+    await flushPromises()
+    expect(updateCartCount).toHaveBeenCalledWith(1, 7)
+  })
+
+  it('手动输入非法数量时回退到原数量，不调后端', async () => {
+    const w = await mountCart([item(1, { count: 2 })])
+    const input = w.get('.cart-qty-num')
+    await input.setValue('0')
+    await input.trigger('change')
+    await flushPromises()
+    expect(updateCartCount).not.toHaveBeenCalled()
+    expect((input.element as HTMLInputElement).value).toBe('2')
   })
 
   it('删除条目调用 delete', async () => {

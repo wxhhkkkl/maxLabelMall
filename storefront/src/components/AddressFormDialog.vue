@@ -229,6 +229,15 @@ watch(
   },
 )
 
+function onProvinceChange() {
+  lv2.value = null
+  lv3.value = null
+}
+
+function onCityChange() {
+  lv3.value = null
+}
+
 function onSave() {
   formError.value = ''
   if (!form.value.name.trim()) {
@@ -241,6 +250,16 @@ function onSave() {
   }
   if (!pickedAreaId.value) {
     formError.value = '请选择所在地区'
+    return
+  }
+  // 有下级区县时必须选到区县：运费模板按 areaId 精确匹配，
+  // 停在地级市会匹配不到模板（用户 18613816876 的 140400 就是这种情况）。
+  if (cities.value.length > 0 && lv2.value === null) {
+    formError.value = '请选择城市'
+    return
+  }
+  if (districts.value.length > 0 && lv3.value === null) {
+    formError.value = '请选择区/县'
     return
   }
   if (!form.value.detailAddress.trim()) {
@@ -332,11 +351,17 @@ async function save() {
       :hint="treeError || areaNameText || '请选择省 / 市 / 区'"
     >
       <div class="area-row">
-        <select id="areaLv1" v-model.number="lv1" class="ml-select">
+        <select id="areaLv1" v-model.number="lv1" class="ml-select" @change="onProvinceChange">
           <option :value="null">省份</option>
           <option v-for="a in tree" :key="a.id" :value="a.id">{{ a.name }}</option>
         </select>
-        <select id="areaLv2" v-model.number="lv2" class="ml-select" :disabled="!lv1">
+        <select
+          id="areaLv2"
+          v-model.number="lv2"
+          class="ml-select"
+          :disabled="!lv1"
+          @change="onCityChange"
+        >
           <option :value="null">城市</option>
           <option v-for="a in cities" :key="a.id" :value="a.id">{{ a.name }}</option>
         </select>

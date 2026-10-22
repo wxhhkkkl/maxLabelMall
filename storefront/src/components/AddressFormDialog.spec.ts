@@ -35,6 +35,7 @@ function node(id: number, name: string, children?: Area[]): Area {
 const TREE: Area[] = [
   node(330000, '浙江省', [
     node(330100, '杭州市', [node(330110, '余杭区'), node(330106, '西湖区')]),
+    node(330200, '宁波市', [node(330203, '海曙区')]),
   ]),
   node(110000, '北京市', [node(110100, '北京市', [node(110105, '朝阳区')])]),
 ]
@@ -249,5 +250,53 @@ describe('AddressFormDialog —— 撤销识别（T330 / US3 / FR-123）', () =>
 
     expect((w.get('#addrName').element as HTMLInputElement).value).toBe('张三')
     expect((w.get('#addrMobile').element as HTMLInputElement).value).toBe('13800138000')
+  })
+})
+
+describe('AddressFormDialog —— 地区必须选到可匹配运费模板的叶子节点', () => {
+  async function fillBasics(w: Awaited<ReturnType<typeof mountDialog>>) {
+    await w.get('#addrName').setValue('张三')
+    await w.get('#addrMobile').setValue('13800138000')
+    await w.get('#addrDetail').setValue('文一西路969号')
+  }
+
+  it('城市有下级区县时，只选到市不允许保存', async () => {
+    const w = await mountDialog()
+    await fillBasics(w)
+    await w.get('#areaLv1').setValue('330000')
+    await w.get('#areaLv2').setValue('330100')
+    await w.get('#addrSave').trigger('click')
+    await flushPromises()
+
+    expect(createAddress).not.toHaveBeenCalled()
+    expect(w.text()).toContain('请选择区/县')
+  })
+
+  it('选到区县后可以保存，落库 areaId 是区县编号', async () => {
+    const w = await mountDialog()
+    await fillBasics(w)
+    await w.get('#areaLv1').setValue('330000')
+    await w.get('#areaLv2').setValue('330100')
+    await w.get('#areaLv3').setValue('330110')
+    await w.get('#addrSave').trigger('click')
+    await flushPromises()
+
+    expect(createAddress).toHaveBeenCalledTimes(1)
+    expect(createAddress.mock.calls[0][0]).toMatchObject({ areaId: 330110 })
+  })
+
+  it('切换城市会清空上一城市已选的区县', async () => {
+    const w = await mountDialog()
+    await w.get('#areaLv1').setValue('330000')
+    await w.get('#areaLv2').setValue('330100')
+    await w.get('#areaLv3').setValue('330110')
+    expect(picked(w)).toEqual(['330000', '330100', '330110'])
+
+    await w.get('#areaLv2').setValue('330200')
+    await flushPromises()
+
+    expect(picked(w).slice(0, 2)).toEqual(['330000', '330200'])
+    expect(picked(w)[2]).not.toBe('330110')
+    expect(w.text()).toContain('浙江省 宁波市')
   })
 })

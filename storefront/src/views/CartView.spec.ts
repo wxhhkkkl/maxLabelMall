@@ -148,7 +148,7 @@ describe('CartView —— 勾选与改量（后端持久化）', () => {
     await w.get('.cart-qty-plus').trigger('click')
     await flushPromises()
     expect(updateCartCount).not.toHaveBeenCalled()
-    expect(w.get('.cart-msg').text()).toContain('最多可购买 2 件')
+    expect(w.get('.ml-modal').text()).toContain('最多可购买 2 件')
   })
 
   it('手动输入超过库存时回退并提示', async () => {
@@ -161,7 +161,7 @@ describe('CartView —— 勾选与改量（后端持久化）', () => {
     await flushPromises()
     expect(updateCartCount).not.toHaveBeenCalled()
     expect((input.element as HTMLInputElement).value).toBe('2')
-    expect(w.get('.cart-msg').text()).toContain('最多可购买 2 件')
+    expect(w.get('.ml-modal').text()).toContain('最多可购买 2 件')
   })
 
   it('手动输入非法数量时回退到原数量，不调后端', async () => {
@@ -214,7 +214,9 @@ describe('CartView —— 库存上限以后端为准（FR-021）', () => {
     const w = await mountCart([item(1, { count: 1 })])
     await w.get('.cart-qty-plus').trigger('click')
     await flushPromises()
-    expect(w.text()).toContain('库存不足')
+    expect(w.get('.ml-modal').text()).toContain('库存不足')
+    await w.get('.ml-modal-close').trigger('click')
+    expect(w.find('.ml-modal').exists()).toBe(false)
   })
 })
 

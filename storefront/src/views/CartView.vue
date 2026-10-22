@@ -11,6 +11,7 @@ import {
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import MlCheck from '@/components/base/MlCheck.vue'
+import MlModal from '@/components/base/MlModal.vue'
 import { useCartStore } from '@/store/cart'
 import type { CartItem } from '@/types'
 import { formatYuan } from '@/utils/money'
@@ -35,6 +36,8 @@ const invalid = ref<CartItem[]>([])
 const loading = ref(true)
 const error = ref(false)
 const message = ref('')
+const stockDialogOpen = ref(false)
+const stockDialogMessage = ref('')
 
 const selectedItems = computed(() => valid.value.filter((i) => i.selected))
 
@@ -82,12 +85,17 @@ function stockMessage(stock: number): string {
   return stock > 0 ? `库存不足，当前最多可购买 ${stock} 件` : '该商品已无库存'
 }
 
+function showStockDialog(text: string): void {
+  stockDialogMessage.value = text
+  stockDialogOpen.value = true
+}
+
 async function setQty(item: CartItem, next: number) {
   if (!Number.isInteger(next) || next < 1 || next === item.count) return
   // 先做一次即时提示；后端仍是最终裁决方（FR-021）。
   const stock = stockOf(item)
   if (stock !== null && next > stock) {
-    message.value = stockMessage(stock)
+    showStockDialog(stockMessage(stock))
     return
   }
   const before = item.count
@@ -99,7 +107,9 @@ async function setQty(item: CartItem, next: number) {
   } catch (e) {
     // 数量上限以后端为准：被拒就回退到原数量并说明原因（FR-021）
     item.count = before
-    message.value = (e as { message?: string })?.message || '数量超出可售库存'
+    const text = (e as { message?: string })?.message || '数量超出可售库存'
+    if (text.includes('库存')) showStockDialog(text)
+    else message.value = text
   }
 }
 
@@ -122,7 +132,7 @@ function onQtyInput(item: CartItem, event: Event) {
   const stock = stockOf(item)
   if (stock !== null && next > stock) {
     input.value = String(item.count)
-    message.value = stockMessage(stock)
+    showStockDialog(stockMessage(stock))
     return
   }
   void setQty(item, next)
@@ -278,6 +288,15 @@ onMounted(load)
       action-text="去商城逛逛"
       @action="router.push('/mall')"
     />
+
+    <MlModal :open="stockDialogOpen" title="库存不足" @close="stockDialogOpen = false">
+      <p class="cart-stock-dialog">{{ stockDialogMessage }}</p>
+      <template #foot>
+        <button class="btn-primary" type="button" @click="stockDialogOpen = false">
+          知道了
+        </button>
+      </template>
+    </MlModal>
   </div>
 </template>
 
@@ -406,6 +425,12 @@ onMounted(load)
   color: var(--ml-orange);
   font-size: 13px;
   margin-bottom: 12px;
+}
+.cart-stock-dialog {
+  margin: 0;
+  color: var(--ml-text);
+  font-size: 14px;
+  line-height: 1.7;
 }
 .cart-bar {
   display: flex;

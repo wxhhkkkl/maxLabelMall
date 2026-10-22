@@ -73,8 +73,23 @@ async function onToggleSelected(item: CartItem, next: boolean) {
   }
 }
 
+function stockOf(item: CartItem): number | null {
+  const stock = Number(item.sku?.stock)
+  return Number.isFinite(stock) && stock >= 0 ? stock : null
+}
+
+function stockMessage(stock: number): string {
+  return stock > 0 ? `库存不足，当前最多可购买 ${stock} 件` : '该商品已无库存'
+}
+
 async function setQty(item: CartItem, next: number) {
   if (!Number.isInteger(next) || next < 1 || next === item.count) return
+  // 先做一次即时提示；后端仍是最终裁决方（FR-021）。
+  const stock = stockOf(item)
+  if (stock !== null && next > stock) {
+    message.value = stockMessage(stock)
+    return
+  }
   const before = item.count
   item.count = next
   message.value = ''
@@ -94,7 +109,7 @@ async function onStepQty(item: CartItem, delta: number) {
 
 /**
  * 手动输入数量：`change` 在失焦/回车时触发。
- * 非法值（空、0、负数、小数）直接回退到原数量，不调后端；
+ * 非法值（空、0、负数、小数、超过库存）直接回退到原数量，不调后端；
  * 合法值走与 +/- 相同的乐观更新与失败回退。
  */
 function onQtyInput(item: CartItem, event: Event) {
@@ -102,6 +117,12 @@ function onQtyInput(item: CartItem, event: Event) {
   const next = Number(input.value)
   if (!Number.isInteger(next) || next < 1) {
     input.value = String(item.count)
+    return
+  }
+  const stock = stockOf(item)
+  if (stock !== null && next > stock) {
+    input.value = String(item.count)
+    message.value = stockMessage(stock)
     return
   }
   void setQty(item, next)
@@ -154,7 +175,7 @@ onMounted(load)
     />
 
     <template v-else-if="valid.length || invalid.length">
-      <p v-if="message" class="cart-msg">{{ message }}</p>
+      <p v-if="message" class="cart-msg" role="alert" aria-live="polite">{{ message }}</p>
 
       <!-- 有效条目 -->
       <div class="ml-card">
@@ -193,6 +214,7 @@ onMounted(load)
               class="cart-qty-num qty-num"
               type="number"
               min="1"
+              :max="item.sku?.stock ?? undefined"
               step="1"
               inputmode="numeric"
               aria-label="数量"

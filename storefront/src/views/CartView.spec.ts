@@ -141,6 +141,29 @@ describe('CartView —— 勾选与改量（后端持久化）', () => {
     expect(updateCartCount).toHaveBeenCalledWith(1, 7)
   })
 
+  it('超过库存时即时提示，不调后端', async () => {
+    const row = item(1, { count: 2 })
+    row.sku.stock = 2
+    const w = await mountCart([row])
+    await w.get('.cart-qty-plus').trigger('click')
+    await flushPromises()
+    expect(updateCartCount).not.toHaveBeenCalled()
+    expect(w.get('.cart-msg').text()).toContain('最多可购买 2 件')
+  })
+
+  it('手动输入超过库存时回退并提示', async () => {
+    const row = item(1, { count: 2 })
+    row.sku.stock = 2
+    const w = await mountCart([row])
+    const input = w.get('.cart-qty-num')
+    await input.setValue('9')
+    await input.trigger('change')
+    await flushPromises()
+    expect(updateCartCount).not.toHaveBeenCalled()
+    expect((input.element as HTMLInputElement).value).toBe('2')
+    expect(w.get('.cart-msg').text()).toContain('最多可购买 2 件')
+  })
+
   it('手动输入非法数量时回退到原数量，不调后端', async () => {
     const w = await mountCart([item(1, { count: 2 })])
     const input = w.get('.cart-qty-num')

@@ -79,6 +79,8 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .inIfPresent(TradeOrderDO::getUserId, userIds)
                 .eqIfPresent(TradeOrderDO::getType, reqVO.getType())
                 .eqIfPresent(TradeOrderDO::getStatus, reqVO.getStatus())
+                // 状态多选（顶部标签页「待发货/已发货」= [10,20]）：与上面的单选是或的关系
+                .inIfPresent(TradeOrderDO::getStatus, reqVO.getStatuses())
                 // ⚠️ 支付渠道**挪到 `applyPayChannelCodeFilter`** 里了（008）：见那里的说明
                 .eqIfPresent(TradeOrderDO::getTerminal, reqVO.getTerminal())
                 .eqIfPresent(TradeOrderDO::getLogisticsId, reqVO.getLogisticsId())
@@ -100,6 +102,8 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .inIfPresent(TradeOrderDO::getUserId, userIds)
                 .eqIfPresent(TradeOrderDO::getType, reqVO.getType())
                 .eqIfPresent(TradeOrderDO::getStatus, reqVO.getStatus())
+                // 状态多选（顶部标签页「待发货/已发货」= [10,20]）：与上面的单选是或的关系
+                .inIfPresent(TradeOrderDO::getStatus, reqVO.getStatuses())
                 // ⚠️ 支付渠道**挪到 `applyPayChannelCodeFilter`** 里了（008）——
                 //    与列表**共用同一处实现**，否则会出现"列表筛得出、统计数不对"
                 .eqIfPresent(TradeOrderDO::getTerminal, reqVO.getTerminal())

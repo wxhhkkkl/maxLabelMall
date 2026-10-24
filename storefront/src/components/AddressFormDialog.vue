@@ -64,8 +64,10 @@ const parseHint = ref('')
 /**
  * 识别前的快照，用于「撤销识别」（FR-123）。
  *
- * **只装识别会碰的那 4 个字段** —— 把整张表单快照进去，撤销就会顺带回退客户手打的
- * 收件人和手机号，那不是"撤销识别"而是"撤销一切"。
+ * **只装识别会碰的那几个字段** —— 把整张表单快照进去，撤销就会顺带回退客户要求的
+ * 「是否默认」之类识别根本不动的值，那不是"撤销识别"而是"撤销一切"。
+ * 姓名与手机号自 Q55（2026-10-23）起也会被识别写回，所以它们也必须进快照：
+ * 否则撤销只退回地址，客户手打的收件人/手机号已经被覆盖了就找不回来。
  * 每次识别**覆盖**上一次快照：撤销的语义是"退回最近一次识别前"。
  */
 const parseSnapshot = ref<{
@@ -73,6 +75,8 @@ const parseSnapshot = ref<{
   lv2: number | null
   lv3: number | null
   detail: string
+  name: string
+  mobile: string
 } | null>(null)
 
 const LEVEL_LABELS: Record<'province' | 'city' | 'district', string> = {
@@ -108,7 +112,10 @@ function onParse() {
   }
 
   const r = parseAddress(pasteText.value, tree.value)
-  if (r.matchedLevels === 0) {
+  // 行政区划与姓名/手机号是**两件独立的事**（Q56）：区划一个没认出来，
+  // 但只要认出了姓名或手机号，这两个照样填 —— 号码是硬匹配，与区划可不可信无关。
+  // 两样都没有，才是一个字段都不动（FR-121）。
+  if (r.matchedLevels === 0 && !r.name && !r.phone) {
     parseHint.value = '未识别到行政区划，请手动选择'
     return
   }
@@ -119,19 +126,28 @@ function onParse() {
     lv2: lv2.value,
     lv3: lv3.value,
     detail: form.value.detailAddress,
+    name: form.value.name,
+    mobile: form.value.mobile,
   }
 
-  if (r.province && lv1.value !== r.province.id) {
-    lv2.value = null
-    lv3.value = null
+  // 姓名/手机号（Q55）：认出来就覆盖，与省市区同一口径（Q16=A）
+  if (r.name) form.value.name = r.name
+  if (r.phone) form.value.mobile = r.phone
+
+  // 区划与详细地址只在**至少认出一级**时才动 —— 沿用 Q18 / FR-121 的判据
+  if (r.matchedLevels > 0) {
+    if (r.province && lv1.value !== r.province.id) {
+      lv2.value = null
+      lv3.value = null
+    }
+    if (r.province) lv1.value = r.province.id
+
+    if (r.city && lv2.value !== r.city.id) lv3.value = null
+    if (r.city) lv2.value = r.city.id
+
+    if (r.district) lv3.value = r.district.id
+    if (r.detail) form.value.detailAddress = r.detail
   }
-  if (r.province) lv1.value = r.province.id
-
-  if (r.city && lv2.value !== r.city.id) lv3.value = null
-  if (r.city) lv2.value = r.city.id
-
-  if (r.district) lv3.value = r.district.id
-  if (r.detail) form.value.detailAddress = r.detail
 
   // ③ 认了一半要说清是**哪一级**没认出来
   parseHint.value = r.missing.length
@@ -147,6 +163,8 @@ function onUndoParse() {
   lv2.value = snap.lv2
   lv3.value = snap.lv3
   form.value.detailAddress = snap.detail
+  form.value.name = snap.name
+  form.value.mobile = snap.mobile
   parseSnapshot.value = null
   parseHint.value = ''
 }
@@ -333,7 +351,14 @@ async function save() {
     </MlField>
 
     <MlField label="收件人" required>
-      <input id="addrName" v-model.trim="form.name" class="ml-input" placeholder="请填写收件人姓名" />
+      <!-- maxlength 与后端 member_address.name 的 64 对齐：不拦的话粘进一个手机号就是一次 500 -->
+      <input
+        id="addrName"
+        v-model.trim="form.name"
+        class="ml-input"
+        maxlength="64"
+        placeholder="请填写收件人姓名"
+      />
     </MlField>
     <MlField label="手机号" required>
       <input

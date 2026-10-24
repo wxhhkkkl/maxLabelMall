@@ -294,3 +294,73 @@ describe('address-parse —— ParseResult 不变量（T316 / contracts §2.4）
     expect(r.missing).toContain('district')
   })
 })
+
+/**
+ * 收件人与手机号的识别（Q55 / Q56，2026-10-23 所有者改判 —— 原 FR-128 明确规定"不识别"，
+ * 理由是有歧义；现在的要求是"宁可少填、不可填错"地认）。
+ */
+describe('address-parse —— 收件人与手机号（Q55 / Q56）', () => {
+  it('姓名紧邻手机号 → 都识别出来，并从详细地址里扣除', () => {
+    const r = parseAddress('张三 18748935785 浙江省杭州市余杭区文一西路969号', TREE)
+    expect(r.name).toBe('张三')
+    expect(r.phone).toBe('18748935785')
+    expect(r.district).toBe(余杭区)
+    expect(r.detail).toBe('文一西路969号')
+  })
+
+  it('姓名在手机号后面也认得出来', () => {
+    const r = parseAddress('浙江省杭州市余杭区文一西路969号 13800138000 张三', TREE)
+    expect(r.name).toBe('张三')
+    expect(r.phone).toBe('13800138000')
+    expect(r.detail).toBe('文一西路969号')
+  })
+
+  it('带「收货人 / 电话」这类标签也认得出来', () => {
+    const r = parseAddress('收货人：张三 电话：18748935785 浙江省杭州市余杭区文一西路969号', TREE)
+    expect(r.name).toBe('张三')
+    expect(r.phone).toBe('18748935785')
+    expect(r.detail).toBe('文一西路969号')
+  })
+
+  it('手机号夹空格或短横也认得', () => {
+    expect(parseAddress('张三 187-4893-5785 浙江省杭州市余杭区文一西路969号', TREE).phone).toBe('18748935785')
+    expect(parseAddress('张三 187 4893 5785 浙江省杭州市余杭区文一西路969号', TREE).phone).toBe('18748935785')
+  })
+
+  it('不紧邻手机号的姓名不认（宁可少填，不可填错）', () => {
+    const r = parseAddress('张三 浙江省杭州市余杭区文一西路969号', TREE)
+    expect(r.name).toBe('')
+    expect(r.phone).toBe('')
+  })
+
+  it('像地址的片段即使紧邻手机号也不当姓名（含路/号/区…）', () => {
+    const r = parseAddress('浙江省杭州市余杭区 文一西路 18748935785', TREE)
+    expect(r.name).toBe('')
+    expect(r.detail).toBe('文一西路')
+  })
+
+  it('超过 4 个字的名字不认', () => {
+    const r = parseAddress('广东省东莞市某某贸易有限公司 18748935785', TREE)
+    expect(r.name).toBe('')
+  })
+
+  it('号码更长时不会截出错号码', () => {
+    const r = parseAddress('浙江省杭州市余杭区文一西路969号 138001380001', TREE)
+    expect(r.phone).toBe('')
+  })
+
+  it('认不出行政区划时手机号与姓名照填，但省市区与详细地址一个都不动（Q56）', () => {
+    const r = parseAddress('张三 18748935785 某某小区3栋', TREE)
+    expect(r.matchedLevels).toBe(0)
+    expect(r.name).toBe('张三')
+    expect(r.phone).toBe('18748935785')
+    expect(r.detail).toBe('')
+    expect(r.province).toBeNull()
+  })
+
+  it('普通地址里没有这两样时都是空串', () => {
+    const r = parseAddress('浙江省杭州市余杭区文一西路969号', TREE)
+    expect(r.name).toBe('')
+    expect(r.phone).toBe('')
+  })
+})

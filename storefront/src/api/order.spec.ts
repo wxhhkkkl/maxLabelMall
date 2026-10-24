@@ -17,6 +17,8 @@ const {
   buildSettlementQuery,
   cancelOrder,
   createOrder,
+  getExpressMapUrl,
+  getExpressTrackList,
   getOrderDetail,
   pageOrders,
   settlement,
@@ -197,5 +199,27 @@ describe('订单查询与取消', () => {
     await cancelOrder(9)
     expect(del.mock.calls[0]?.[0]).toBe('/trade/order/cancel')
     expect(del.mock.calls[0]?.[1]).toEqual({ id: 9 })
+  })
+})
+
+describe('物流轨迹（010 / US35）', () => {
+  it('GET 到 get-express-track-list，id 走 query', async () => {
+    get.mockResolvedValue([])
+
+    await getExpressTrackList(900)
+
+    expect(get.mock.calls[0]?.[0]).toBe('/trade/order/get-express-track-list')
+    expect(get.mock.calls[0]?.[1]).toEqual({ id: 900 })
+  })
+})
+
+describe('物流地图（010 追加）', () => {
+  it('GET 到 get-express-map-url，id 走 query', async () => {
+    get.mockResolvedValue('https://api.kuaidi100.com/tools/map/x')
+
+    await getExpressMapUrl(900)
+
+    expect(get.mock.calls[0]?.[0]).toBe('/trade/order/get-express-map-url')
+    expect(get.mock.calls[0]?.[1]).toEqual({ id: 900 })
   })
 })

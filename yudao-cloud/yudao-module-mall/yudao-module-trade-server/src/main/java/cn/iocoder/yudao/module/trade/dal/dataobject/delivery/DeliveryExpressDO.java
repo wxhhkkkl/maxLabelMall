@@ -25,8 +25,18 @@ public class DeliveryExpressDO extends BaseDO {
 
     /**
      * 快递公司 code
+     *
+     * ⚠️ 它**同时**被微信小程序发货信息同步当作 {@code expressCompany} 上送，
+     * 所以是 `SF / STO / ZTO / YD` 这套短码。**不要**把它改成快递100 的全拼编码。
      */
     private String code;
+
+    /**
+     * 快递100 的公司编码（实时查询的 {@code com} 参数），如 {@code shunfeng}
+     *
+     * 为空 = 该快递公司暂不支持物流查询（例如分不清产品线的「安能」）。
+     */
+    private String kd100Code;
 
     /**
      * 快递公司名称

@@ -50,6 +50,16 @@ public class TradeOrderPageReqVO extends PageParam {
     @InEnum(value = TradeOrderStatusEnum.class, message = "订单状态必须是 {value}")
     private Integer status;
 
+    /**
+     * 订单状态**多选**（2026-10-23 起订单列表顶部有状态标签页，其中「待发货/已发货」
+     * 一个标签对应两个状态）
+     *
+     * 与 {@link #status} 是**或**的关系：两个都传时取交集 —— 但前端保证一次只用一个，
+     * 选标签会清掉下拉、选下拉会清掉标签。
+     */
+    @Schema(description = "订单状态数组（可多选）", example = "[10, 20]")
+    private List<Integer> statuses;
+
     @Schema(description = "支付渠道", example = "wx_lite")
     private String payChannelCode;
 

@@ -3,6 +3,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 // TODO 芋艿：example 缺失
 /**
@@ -14,6 +15,9 @@ public class AppAddressBaseVO {
 
     @Schema(description = "收件人名称", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "收件人名称不能为空")
+    // 与 member_address.name 的列宽一致：不加这条，超长会一路落到 INSERT 才报
+    // 「Data too long for column 'name'」，客户只看到兜底的「系统异常」
+    @Size(max = 64, message = "收件人名称不能超过 64 个字符")
     private String name;
 
     @Schema(description = "手机号", requiredMode = Schema.RequiredMode.REQUIRED)

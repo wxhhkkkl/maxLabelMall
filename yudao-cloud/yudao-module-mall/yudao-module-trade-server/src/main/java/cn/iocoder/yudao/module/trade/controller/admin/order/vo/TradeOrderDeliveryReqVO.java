@@ -20,4 +20,10 @@ public class TradeOrderDeliveryReqVO {
     @Schema(description = "发货物流单号", example = "SF123456789")
     private String logisticsNo;
 
+    @Schema(description = "发货地址地区编号（省市区）", example = "110108")
+    private Integer deliveryFromAreaId;
+
+    @Schema(description = "发货地址详情", example = "西北旺亮甲店永丰中路100号北京人才教育基地红楼107")
+    private String deliveryFromAddress;
+
 }

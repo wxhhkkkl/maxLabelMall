@@ -3,6 +3,8 @@ import request from '@/config/axios'
 export interface DeliveryExpressVO {
   id?: number
   code: string
+  /** 快递100 的 com 编码；为空表示暂不支持物流查询 */
+  kd100Code?: string
   name: string
   logo: string
   sort: number

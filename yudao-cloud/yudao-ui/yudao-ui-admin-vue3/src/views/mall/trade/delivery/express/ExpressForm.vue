@@ -9,6 +9,19 @@
     >
       <el-form-item label="公司编码" prop="code">
         <el-input v-model="formData.code" placeholder="请输入快递编码" />
+        <div style="font-size: 10px" class="pl-10px">
+          微信小程序物流同步使用（如 SF / STO / ZTO），不要填快递100 编码
+        </div>
+      </el-form-item>
+      <el-form-item label="快递100 编码" prop="kd100Code">
+        <el-input
+          v-model="formData.kd100Code"
+          maxlength="64"
+          placeholder="选填，如 shunfeng / shentong"
+        />
+        <div style="font-size: 10px" class="pl-10px">
+          快递100 实时查询的 com 参数；留空表示该快递公司暂不支持查询
+        </div>
       </el-form-item>
       <el-form-item label="公司名称" prop="name">
         <el-input v-model="formData.name" placeholder="请输入快递名称" />
@@ -55,6 +68,7 @@ const formType = ref('') // 表单的类型：create - 新增；update - 修改
 const formData = ref<DeliveryExpressApi.DeliveryExpressVO>({
   id: undefined,
   code: '',
+  kd100Code: '',
   name: '',
   logo: '',
   sort: 0,
@@ -118,6 +132,7 @@ const resetForm = () => {
   formData.value = {
     id: undefined,
     code: '',
+    kd100Code: '',
     name: '',
     logo: '',
     sort: 0,

@@ -285,6 +285,11 @@ describe('AddressFormDialog —— 地区必须选到可匹配运费模板的叶
     expect(createAddress.mock.calls[0][0]).toMatchObject({ areaId: 330110 })
   })
 
+  it('收件人输入框有 64 字上限（与 member_address.name 列宽一致，超长会 500）', async () => {
+    const w = await mountDialog()
+    expect((w.get('#addrName').element as HTMLInputElement).getAttribute('maxlength')).toBe('64')
+  })
+
   it('切换城市会清空上一城市已选的区县', async () => {
     const w = await mountDialog()
     await w.get('#areaLv1').setValue('330000')
@@ -298,5 +303,58 @@ describe('AddressFormDialog —— 地区必须选到可匹配运费模板的叶
     expect(picked(w).slice(0, 2)).toEqual(['330000', '330200'])
     expect(picked(w)[2]).not.toBe('330110')
     expect(w.text()).toContain('浙江省 宁波市')
+  })
+})
+
+/**
+ * 收件人与手机号的识别（Q55 / Q56，2026-10-23 所有者改判）。
+ * 原来的 FR-128 明确规定"不识别"，现在改为**保守地认**：姓名必须紧邻手机号。
+ */
+describe('AddressFormDialog —— 识别收件人与手机号', () => {
+  async function parse(w: Awaited<ReturnType<typeof mountDialog>>, text: string) {
+    await w.get('#addrPaste').setValue(text)
+    await w.get('#addrParseBtn').trigger('click')
+    await flushPromises()
+  }
+
+  function formValues(w: Awaited<ReturnType<typeof mountDialog>>) {
+    return {
+      name: (w.get('#addrName').element as HTMLInputElement).value,
+      mobile: (w.get('#addrMobile').element as HTMLInputElement).value,
+    }
+  }
+
+  it('粘贴「姓名 + 手机号 + 整段地址」→ 五个字段一次填好', async () => {
+    const w = await mountDialog()
+    await parse(w, '张三 18748935785 浙江省杭州市余杭区文一西路969号')
+
+    expect(formValues(w)).toEqual({ name: '张三', mobile: '18748935785' })
+    expect(picked(w)).toEqual(['330000', '330100', '330110'])
+    expect(detailText(w)).toBe('文一西路969号')
+  })
+
+  it('撤销识别把收件人 / 手机号也一起退回（不只是省市区 + 详细地址）', async () => {
+    const w = await mountDialog()
+    await w.get('#addrName').setValue('李四')
+    await w.get('#addrMobile').setValue('13900139000')
+
+    await parse(w, '张三 18748935785 浙江省杭州市余杭区文一西路969号')
+    expect(formValues(w)).toEqual({ name: '张三', mobile: '18748935785' })
+
+    await w.get('#addrParseUndo').trigger('click')
+    await flushPromises()
+    expect(formValues(w)).toEqual({ name: '李四', mobile: '13900139000' })
+  })
+
+  it('认不出行政区划但认得出姓名与手机号 → 照填，地址与详细地址一个都不动（Q56）', async () => {
+    const w = await mountDialog()
+    await w.get('#addrDetail').setValue('原来的详细地址')
+
+    await parse(w, '张三 18748935785 某某小区3栋')
+
+    expect(formValues(w)).toEqual({ name: '张三', mobile: '18748935785' })
+    expect(picked(w)).toEqual(['省份', '城市', '区县'])
+    expect(detailText(w)).toBe('原来的详细地址')
+    expect(w.text()).toContain('未识别到')
   })
 })

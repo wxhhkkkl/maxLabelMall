@@ -111,6 +111,23 @@ public interface TradeOrderQueryService {
     List<ExpressTrackRespDTO> getExpressTrackList(Long id);
 
     /**
+     * 【会员】获得订单的物流地图地址（快递100 trailUrl）
+     *
+     * @param id     交易订单编号
+     * @param userId 用户编号
+     * @return 地图地址
+     */
+    String getExpressMapUrl(Long id, Long userId);
+
+    /**
+     * 【后台】获得订单的物流地图地址
+     *
+     * @param id 交易订单编号
+     * @return 地图地址
+     */
+    String getExpressMapUrl(Long id);
+
+    /**
      * 【会员】在指定活动下，用户购买的商品数量
      *
      * @param userId     用户编号

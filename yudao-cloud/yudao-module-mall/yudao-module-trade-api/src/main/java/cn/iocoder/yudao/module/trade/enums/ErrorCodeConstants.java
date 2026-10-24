@@ -27,6 +27,7 @@ public interface ErrorCodeConstants {
     ErrorCode ORDER_DELIVERY_FAIL_COMBINATION_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_022, "交易订单发货失败，拼团未成功");
     ErrorCode ORDER_DELIVERY_FAIL_BARGAIN_RECORD_STATUS_NOT_SUCCESS = new ErrorCode(1_011_000_023, "交易订单发货失败，砍价未成功");
     ErrorCode ORDER_DELIVERY_FAIL_DELIVERY_TYPE_NOT_EXPRESS = new ErrorCode(1_011_000_024, "交易订单发货失败，发货类型不是快递");
+    ErrorCode ORDER_DELIVERY_FROM_ADDRESS_REQUIRED = new ErrorCode(1_011_000_025, "发货地址不能为空");
     ErrorCode ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID = new ErrorCode(1_011_000_025, "交易订单取消失败，订单不是【待支付】状态");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_PAID = new ErrorCode(1_011_000_026, "支付订单调价失败，原因：支付订单已付款,不能调价");
     ErrorCode ORDER_UPDATE_PRICE_FAIL_ALREADY = new ErrorCode(1_011_000_027, "支付订单调价失败，原因：已经修改过价格");
@@ -90,7 +91,13 @@ public interface ErrorCodeConstants {
     ErrorCode EXPRESS_STATUS_NOT_ENABLE = new ErrorCode(1_011_004_003, "快递公司未启用");
 
     ErrorCode EXPRESS_API_QUERY_ERROR = new ErrorCode(1_011_004_101, "快递查询接口异常");
-    ErrorCode EXPRESS_API_QUERY_FAILED = new ErrorCode(1_011_004_102, "快递查询返回失败，原因：{}");
+    // ⚠️ 文案**不含第三方原文**：三方原因只进服务端日志（FR-259 / FR-274）
+    ErrorCode EXPRESS_API_QUERY_FAILED = new ErrorCode(1_011_004_102, "暂时无法获取物流信息，请稍后重试");
+    // 快递公司没有可用的快递100 编码（如「安能」分不清产品线）—— 前端显示「暂不支持查询」
+    ErrorCode EXPRESS_QUERY_NOT_SUPPORTED = new ErrorCode(1_011_004_103, "该快递公司暂不支持物流查询");
+    // 物流地图：未配置发货地址/地图模板，或订单缺少收件地区
+    ErrorCode EXPRESS_MAP_NOT_CONFIGURED = new ErrorCode(1_011_004_104, "物流地图未配置发货地址");
+    ErrorCode EXPRESS_MAP_NOT_AVAILABLE = new ErrorCode(1_011_004_105, "该订单无法生成物流地图");
 
     // ========== 物流 Template 模块 1-011-005-000 ==========
     ErrorCode EXPRESS_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_011_005_000, "已经存在该运费模板名");

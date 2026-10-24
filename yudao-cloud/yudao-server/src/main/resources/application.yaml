@@ -381,6 +381,10 @@ yudao:
       kd100:
         key: pLXUGAwK5305
         customer: E77DF18BE109F454A5CD319E44BF5177
+        # 物流地图（010 追加）：模板 id 与默认发货地址只放 application-my.yaml（生产/本地），不写进仓库
+        map-config-key: ''
+        default-from-area-id:
+        default-from-address: ''
   iot:
     message-bus:
       type: redis # 消息总线的类型

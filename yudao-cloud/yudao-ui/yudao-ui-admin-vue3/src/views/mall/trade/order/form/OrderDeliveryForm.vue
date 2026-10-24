@@ -21,6 +21,24 @@
         <el-form-item label="物流单号">
           <el-input v-model="formData.logisticsNo" />
         </el-form-item>
+        <el-form-item label="发货地址">
+          <el-tree-select
+            v-model="formData.deliveryFromAreaId"
+            :data="areaList"
+            :props="defaultProps"
+            :render-after-expand="true"
+            placeholder="请选择省/市/区"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="发货详细地址">
+          <el-input
+            v-model="formData.deliveryFromAddress"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入发货详细地址"
+          />
+        </el-form-item>
       </template>
     </el-form>
     <template #footer>
@@ -32,7 +50,9 @@
 <script lang="ts" setup>
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import * as TradeOrderApi from '@/api/mall/trade/order'
+import { getAreaTree } from '@/api/system/area'
 import { copyValueToTarget } from '@/utils'
+import { defaultProps } from '@/utils/tree'
 
 defineOptions({ name: 'OrderDeliveryForm' })
 
@@ -45,8 +65,11 @@ const expressType = ref('express') // 如果值是 express，则是快递；none
 const formData = ref<TradeOrderApi.DeliveryVO>({
   id: undefined, // 订单编号
   logisticsId: null, // 物流公司编号
-  logisticsNo: '' // 物流编号
+  logisticsNo: '', // 物流编号
+  deliveryFromAreaId: null, // 发货地址地区
+  deliveryFromAddress: '' // 发货地址详情
 })
+const areaList = ref([]) // 地区列表
 const formRef = ref() // 表单 Ref
 
 /** 打开弹窗 */
@@ -58,6 +81,26 @@ const open = async (row: TradeOrderApi.OrderVO) => {
     expressType.value = 'none'
   }
   dialogVisible.value = true
+  formLoading.value = true
+  try {
+    if (areaList.value.length === 0) {
+      areaList.value = await getAreaTree()
+    }
+    // 010 追加：发货地址默认取配置的默认发货仓；订单已填过则用订单的
+    if (formData.value.deliveryFromAreaId == null || !formData.value.deliveryFromAddress) {
+      const def = await TradeOrderApi.getDeliveryDefaultAddress()
+      if (formData.value.deliveryFromAreaId == null) {
+        formData.value.deliveryFromAreaId = def?.areaId ?? null
+      }
+      if (!formData.value.deliveryFromAddress) {
+        formData.value.deliveryFromAddress = def?.address ?? ''
+      }
+    }
+  } catch {
+    // 拿不到默认地址就让运营自己填；提交时前后端都会校验
+  } finally {
+    formLoading.value = false
+  }
 }
 defineExpose({ open }) // 提供 open 方法，用于打开弹窗
 
@@ -72,6 +115,11 @@ const submitForm = async () => {
       // 无需发货的情况
       data.logisticsId = 0
       data.logisticsNo = ''
+    } else if (data.deliveryFromAreaId == null || !data.deliveryFromAddress?.trim()) {
+      // 010 追加：快递发货必须有发货地址（地图的 from）
+      message.warning('请填写发货地址')
+      formLoading.value = false
+      return
     }
     await TradeOrderApi.deliveryOrder(data)
     message.success(t('common.updateSuccess'))
@@ -88,7 +136,9 @@ const resetForm = () => {
   formData.value = {
     id: undefined, // 订单编号
     logisticsId: null, // 物流公司编号
-    logisticsNo: '' // 物流编号
+    logisticsNo: '', // 物流编号
+    deliveryFromAreaId: null, // 发货地址地区
+    deliveryFromAddress: '' // 发货地址详情
   }
   formRef.value?.resetFields()
 }

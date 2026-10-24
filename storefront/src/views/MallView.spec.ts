@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { Category, ProductSpu } from '@/types'
+import { LAST_SEARCH_KEY } from '@/utils/last-search'
 
 const addToCartMock = vi.fn()
 vi.mock('@/api/cart', () => ({
@@ -676,5 +677,69 @@ describe('MallView —— 筛选条（FR-098 ~ FR-106）', () => {
     await pickLabelChild(w)
     await flushPromises()
     expect(lastParams().filterValueIds).toEqual([])
+  })
+})
+
+describe('MallView —— 记住上次搜索（本地存储）', () => {
+  /** 搜索框当前的灰色提示文字 */
+  function placeholder(w: Awaited<ReturnType<typeof mountMall>>) {
+    return (w.get('#mallSearch').element as HTMLInputElement).placeholder
+  }
+
+  it('从没搜过时仍是默认提示', async () => {
+    const w = await mountMall()
+    expect(placeholder(w)).toBe('搜索商品名称、型号或规格')
+  })
+
+  it('提交搜索后把关键词记在本地，输入框清空时以灰色提示直接显示它', async () => {
+    const w = await mountMall()
+    await w.get('#mallSearch').setValue('碳带')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+
+    expect(window.localStorage.getItem(LAST_SEARCH_KEY)).toBe('碳带')
+
+    await w.get('#mallSearch').setValue('')
+    expect(placeholder(w)).toBe('碳带')
+  })
+
+  it('输入框为空时点「搜索」→ 直接用上次的关键词再搜一次', async () => {
+    const w = await mountMall([spu(1)], 1)
+    await w.get('#mallSearch').setValue('碳带')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+    expect(lastParams().keyword).toBe('碳带')
+
+    await w.get('#mallSearch').setValue('')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+    expect(lastParams().keyword).toBe('碳带')
+  })
+
+  it('填了内容就按填的搜，并把它变成新的「上次搜索」', async () => {
+    window.localStorage.setItem(LAST_SEARCH_KEY, '碳带')
+    const w = await mountMall([spu(1)], 1)
+    expect(placeholder(w)).toBe('碳带')
+
+    await w.get('#mallSearch').setValue('热敏纸')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+
+    expect(lastParams().keyword).toBe('热敏纸')
+    expect(window.localStorage.getItem(LAST_SEARCH_KEY)).toBe('热敏纸')
+  })
+
+  it('「清除」是显式中止：不会把上次的关键词又搜回来', async () => {
+    const w = await mountMall([spu(1)], 1)
+    await w.get('#mallSearch').setValue('碳带')
+    await w.get('#mallSearchBox').trigger('submit')
+    await flushPromises()
+
+    await w.get('#mallSearchClear').trigger('click')
+    await flushPromises()
+
+    expect(lastParams().keyword).toBeUndefined()
+    // 记着的词还在：想再搜一次同一个词，点「搜索」即可
+    expect(placeholder(w)).toBe('碳带')
   })
 })

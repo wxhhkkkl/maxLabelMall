@@ -21,8 +21,12 @@ export interface ParseResult {
   province: Area | null
   city: Area | null
   district: Area | null
-  /** 扣除行政区划后的剩余文本；没有剩余时是空串 */
+  /** 扣除行政区划（以及识别到的姓名、手机号）后的剩余文本；没有剩余时是空串 */
   detail: string
+  /** 识别到的手机号（11 位，已去掉内部空格/短横）；没识别到时是空串（Q55） */
+  phone: string
+  /** 识别到的收件人姓名；没识别到时是空串（Q55） */
+  name: string
   /** 未识别到的层级，顺序固定为 province → city → district */
   missing: AddressLevel[]
   /**
@@ -41,6 +45,8 @@ function nothing(): ParseResult {
     city: null,
     district: null,
     detail: '',
+    phone: '',
+    name: '',
     missing: [...ALL_LEVELS],
     matchedLevels: 0,
   }
@@ -169,6 +175,99 @@ function meaningful(text: string): boolean {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// 收件人与手机号（Q55 / Q56，2026-10-23 所有者改判 —— 原 FR-128 说不识别）
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 姓名与手机号之间的分隔符：空白与常见中英文标点 */
+const SEPARATOR = /[\s,，、;；:：|]/
+
+/**
+ * 「收货人：张三」这类标签。只在**找姓名/手机号**用的副本上擦掉，
+ * 不动原文 —— 详细地址的扣除仍用原文片段。
+ *
+ * 长词必须排在短词前面（「手机号」先于「手机」），否则会剩下一个「号」字。
+ */
+const PERSON_LABELS = /(收货人|收件人|联系人|姓名|手机号码|手机号|手机|联系电话|联系方式|电话|地址)/g
+
+/** 首尾各取一个「只由分隔符隔开」的片段 */
+function segmentBefore(text: string, end: number): string {
+  let i = end
+  while (i > 0 && SEPARATOR.test(text[i - 1])) i--
+  let j = i
+  while (j > 0 && !SEPARATOR.test(text[j - 1])) j--
+  return text.slice(j, i)
+}
+
+function segmentAfter(text: string, start: number): string {
+  let i = start
+  while (i < text.length && SEPARATOR.test(text[i])) i++
+  let j = i
+  while (j < text.length && !SEPARATOR.test(text[j])) j++
+  return text.slice(i, j)
+}
+
+/**
+ * 找手机号：`1[3-9]` 开头的 11 位，允许号码内部夹空格或短横
+ * （「187-4893-5785」「187 4893 5785」是复制来的号码的常见形态）。
+ *
+ * 前后紧邻数字的不算 —— 否则「138001380001」会被截成「13800138000」填进表单。
+ */
+function findPhone(text: string): { phone: string; raw: string; at: number } | null {
+  const re = /1[3-9]\d(?:[\s-]?\d){8}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const before = text[m.index - 1] ?? ''
+    const after = text[m.index + m[0].length] ?? ''
+    if (/\d/.test(before) || /\d/.test(after)) {
+      re.lastIndex = m.index + 1 // 往后挪一个字符继续找，别漏掉后面的号码
+      continue
+    }
+    return { phone: m[0].replace(/[\s-]/g, ''), raw: m[0], at: m.index }
+  }
+  return null
+}
+
+/**
+ * 详细地址里残留的**独立标签**（「收货人：」「电话：」）。
+ *
+ * 只在认出了姓名/手机号时才擦 —— 那种文本本来就是"标签 + 值"的结构，
+ * 值被各自取走之后标签留在详细地址里毫无意义。
+ *
+ * 必须**有冒号或空格**才算标签：否则「地址不详」「联系电话区号」这类正常文字会被啃掉。
+ */
+const PERSON_LABEL_IN_REST =
+  /(^|[\s,，、;；|])(?:(?:收货人|收件人|联系人|姓名|手机号码|手机号|手机|联系电话|联系方式|电话|地址)(?:\s*[:：]\s*|\s+))+/g
+
+/** 姓名只认 2~4 个汉字（Q55=A） */
+const NAME_RE = /^[一-龥]{2,4}$/
+
+/** 含这些字的片段当地址看，不当姓名 —— 「文一西路」紧邻手机号时最容易误伤 */
+const ADDRESS_CHARS = /[省市县区镇乡村路街巷弄号楼室层栋幢单元园厦场]/
+
+/**
+ * 姓名的判定**故意保守**（Q55=A）：与手机号相邻、2~4 个汉字、且不含地址用字，
+ * 三条同时满足才认，否则留空让客户手填。
+ *
+ * 猜错比不猜更糟：把「文一西路」填进收件人，客户往往不会注意到。
+ */
+function findName(text: string, phone: { at: number; raw: string }): string {
+  const before = segmentBefore(text, phone.at)
+  if (NAME_RE.test(before) && !ADDRESS_CHARS.test(before)) return before
+  const after = segmentAfter(text, phone.at + phone.raw.length)
+  if (NAME_RE.test(after) && !ADDRESS_CHARS.test(after)) return after
+  return ''
+}
+
+/** 一次找出姓名与手机号。两者都拿不到时返回空串 */
+function findPerson(text: string): { name: string; phone: string; raw: string } {
+  // 擦掉「收货人：」这类标签再找，否则紧邻手机号的那段会是「电话」两个字
+  const t = text.replace(PERSON_LABELS, ' ')
+  const hit = findPhone(t)
+  if (!hit) return { name: '', phone: '', raw: '' }
+  return { name: findName(t, hit), phone: hit.phone, raw: hit.raw }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // 入口
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -181,7 +280,9 @@ function meaningful(text: string): boolean {
  *    北京的市级节点与省级**同名**、重庆的市级叫「重庆城区」而文本里根本不会出现，
  *    「省→市→区逐级往下匹配」在这两个地方都会失败
  * 3. 省名没出现 → 先定**市**，且市名必须全国唯一；只找到区县时同理要求区县唯一（R4）
- * 4. 剩余文本 = 扣掉省 / 市 / 区名之后的部分（R6）
+ * 4. 剩余文本 = 扣掉省 / 市 / 区名、认出来的姓名与手机号之后的部分（R6 / Q55）
+ * 5. 姓名与手机号**独立于行政区划**识别（Q56）：区划一个没认出来时它们照样返回，
+ *    是否写回表单由调用方决定
  *
  * @param text 客户粘贴或输入的整段地址（无需预归一化）
  * @param tree 行政区划树（省数组），来自 `getAreaTree()`
@@ -190,6 +291,14 @@ function meaningful(text: string): boolean {
 export function parseAddress(text: string, tree: Area[]): ParseResult {
   const t = normalize(text)
   if (!tree.length || !t) return nothing()
+
+  // 先认人：手机号/姓名不依赖行政区划，认不出区划时也要能填（Q56）
+  const person = findPerson(t)
+  const withPerson = (result: ParseResult): ParseResult => ({
+    ...result,
+    phone: person.phone,
+    name: person.name,
+  })
 
   const provinceHit = findEarliest(tree, t)
 
@@ -220,11 +329,11 @@ export function parseAddress(text: string, tree: Area[]): ParseResult {
 
     const cityHit = findEarliest(cities, t)
     if (cityHit) {
-      if (countByName(cities, cityHit.node.name) !== 1) return nothing()
+      if (countByName(cities, cityHit.node.name) !== 1) return withPerson(nothing())
       city = cityHit.node
     } else {
       const districtHit = findEarliest(districts, t)
-      if (!districtHit || countByName(districts, districtHit.node.name) !== 1) return nothing()
+      if (!districtHit || countByName(districts, districtHit.node.name) !== 1) return withPerson(nothing())
       district = districtHit.node
       city = triples.find((x) => x.district === districtHit.node)?.city ?? null
     }
@@ -236,13 +345,18 @@ export function parseAddress(text: string, tree: Area[]): ParseResult {
     }
   }
 
-  if (!province) return nothing()
+  if (!province) return withPerson(nothing())
 
   // 剩余文本：省名没在文本里出现过时**不扣它**（否则会把「吉林市」的「吉林」误扣掉）
   let rest = t
   if (provinceHit) rest = consume(rest, province)
   rest = consume(rest, city)
   rest = consume(rest, district)
+  // 认出来的姓名与手机号已经各自有归属了，不能再留在详细地址里
+  if (person.raw) rest = rest.replace(person.raw, ' ')
+  if (person.name) rest = rest.replace(person.name, ' ')
+  // 「收货人：」「电话：」这类标签同样不该留在详细地址里
+  if (person.raw || person.name) rest = rest.replace(PERSON_LABEL_IN_REST, '$1 ')
   rest = rest.replace(/\s+/g, ' ').trim()
 
   const missing: AddressLevel[] = []
@@ -255,6 +369,8 @@ export function parseAddress(text: string, tree: Area[]): ParseResult {
     city,
     district,
     detail: meaningful(rest) ? rest : '',
+    phone: person.phone,
+    name: person.name,
     missing,
     matchedLevels: 3 - missing.length,
   }

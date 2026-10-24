@@ -177,6 +177,13 @@ public class AppTradeOrderController {
                 tradeOrderQueryService.getExpressTrackList(id, getLoginUserId())));
     }
 
+    @GetMapping("/get-express-map-url")
+    @Operation(summary = "获得交易订单的物流地图地址")
+    @Parameter(name = "id", description = "交易订单编号")
+    public CommonResult<String> getExpressMapUrl(@RequestParam("id") Long id) {
+        return success(tradeOrderQueryService.getExpressMapUrl(id, getLoginUserId()));
+    }
+
     @GetMapping("/page")
     @Operation(summary = "获得交易订单分页")
     public CommonResult<PageResult<AppTradeOrderPageItemRespVO>> getOrderPage(AppTradeOrderPageReqVO reqVO) {

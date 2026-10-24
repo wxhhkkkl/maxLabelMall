@@ -4,19 +4,28 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/008-corporate-transfer/plan.md
+specs/010-express-track/plan.md
 
 Supporting artifacts for the active feature:
-- specs/008-corporate-transfer/spec.md — 功能规格（两轮澄清共 6 项决策 Q41~Q46）
-- specs/008-corporate-transfer/research.md — 技术决策与被否决方案（R42~R47）
-- specs/008-corporate-transfer/data-model.md — 1 张新子表 + trade_config 新字段 + 「待收款」判定
-- specs/008-corporate-transfer/contracts/app-api.md — C 端：结算 / 下单 / 订单详情
-- specs/008-corporate-transfer/contracts/admin-api.md — 管理端：确认收款 / 取消订单 / 筛选
-- specs/008-corporate-transfer/quickstart.md — 手工验证清单与显式不验证项
-  ⚠️ 两条**最容易踩的实现陷阱**（详见 plan 的风险表）：**自动取消的筛选有两处，只改一处会出事**（R45）、
-  C 端 `needsNoPay` 会把对公单**误判成"无需支付"**（R47）
+- specs/010-express-track/spec.md — 功能规格（Q55~Q60，含两条棕地事实 E9 / E11）
+- specs/010-express-track/research.md — 技术决策与被否决方案（R48~R55）
+- specs/010-express-track/data-model.md — `trade_delivery_express.kd100_code` + 13 家编码回填
+- specs/010-express-track/contracts/app-api.md — C 端：物流轨迹 / 列表加 `logisticsNo`
+- specs/010-express-track/contracts/admin-api.md — 管理端：物流轨迹 / 快递公司编码维护
+- specs/010-express-track/quickstart.md — 手工验证清单与显式不验证项
+  ⚠️ **最容易踩的实现陷阱**（详见 plan 风险表）：`trade_delivery_express.code` **同时供微信小程序
+  物流同步使用**，绝不能改成快递100 全拼编码 —— 快递100 用**新增的 `kd100_code`**（R48）
 
-上一个特性（虚拟商品：买软件不填收货地址）：
+上一个特性（桌面端接入商城会员体系 —— 跨仓库 `maxlabel` + `maxLabelMall`）：
+- specs/009-maxlabel-member-integration/{spec,plan,data-model,quickstart,tasks}.md
+- specs/009-maxlabel-member-integration/contracts/{app-api,admin-api}.md
+
+更早的特性（对公转账：客户线下打款，财务确认收款）：
+- specs/008-corporate-transfer/{spec,plan,research,data-model,quickstart,tasks}.md
+- specs/008-corporate-transfer/contracts/{app-api,admin-api}.md — 确认收款 / 取消订单 / 筛选
+  ⚠️ 三条口径已由所有者拍板（Q41~Q46）：自动取消筛选两处（R45）、`needsNoPay` 误判（R47）
+
+更早的特性（虚拟商品：买软件不填收货地址）：
 - specs/007-virtual-goods/{spec,plan,data-model,quickstart,tasks}.md
 - specs/007-virtual-goods/contracts/{app-api,admin-api}.md — 结算响应加 `deliveryType`、字典加「虚拟商品」
 

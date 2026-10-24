@@ -21,4 +21,12 @@ public class DeliveryExpressSimpleRespVO {
     @NotNull(message = "快递公司名称不能为空")
     private String name;
 
+    /**
+     * 快递100 的公司编码；为空表示该快递公司暂不支持物流查询
+     *
+     * 后台订单详情用它**先判断能不能查**（后台拿不到错误码，见 contracts/admin-api.md）。
+     */
+    @Schema(description = "快递100 编码，为空表示暂不支持查询", example = "shunfeng")
+    private String kd100Code;
+
 }

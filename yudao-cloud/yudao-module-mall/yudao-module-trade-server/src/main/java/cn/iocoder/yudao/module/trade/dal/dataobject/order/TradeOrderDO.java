@@ -216,6 +216,17 @@ public class TradeOrderDO extends BaseDO {
     private LocalDateTime deliveryTime;
 
     /**
+     * 发货地址的地区编号（010 追加；物流地图的 from）
+     *
+     * 发货时后台填写；未填写时用配置的默认发货仓。
+     */
+    private Integer deliveryFromAreaId;
+    /**
+     * 发货地址详情（010 追加；后台发货时填写）
+     */
+    private String deliveryFromAddress;
+
+    /**
      * 收货时间
      */
     private LocalDateTime receiveTime;

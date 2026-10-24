@@ -31,6 +31,10 @@ export interface ParseResult {
   city: Area | null
   district: Area | null
   detail: string
+  /** 识别到的手机号（11 位，已去掉内部空格/短横）；没识别到时是空串（Q55） */
+  phone: string
+  /** 识别到的收件人姓名；没识别到时是空串（Q55） */
+  name: string
   missing: Array<'province' | 'city' | 'district'>
   matchedLevels: number
 }
@@ -67,10 +71,15 @@ export function parseAddress(text: string, tree: Area[]): ParseResult
 | `某某小区3号楼2单元501` | 三个都是 null, detail=**空串**, missing=['province','city','district'], matchedLevels=**0** | FR-121 |
 | `""` / `"   "` / 树为空 | matchedLevels=0 | FR-121 |
 | 文本含多个省（`从浙江发到广东`） | 取**位置最靠前**的那个省 | R2 |
+| `张三 18748935785 浙江省杭州市余杭区文一西路969号` | name=张三, phone=18748935785, detail=`文一西路969号` | Q55 / FR-128 |
+| `浙江省杭州市余杭区文一西路969号 13800138000 张三` | 同上（姓名在号码后面也认） | Q55 |
+| `张三 浙江省杭州市余杭区文一西路969号`（姓名不挨着号码） | name='' , phone='' | Q55（宁可少填） |
+| `浙江省杭州市余杭区 文一西路 18748935785` | name=''（「文一西路」含地址用字）, detail=`文一西路` | Q55 |
+| `张三 18748935785 某某小区3栋`（认不出区划） | matchedLevels=0, detail='', **name=张三, phone=18748935785** | Q56 |
 
 ### 2.4 不变量（可用断言表达）
 
-1. `matchedLevels === 0` ⟺ 三个节点全 `null` **且** `detail === ''`
+1. `matchedLevels === 0` ⟺ 三个节点全 `null` **且** `detail === ''`（`name` / `phone` 不参与这个判据 —— Q56）
 2. `district !== null` ⟹ `province !== null`；`city !== null` ⟹ `province !== null`
 3. `matchedLevels === 3 - missing.length`
 4. 输出的节点对象**必须是入参 `tree` 里的同一个对象引用**（便于组件直接拿去比 `id` 做选中），
@@ -84,10 +93,10 @@ export function parseAddress(text: string, tree: Area[]): ParseResult
 |---|---|
 | 入口 | 表单顶部一个「粘贴整段地址」输入框 + 「自动识别」按钮（Q15=A） |
 | 触发 | **只在点按钮时**执行 `parseAddress`；MUST NOT 在 `detailAddress` 的 input/paste 事件里调用（FR-124） |
-| 写回 | 用 `result.province.id / city?.id / district?.id` 赋给 `lv1 / lv2 / lv3`；`result.detail` 非空时写 `form.detailAddress`（Q16=A / Q17=A） |
-| **识别不到的层级** | **保持客户原值**，MUST NOT 清空（Q16=A；FR-120） |
-| 完全未识别 | `matchedLevels === 0` → **一个字段都不写**，仅提示（FR-121） |
-| 撤销 | 识别前快照 `{lv1, lv2, lv3, detailAddress}`，点撤销整体还原；**不碰** name / mobile / defaultStatus（R10） |
+| 写回 | 用 `result.province.id / city?.id / district?.id` 赋给 `lv1 / lv2 / lv3`；`result.detail` 非空时写 `form.detailAddress`（Q16=A / Q17=A）；`result.name / phone` 非空时写 `form.name / form.mobile`（Q55） |
+| **识别不到的层级** | **保持客户原值**，MUST NOT 清空（Q16=A；FR-120）；姓名/手机号同理 |
+| 完全未识别 | `matchedLevels === 0` **且** `name`、`phone` 都为空 → **一个字段都不写**，仅提示（FR-121）；只要认出了姓名或手机号，就只写这两项（Q56） |
+| 撤销 | 识别前快照 `{lv1, lv2, lv3, detailAddress, name, mobile}`，点撤销整体还原；**不碰** defaultStatus（R10 / Q55） |
 | 树不可用 | `tree` 为空或 `treeError` 非空 → 识别按钮**禁用**并说明原因（R13 / US2 场景 3） |
 | 既有 id | `#addrName` / `#addrMobile` / `#areaLv1..3` / `#addrDetail` / `#addrSave` **一个都不动**（e2e 依赖） |
 | 既有校验 | 五字段必填与保存链路不变（FR-127） |
@@ -96,7 +105,7 @@ export function parseAddress(text: string, tree: Area[]): ParseResult
 
 ## 4. 明确不在契约内
 
-- 不识别收件人姓名与手机号（FR-128）
+- 不识别**寄件人、备注**里的姓名与号码（只认与手机号紧邻的那一个姓名，FR-128 / Q55）
 - 不读剪贴板（FR-124）
 - 不做拼音 / 繁简 / 错别字纠正（R7）
 - 不产出置信度分数（data-model.md 第 3 节末）

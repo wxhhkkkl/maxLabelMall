@@ -84,6 +84,25 @@ public class TradeExpressProperties {
         @NotEmpty(message = "快递 100 授权 Key 配置项不能为空")
         private String key;
 
+        /**
+         * 快递100 地图模板 id（maptrack.do 的 mapConfigKey）
+         *
+         * 取自 `.env` 的 KUAIDI100_TEMPLATE；为空时物流地图不可用。
+         */
+        private String mapConfigKey;
+
+        /**
+         * 默认发货地址的地区编号（如 110108 = 北京市海淀区）
+         *
+         * 发货时后台可改；未改 / 历史订单用这个默认值生成地图。
+         */
+        private Integer defaultFromAreaId;
+
+        /**
+         * 默认发货地址的详细地址（后台发货表单的默认值）
+         */
+        private String defaultFromAddress;
+
     }
 
 }

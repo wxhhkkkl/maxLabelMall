@@ -229,8 +229,14 @@
           {{ formatDate(formData.deliveryTime) }}
         </el-descriptions-item>
         <el-descriptions-item v-for="item in 2" :key="item" label-class-name="no-colon" />
-        <el-descriptions-item v-if="expressTrackList.length > 0" label="物流详情: ">
-          <el-timeline>
+        <el-descriptions-item v-if="formData.logisticsId" label="物流详情: ">
+          <!--
+            010：三种「没有时间轴」的情形必须分开说，不能都渲染成空白 ——
+            编码缺失（暂不支持）/ 查询失败（暂时拿不到）/ 服务商还没轨迹（暂无）。
+          -->
+          <div v-if="expressTrackUnsupported">该快递公司暂不支持查询</div>
+          <div v-else-if="expressTrackError">{{ expressTrackError }}</div>
+          <el-timeline v-else-if="expressTrackList.length > 0">
             <el-timeline-item
               v-for="(express, index) in expressTrackList"
               :key="index"
@@ -239,6 +245,8 @@
               {{ express.content }}
             </el-timeline-item>
           </el-timeline>
+          <div v-else-if="expressTrackLoaded">暂无轨迹信息</div>
+          <div v-else>物流信息加载中…</div>
         </el-descriptions-item>
       </div>
       <!-- 自提门店 -->
@@ -248,6 +256,26 @@
         </el-descriptions-item>
       </div>
     </el-descriptions>
+
+    <!--
+      物流地图（010 追加）：点击才查询；iframe 内嵌快递100 trailUrl。
+      没配置发货地址 / 历史单缺地区时在按钮下给明确提示，不渲染空 iframe。
+    -->
+    <div
+      v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type && formData.logisticsId"
+      class="express-map"
+    >
+      <div class="express-map-title">物流地图</div>
+      <div v-if="expressMapLoading" class="express-map-loading">地图加载中…</div>
+      <div v-if="expressMapError" class="express-map-error">{{ expressMapError }}</div>
+      <iframe
+        v-if="expressMapUrl"
+        :src="expressMapUrl"
+        class="express-map-frame"
+        title="物流地图"
+        loading="lazy"
+      ></iframe>
+    </div>
 
     <!-- 订单日志 -->
     <el-descriptions title="订单操作日志">
@@ -404,8 +432,12 @@ const getDetail = async () => {
     if (!res) {
       message.error('交易订单不存在')
       close()
+      // 必须 return：否则 formData 被置 null，后面的 loadExpressTracks() 会读 deliveryType 抛 NPE
+      return
     }
     formData.value = res
+    // 010：订单刷新后同步刷新物流区（发货 / 改地址 / 确认收款等表单都走 @success="getDetail"）
+    await loadExpressTracks()
   }
 }
 
@@ -424,22 +456,110 @@ const clipboardSuccess = () => {
 
 /** 初始化 **/
 const deliveryExpressList = ref<DeliveryExpressApi.DeliveryExpressVO[]>([]) // 物流公司
-const expressTrackList = ref<Array<{ time?: Date | string; content?: string }>>([]) // 物流详情
+const expressTrackList = ref<TradeOrderApi.ExpressTrack[]>([]) // 物流详情
+const expressTrackLoaded = ref(false) // 轨迹已查完（用来区分「空轨迹」与「还没查」）
+const expressTrackError = ref('') // 查询失败的站内文案
+const expressTrackUnsupported = ref(false) // 快递公司没有 kd100Code
+const expressMapUrl = ref('') // 物流地图 trailUrl（010 追加）
+const expressMapLoading = ref(false)
+const expressMapError = ref('')
 const pickUpStore = ref<DeliveryPickUpStoreApi.DeliveryPickUpStoreVO>() // 自提门店
+
+/**
+ * 加载物流区（010）。
+ *
+ * ⚠️ **必须可重入，且由 `getDetail()` 调用**：只放在 `onMounted` 里会导致
+ * 「发货后 logisticsId 才出现、物流区却永远停在「加载中…」」。
+ * 这里同时兜住两种失败：精简快递列表拉取失败、轨迹接口失败。
+ */
+async function loadExpressTracks() {
+  expressTrackList.value = []
+  expressTrackLoaded.value = false
+  expressTrackError.value = ''
+  expressTrackUnsupported.value = false
+  // 地图是按订单/地址生成的，刷新订单时清掉旧图
+  expressMapUrl.value = ''
+  expressMapError.value = ''
+  expressMapLoading.value = false
+  if (formData.value.deliveryType !== DeliveryTypeEnum.EXPRESS.type) {
+    return
+  }
+  // 地图与轨迹并行加载；地图失败只影响地图区
+  void loadExpressMap()
+  // 精简快递列表（含 kd100Code）只拉一次；失败也只影响物流区（FR-258）
+  if (deliveryExpressList.value.length === 0) {
+    try {
+      deliveryExpressList.value = await DeliveryExpressApi.getSimpleDeliveryExpressList()
+    } catch {
+      expressTrackError.value = '暂时无法获取物流信息，请稍后重试'
+      return
+    }
+  }
+  if (!formData.value.logisticsId) {
+    return
+  }
+  // 先用 kd100Code 判断能不能查（后台拿不到错误码，见 contracts/admin-api.md）
+  const express = deliveryExpressList.value.find((item) => item.id === formData.value.logisticsId)
+  if (!express?.kd100Code) {
+    expressTrackUnsupported.value = true
+    return
+  }
+  try {
+    expressTrackList.value = await TradeOrderApi.getExpressTrackList(formData.value.id!)
+    expressTrackLoaded.value = true
+  } catch (e) {
+    // 失败只影响这一块，页面其余内容照常（FR-258 / FR-259）
+    expressTrackList.value = []
+    // 轨迹请求带 silent，能拿到业务 code；编码无法识别时要与「暂时失败」分开说（FR-261）
+    expressTrackError.value =
+      (e as { code?: number })?.code === TradeOrderApi.EXPRESS_QUERY_NOT_SUPPORTED
+        ? '该快递公司暂不支持查询'
+        : '暂时无法获取物流信息，请稍后重试'
+  }
+}
+
+/**
+ * 加载物流地图（默认展示，不要求点击）。
+ *
+ * 地图查询独立计费；服务端 `express_map` 缓存 1 小时，重复打开不重复计费。
+ */
+async function loadExpressMap() {
+  if (!formData.value.id
+      || formData.value.deliveryType !== DeliveryTypeEnum.EXPRESS.type
+      || !formData.value.logisticsId) {
+    return
+  }
+  expressMapLoading.value = true
+  expressMapError.value = ''
+  try {
+    expressMapUrl.value = await TradeOrderApi.getExpressMapUrl(formData.value.id)
+  } catch (e) {
+    expressMapUrl.value = ''
+    const code = (e as { code?: number })?.code
+    if (code === TradeOrderApi.EXPRESS_MAP_NOT_CONFIGURED) {
+      expressMapError.value = '物流地图暂未配置发货地址'
+    } else if (code === TradeOrderApi.EXPRESS_MAP_NOT_AVAILABLE) {
+      expressMapError.value = '该订单暂无法生成物流地图'
+    } else if (code === TradeOrderApi.EXPRESS_QUERY_NOT_SUPPORTED) {
+      expressMapError.value = '该快递公司暂不支持查询'
+    } else {
+      expressMapError.value = '暂时无法获取物流地图，请稍后重试'
+    }
+  } finally {
+    expressMapLoading.value = false
+  }
+}
+
 onMounted(async () => {
+  // getDetail 内部会加载物流区
   await getDetail()
-  // 如果配送方式为快递，则查询物流公司
-  if (formData.value.deliveryType === DeliveryTypeEnum.EXPRESS.type) {
-    deliveryExpressList.value = await DeliveryExpressApi.getSimpleDeliveryExpressList()
-    if (formData.value.logisticsId) {
-      expressTrackList.value = await TradeOrderApi.getExpressTrackList(formData.value.id!)
-    }
-  } else if (formData.value.deliveryType === DeliveryTypeEnum.PICK_UP.type) {
-    if (formData.value.pickUpStoreId) {
-      pickUpStore.value = await DeliveryPickUpStoreApi.getDeliveryPickUpStore(
-        formData.value.pickUpStoreId
-      )
-    }
+  if (
+    formData.value.deliveryType === DeliveryTypeEnum.PICK_UP.type &&
+    formData.value.pickUpStoreId
+  ) {
+    pickUpStore.value = await DeliveryPickUpStoreApi.getDeliveryPickUpStore(
+      formData.value.pickUpStoreId
+    )
   }
 })
 </script>
@@ -522,5 +642,33 @@ onMounted(async () => {
     justify-content: center;
     align-items: center;
   }
+}
+
+/* 物流地图（010 追加） */
+.express-map {
+  margin-top: 20px;
+}
+.express-map-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.express-map-loading {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  margin-top: 8px;
+}
+.express-map-error {
+  color: var(--el-color-danger);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.express-map-frame {
+  width: 100%;
+  height: 360px;
+  border: 0;
+  border-radius: 8px;
+  margin-top: 12px;
+  background: #f5f7fa;
 }
 </style>

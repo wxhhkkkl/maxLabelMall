@@ -217,9 +217,13 @@ service.interceptors.response.use(
         // hard coding：忽略这个提示，直接登出
         console.log(msg)
         return handleAuthorized()
-      } else {
-        ElNotification.error({ title: msg })
       }
+      // silent：调用方自己处理错误（不弹全局通知），并把业务 code 一起 reject。
+      // 用于「物流轨迹」这类要在页面内联显示、且需要区分 1_011_004_103 的请求。
+      if ((config as any)?.silent) {
+        return Promise.reject({ code, message: msg })
+      }
+      ElNotification.error({ title: msg })
       return Promise.reject('error')
     } else {
       return data
@@ -236,7 +240,10 @@ service.interceptors.response.use(
     } else if (message.includes('Request failed with status code')) {
       message = t('sys.api.apiRequestFailed') + message.substr(message.length - 3)
     }
-    ElMessage.error(message)
+    // silent 请求由调用方内联提示，不再弹全局错误
+    if (!(error.config as any)?.silent) {
+      ElMessage.error(message)
+    }
     return Promise.reject(error)
   }
 )

@@ -128,6 +128,13 @@ export interface OrderPageItem {
    */
   offlineWaiting?: boolean
   /**
+   * 发货物流单号；未发货 / 虚拟商品 / 自提为 null（010 / FR-273）。
+   *
+   * ⚠️ 列表上的「查看物流」入口**只认这个字段**，不要用订单状态代替：
+   * 历史导入单里存在「已完成但没有运单号」的订单。
+   */
+  logisticsNo?: string | null
+  /**
    * 订单项。**名称 / 规格 / 单价 / 数量都是下单时的快照** —— 商品后续改名、
    * 换规格、调价都不应让历史订单跟着变。
    */
@@ -166,9 +173,24 @@ export interface OrderPageItem {
  *
  * 本接口**结构上满足 `OrderPrice`**，所以 `reconcile(order)` 可以直接用（SC-007）。
  */
+/**
+ * 一条物流轨迹（010）。
+ *
+ * ⚠️ `time` 与订单其他时间一样是 **epoch 毫秒数**，渲染一律走 `utils/time.ts` 的
+ * `formatDateTime`（FR-270）。
+ */
+export interface ExpressTrack {
+  time: number | string
+  content: string
+}
+
 export interface OrderDetail extends OrderPageItem, OrderPrice {
   /** epoch 毫秒数（见 `createTime` 的说明） */
   payExpireTime: number | string
+  /** 发货物流公司名称（后端 `AppTradeOrderDetailRespVO.logisticsName`） */
+  logisticsName?: string | null
+  /** 发货时间，epoch 毫秒数 */
+  deliveryTime?: number | string | null
   payTime?: number | string
   payChannelName?: string
   /**

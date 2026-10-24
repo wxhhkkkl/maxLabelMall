@@ -7,12 +7,14 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
+import cn.iocoder.yudao.module.trade.framework.delivery.config.TradeExpressProperties;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
+import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
@@ -49,12 +51,16 @@ public class TradeOrderController {
     @Resource
     private TradeOrderQueryService tradeOrderQueryService;
     @Resource
+    private cn.iocoder.yudao.module.trade.framework.delivery.config.TradeExpressProperties tradeExpressProperties;
+    @Resource
     private TradeOrderLogService tradeOrderLogService;
 
     @Resource
     private MemberUserApi memberUserApi;
     @Resource
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
+    @Resource
+    private TradeOrderInvoiceService tradeOrderInvoiceService;
 
     @GetMapping("/page")
     @Operation(summary = "获得交易订单分页")
@@ -75,6 +81,12 @@ public class TradeOrderController {
                 convertSet(pageResult.getList(), TradeOrderDO::getId));
         // 最终组合
         PageResult<TradeOrderPageItemRespVO> page = TradeOrderConvert.INSTANCE.convertPage(pageResult, orderItems, userMap);
+
+        // 开票状态（006 / FR-178）：**一次 IN 批量查**，与 C 端订单列表同一手法。
+        // 未申请的订单拿不到值 → 字段保持 null → 列表显示「否」
+        Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(
+                convertSet(page.getList(), TradeOrderPageItemRespVO::getId));
+        page.getList().forEach(item -> item.setInvoiceStatus(invoiceStatusMap.get(item.getId())));
 
         // 对公转账「待收款」（008 / FR-209）：**一次 IN 批量查**，与 C 端同一手法
         Set<Long> waitingOrderIds = tradeOrderOfflinePaymentService.getWaitingReceiptOrderIds(
@@ -140,6 +152,24 @@ public class TradeOrderController {
     public CommonResult<List<?>> getOrderExpressTrackList(@RequestParam("id") Long id) {
         return success(TradeOrderConvert.INSTANCE.convertList02(
                 tradeOrderQueryService.getExpressTrackList(id)));
+    }
+
+    @GetMapping("/get-express-map-url")
+    @Operation(summary = "获得交易订单的物流地图地址")
+    @Parameter(name = "id", description = "交易订单编号")
+    @PreAuthorize("@ss.hasPermission('trade:order:query')")
+    public CommonResult<String> getExpressMapUrl(@RequestParam("id") Long id) {
+        return success(tradeOrderQueryService.getExpressMapUrl(id));
+    }
+
+    @GetMapping("/get-delivery-default-address")
+    @Operation(summary = "获得发货默认地址")
+    @PreAuthorize("@ss.hasPermission('trade:order:update')")
+    public CommonResult<TradeOrderDeliveryDefaultRespVO> getDeliveryDefaultAddress() {
+        TradeExpressProperties.Kd100Config kd100 = tradeExpressProperties.getKd100();
+        return success(new TradeOrderDeliveryDefaultRespVO()
+                .setAreaId(kd100 != null ? kd100.getDefaultFromAreaId() : null)
+                .setAddress(kd100 != null ? kd100.getDefaultFromAddress() : null));
     }
 
     @PutMapping("/delivery")

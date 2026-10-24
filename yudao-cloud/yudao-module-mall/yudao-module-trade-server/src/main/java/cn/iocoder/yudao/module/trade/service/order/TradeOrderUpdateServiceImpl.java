@@ -448,8 +448,15 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 2.1 快递发货
         DeliveryExpressDO express = null;
         if (ObjectUtil.notEqual(deliveryReqVO.getLogisticsId(), TradeOrderDO.LOGISTICS_ID_NULL)) {
+            // 010 追加：快递发货必须填发货地址（后台表单已默认填好，可改）
+            if (deliveryReqVO.getDeliveryFromAreaId() == null
+                    || StrUtil.isEmpty(deliveryReqVO.getDeliveryFromAddress())) {
+                throw exception(ORDER_DELIVERY_FROM_ADDRESS_REQUIRED);
+            }
             express = deliveryExpressService.validateDeliveryExpress(deliveryReqVO.getLogisticsId());
-            updateOrderObj.setLogisticsId(deliveryReqVO.getLogisticsId()).setLogisticsNo(deliveryReqVO.getLogisticsNo());
+            updateOrderObj.setLogisticsId(deliveryReqVO.getLogisticsId()).setLogisticsNo(deliveryReqVO.getLogisticsNo())
+                    .setDeliveryFromAreaId(deliveryReqVO.getDeliveryFromAreaId())
+                    .setDeliveryFromAddress(deliveryReqVO.getDeliveryFromAddress());
         } else {
             // 2.2 无需发货
             updateOrderObj.setLogisticsId(0L).setLogisticsNo("");
@@ -474,7 +481,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 5. 处理订单发货后逻辑
         order.setLogisticsId(updateOrderObj.getLogisticsId()).setLogisticsNo(updateOrderObj.getLogisticsNo())
-                .setStatus(updateOrderObj.getStatus()).setDeliveryTime(updateOrderObj.getDeliveryTime());
+                .setStatus(updateOrderObj.getStatus()).setDeliveryTime(updateOrderObj.getDeliveryTime())
+                .setDeliveryFromAreaId(updateOrderObj.getDeliveryFromAreaId())
+                .setDeliveryFromAddress(updateOrderObj.getDeliveryFromAddress());
         tradeOrderHandlers.forEach(handler -> handler.afterDeliveryOrder(order));
     }
 

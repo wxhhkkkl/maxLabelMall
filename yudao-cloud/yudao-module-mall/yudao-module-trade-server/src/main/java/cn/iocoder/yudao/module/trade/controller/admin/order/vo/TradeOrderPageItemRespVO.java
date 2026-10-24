@@ -24,6 +24,16 @@ public class TradeOrderPageItemRespVO extends TradeOrderBaseVO {
     private MemberUserRespVO brokerageUser;
 
     /**
+     * 开票状态（006）：0 待开票 / 10 已开票 / 20 已作废；**未申请为 null**
+     *
+     * 订单列表用它替换掉原来的「推荐人」列 —— 运营扫单时更关心"这单要不要开票、开了没"。
+     * ⚠️ 一次 `IN` 批量查（`TradeOrderInvoiceService#getInvoiceStatusMapByOrderIds`），
+     * 不许逐笔查。
+     */
+    @Schema(description = "开票状态：0 待开票，10 已开票，20 已作废；未申请为 null", example = "0")
+    private Integer invoiceStatus;
+
+    /**
      * 是不是**待收款**的对公转账单（008 / FR-209）
      *
      * 列表上把它显示成「待收款」而不是「待支付」，财务一眼能看出"这单在等打款"。

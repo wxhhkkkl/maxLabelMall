@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { InvoiceStatus, InvoiceTitleKind, InvoiceType, OrderStatus, type OrderDetail, type OrderInvoice } from '@/types'
+import { EXPRESS_MAP_NOT_CONFIGURED, EXPRESS_QUERY_NOT_SUPPORTED } from '@/utils/expressTrack'
 import { clearWxPayPending, markWxPayPending, readWxPayPending } from '@/utils/weixin'
 
 const getOrderDetail = vi.fn()
@@ -19,12 +20,16 @@ vi.mock('@/api/invoice', () => ({
   deleteInvoiceTitle: vi.fn(),
 }))
 const cancelOrder = vi.fn()
+const getExpressTrackList = vi.fn()
+const getExpressMapUrl = vi.fn()
 const submitPay = vi.fn()
 const getPayOrder = vi.fn()
 const listEnabledChannelCodes = vi.fn()
 vi.mock('@/api/order', () => ({
   getOrderDetail: (...a: unknown[]) => getOrderDetail(...a),
   cancelOrder: (...a: unknown[]) => cancelOrder(...a),
+  getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
+  getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
   pageOrders: vi.fn(),
   getOrderCount: vi.fn(),
   createOrder: vi.fn(),
@@ -103,6 +108,8 @@ const router = createRouter({
 const CREATE_AT = new Date(2026, 8, 24, 10, 0, 0).getTime() // 2026-09-24 10:00:00
 const EXPIRE_AT = new Date(2026, 8, 24, 12, 0, 0).getTime() // 2026-09-24 12:00:00
 const PAID_AT = new Date(2026, 8, 24, 10, 5, 0).getTime() // 2026-09-24 10:05:00
+const TRACK_OLD_AT = new Date(2026, 9, 21, 12, 0, 0).getTime() // 2026-10-21 12:00:00
+const TRACK_NEW_AT = new Date(2026, 9, 22, 18, 30, 0).getTime() // 2026-10-22 18:30:00
 
 /**
  * 六项自洽：100 元商品 - 30 元券 + 8 元运费 = 78 元。
@@ -164,6 +171,10 @@ beforeEach(async () => {
   createOrderInvoice.mockResolvedValue(77)
   cancelOrder.mockReset()
   cancelOrder.mockResolvedValue(true)
+  getExpressTrackList.mockReset()
+  getExpressTrackList.mockResolvedValue([])
+  getExpressMapUrl.mockReset()
+  getExpressMapUrl.mockResolvedValue('')
   submitPay.mockReset()
   // ⚠️ 默认取「渠道已受理、**没有** displayMode」那条路 —— 即提交后重拉详情确认状态。
   //    这个值**不能随便写**：`displayMode: 'url'` 意味着「跳收银台」，组件会直接
@@ -275,6 +286,115 @@ describe('OrderDetailView —— 商品明细与收货信息（FR-035）', () =>
     expect(w.text()).toContain('13800008888')
     expect(w.text()).toContain('北京市 东城区')
     expect(w.text()).toContain('xx 路 1 号')
+  })
+})
+
+describe('OrderDetailView —— 物流信息（US35 / FR-253~255 / FR-270）', () => {
+  it('已发货订单自动加载并展示公司、运单号与倒序轨迹', async () => {
+    getExpressTrackList.mockResolvedValue([
+      { time: TRACK_NEW_AT, content: '已签收' },
+      { time: TRACK_OLD_AT, content: '运输中' },
+    ])
+    const w = await mountDetail(
+      detail({
+        status: OrderStatus.DELIVERED,
+        logisticsNo: 'SF1234567890',
+        logisticsName: '顺丰速运',
+        deliveryTime: CREATE_AT,
+      }),
+    )
+
+    expect(getExpressTrackList).toHaveBeenCalledWith(1)
+    expect(w.text()).toContain('顺丰速运')
+    expect(w.text()).toContain('SF1234567890')
+    expect(w.text()).toContain('已签收')
+    expect(w.text()).toContain('运输中')
+    // 时间格式化过，不是原始毫秒数（FR-270）
+    expect(w.text()).toContain('2026-10-22 18:30:00')
+    expect(w.text()).not.toContain(String(TRACK_NEW_AT))
+  })
+
+  it('未发货 / 虚拟商品 / 自提**不渲染物流卡，也不查轨迹**', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.UNDELIVERED }))
+
+    expect(w.text()).not.toContain('物流信息')
+    expect(getExpressTrackList).not.toHaveBeenCalled()
+  })
+
+  it('轨迹为空时显示「暂无轨迹信息」，公司/运单号仍在', async () => {
+    getExpressTrackList.mockResolvedValue([])
+    const w = await mountDetail(
+      detail({
+        status: OrderStatus.DELIVERED,
+        logisticsNo: 'SF1234567890',
+        logisticsName: '顺丰速运',
+      }),
+    )
+
+    expect(w.text()).toContain('顺丰速运')
+    expect(w.text()).toContain('SF1234567890')
+    expect(w.text()).toContain('暂无轨迹信息')
+  })
+})
+
+describe('OrderDetailView —— 物流失败降级（US37 / FR-258~261）', () => {
+  const shipped = () =>
+    detail({
+      status: OrderStatus.DELIVERED,
+      logisticsNo: 'SF1234567890',
+      logisticsName: '顺丰速运',
+    })
+
+  it('编码不支持 → 「该快递公司暂不支持查询」，公司/运单号仍在', async () => {
+    getExpressTrackList.mockRejectedValue({ code: EXPRESS_QUERY_NOT_SUPPORTED })
+
+    const w = await mountDetail(shipped())
+
+    expect(w.text()).toContain('该快递公司暂不支持查询')
+    expect(w.text()).toContain('顺丰速运')
+    expect(w.text()).toContain('SF1234567890')
+  })
+
+  it('三方/网络失败 → 通用降级提示，订单其余内容照常渲染（FR-258 / FR-259）', async () => {
+    getExpressTrackList.mockRejectedValue(new Error('socket hang up'))
+
+    const w = await mountDetail(shipped())
+
+    expect(w.text()).toContain('暂时无法获取物流信息，请稍后重试')
+    // 第三方原文不出现
+    expect(w.text()).not.toContain('socket hang up')
+    // 订单本身照常
+    expect(w.text()).toContain('三防热敏标签纸')
+    expect(w.text()).toContain('¥78.00')
+  })
+})
+
+describe('OrderDetailView —— 物流地图（010 追加）', () => {
+  const shipped = () =>
+    detail({
+      status: OrderStatus.DELIVERED,
+      logisticsNo: 'SF1234567890',
+      logisticsName: '顺丰速运',
+    })
+
+  it('进入详情自动加载地图并内嵌 iframe（不需要点击）', async () => {
+    getExpressMapUrl.mockResolvedValue('https://api.kuaidi100.com/tools/map/x')
+
+    const w = await mountDetail(shipped())
+
+    expect(getExpressMapUrl).toHaveBeenCalledWith(1)
+    expect(w.find('iframe.od-map-frame').attributes('src')).toBe(
+      'https://api.kuaidi100.com/tools/map/x',
+    )
+  })
+
+  it('地图未配置 → 站内提示，不渲染 iframe', async () => {
+    getExpressMapUrl.mockRejectedValue({ code: EXPRESS_MAP_NOT_CONFIGURED })
+
+    const w = await mountDetail(shipped())
+
+    expect(w.text()).toContain('物流地图暂未配置')
+    expect(w.find('iframe').exists()).toBe(false)
   })
 })
 

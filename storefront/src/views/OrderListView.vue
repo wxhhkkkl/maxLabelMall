@@ -216,6 +216,18 @@ onMounted(load)
             >
               取消订单
             </button>
+            <!--
+              物流入口（010 / FR-273）：**只认运单号**，不用订单状态判断 ——
+              历史导入单里有「已完成但没有运单号」的订单，按状态给入口会点进一个没有物流的详情页。
+              列表这里只把人送过去，轨迹与查询都在详情页（不复制、不为列表发轨迹请求）。
+            -->
+            <RouterLink
+              v-if="o.logisticsNo"
+              class="btn-cart oc-express"
+              :to="`/order/${o.id}`"
+            >
+              查看物流
+            </RouterLink>
             <RouterLink class="btn-cart" :to="`/order/${o.id}`">查看详情</RouterLink>
             </div>
           </div>

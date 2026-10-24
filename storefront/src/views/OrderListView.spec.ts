@@ -308,3 +308,25 @@ describe('OrderListView —— 对公转账「待收款」（008 / FR-200）', (
     expect(labels).toEqual(['全部', '待支付', '待发货', '已发货', '已完成', '已取消'])
   })
 })
+
+describe('OrderListView —— 物流入口（US35 / FR-273）', () => {
+  it('有运单号时显示「查看物流」，指向订单详情', async () => {
+    const w = await mountList([order(1, { logisticsNo: 'SF1234567890' })])
+
+    const link = w.findAll('a').find((a) => a.text().includes('查看物流'))
+    expect(link).toBeTruthy()
+    expect(link?.attributes('href')).toBe('/order/1')
+  })
+
+  it('没有运单号（含已完成的历史单）**不显示**入口', async () => {
+    const w = await mountList([order(1, { status: OrderStatus.COMPLETED })])
+
+    expect(w.text()).not.toContain('查看物流')
+  })
+
+  it('列表**不展示轨迹内容**，也不为列表发起轨迹查询', async () => {
+    const w = await mountList([order(1, { logisticsNo: 'SF1234567890' })])
+
+    expect(w.text()).not.toContain('已签收')
+  })
+})

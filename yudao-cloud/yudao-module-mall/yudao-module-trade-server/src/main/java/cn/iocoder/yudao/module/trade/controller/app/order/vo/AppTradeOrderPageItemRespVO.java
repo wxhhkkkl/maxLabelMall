@@ -46,6 +46,15 @@ public class AppTradeOrderPageItemRespVO {
     private Integer deliveryType;
 
     /**
+     * 发货物流单号；未发货 / 虚拟商品 / 自提为 null
+     *
+     * C 端「我的订单」只在它非空时显示「查看物流」入口（010 / FR-273）。
+     * ⚠️ 不要用订单状态代替：历史导入单里存在「已完成但没有运单号」的订单。
+     */
+    @Schema(description = "发货物流单号", example = "SF1234567890")
+    private String logisticsNo;
+
+    /**
      * 订单项数组
      */
     private List<AppTradeOrderItemRespVO> items;

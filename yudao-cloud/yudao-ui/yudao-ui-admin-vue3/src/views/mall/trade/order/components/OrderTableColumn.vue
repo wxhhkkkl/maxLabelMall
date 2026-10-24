@@ -1,152 +1,153 @@
 <template>
   <el-table-column class-name="order-table-col">
+    <!--
+      ⚠️ 表头与每笔订单的内容**共用同一个 grid 模板**（`.order-grid`，见下方样式）。
+      早先这里是「外层表头 + 每个订单一张内层 el-table」，表头宽度靠挂载后实测内层表的
+      像素宽再回填 —— 容器一变（窗口缩放、侧栏折叠）就错位，2026-10-23 预览时肉眼可见。
+      现在两边都由同一个 fr 模板算宽度，天然对齐，也不再需要那套测量代码。
+    -->
     <template #header>
-      <div class="flex items-center" style="width: 100%">
-        <div :style="{ width: orderTableHeadWidthList[0] + 'px' }" class="flex justify-center">
-          商品信息
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[1] + 'px' }" class="flex justify-center">
-          单价(元)/数量
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[2] + 'px' }" class="flex justify-center">
-          售后状态
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[3] + 'px' }" class="flex justify-center">
-          实付金额(元)
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[4] + 'px' }" class="flex justify-center">
-          买家/收货人
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[5] + 'px' }" class="flex justify-center">
-          配送方式
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[6] + 'px' }" class="flex justify-center">
-          订单状态
-        </div>
-        <div :style="{ width: orderTableHeadWidthList[7] + 'px' }" class="flex justify-center">
-          操作
-        </div>
+      <div class="order-grid order-grid-head">
+        <div>产品</div>
+        <div>数量</div>
+        <div>金额</div>
+        <div>下单时间</div>
+        <div>会员</div>
+        <div>发票</div>
+        <div>收件人信息</div>
+        <div>状态</div>
+        <div>操作</div>
       </div>
     </template>
     <template #default="scope">
-      <el-table
-        :ref="setOrderTableRef"
-        :border="true"
-        :data="scope.row.items"
-        :header-cell-style="headerStyle"
-        :span-method="spanMethod"
-        style="width: 100%"
-      >
-        <el-table-column min-width="300" prop="spuName">
-          <template #header>
-            <div
-              class="h-[28px] flex items-center -mx-[10px] px-[20px]"
-              style="background-color: #f1f706"
+      <div class="order-block">
+        <!--
+          订单信息条（按旧后台的版式）：左边「订单编号 + 完成时间」，右边「快递编号 + 查看物流」。
+          原来那条亮黄色（#f1f706）把来源/支付方式/支付时间/订单类型全塞在一行里，挤且刺眼；
+          现在只留运营扫单时真正会看的几项，其余去详情页看。
+        -->
+        <div class="order-head-bar">
+          <div class="order-head-left">
+            <span>订单编号：{{ scope.row.no }}</span>
+            <span v-if="scope.row.finishTime">
+              完成时间：{{ formatDate(scope.row.finishTime) }}
+            </span>
+            <span v-else>下单时间：{{ formatDate(scope.row.createTime) }}</span>
+          </div>
+          <div v-if="scope.row.logisticsNo" class="order-head-right">
+            <span>快递编号：{{ scope.row.logisticsNo }}</span>
+            <!-- 物流轨迹在订单详情里（唯一一处实现），这里只负责把人送过去 -->
+            <el-link
+              type="primary"
+              :underline="false"
+              class="order-head-link"
+              @click="openDetail(scope.row.id)"
             >
-              <span class="mr-20px">订单号：{{ scope.row.no }} </span>
-              <span class="mr-20px">下单时间：{{ formatDate(scope.row.createTime) }}</span>
-              <span>订单来源：</span>
-              <dict-tag :type="DICT_TYPE.TERMINAL" :value="scope.row.terminal" class="mr-20px" />
-              <span>支付方式：</span>
-              <dict-tag
-                v-if="scope.row.payChannelCode"
-                :type="DICT_TYPE.PAY_CHANNEL_CODE"
-                :value="scope.row.payChannelCode"
-                class="mr-20px"
-              />
-              <span v-else class="mr-20px">未支付</span>
-              <span v-if="scope.row.payTime" class="mr-20px">
-                支付时间：{{ formatDate(scope.row.payTime) }}
-              </span>
-              <span>订单类型：</span>
-              <dict-tag :type="DICT_TYPE.TRADE_ORDER_TYPE" :value="scope.row.type" />
-            </div>
-          </template>
-          <template #default="{ row }">
-            <div class="flex flex-wrap items-center">
-              <div class="mr-[8px] flex items-start">
-                <ElTooltip :content="row.spuName" placement="top">
-                  <span class="overflow-ellipsis max-h-[38px] overflow-hidden leading-[19px]">
-                    {{ row.spuName }}
-                  </span>
-                </ElTooltip>
+              查看物流
+            </el-link>
+          </div>
+        </div>
+
+        <div class="order-grid order-grid-body">
+          <!-- 每个订单项一行：产品 / 数量 -->
+          <template v-for="(item, index) in scope.row.items" :key="item.id">
+            <div class="order-cell is-left" :style="{ gridColumn: '1', gridRow: itemRow(index) }">
+              <div class="order-product">
+                <div class="order-product-pic">
+                  <el-image :src="item.picUrl" fit="cover" class="h-[44px] w-[44px]">
+                    <template #error>
+                      <div class="flex h-full w-full items-center justify-center bg-gray-100">
+                        <Icon icon="ep:picture" :size="16" color="#c0c4cc" />
+                      </div>
+                    </template>
+                  </el-image>
+                </div>
+                <div class="order-product-info">
+                  <ElTooltip :content="item.spuName" placement="top">
+                    <span class="order-product-name">{{ item.spuName }}</span>
+                  </ElTooltip>
+                  <div v-if="item.properties?.length" class="order-product-spec">
+                    <el-tag
+                      v-for="property in item.properties"
+                      :key="property.propertyId"
+                      size="small"
+                      class="mr-[4px]"
+                    >
+                      {{ property.propertyName }}: {{ property.valueName }}
+                    </el-tag>
+                  </div>
+                </div>
               </div>
-              <el-tag
-                v-for="property in row.properties"
-                :key="property.propertyId"
-                size="small"
-                class="mb-[2px] mr-[6px]"
-              >
-                {{ property.propertyName }}: {{ property.valueName }}
-              </el-tag>
+            </div>
+            <div class="order-cell" :style="{ gridColumn: '2', gridRow: itemRow(index) }">
+              {{ item.count }}
             </div>
           </template>
-        </el-table-column>
-        <el-table-column label="商品原价*数量" prop="price" width="150">
-          <template #default="{ row }">
-            {{ floatToFixed2(row.price) }} 元 / {{ row.count }}
-          </template>
-        </el-table-column>
-        <el-table-column label="售后状态" prop="afterSaleStatus" width="120">
-          <template #default="{ row }">
-            <dict-tag
-              :type="DICT_TYPE.TRADE_ORDER_ITEM_AFTER_SALE_STATUS"
-              :value="row.afterSaleStatus"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column align="center" label="实际支付" min-width="120" prop="payPrice">
-          <template #default>
-            {{ floatToFixed2(scope.row.payPrice) + '元' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="买家/收货人" min-width="160">
-          <template #default>
-            <!-- 快递发货  -->
-            <div
-              v-if="scope.row.deliveryType === DeliveryTypeEnum.EXPRESS.type"
-              class="flex flex-col"
-            >
-              <span>买家：{{ scope.row.user?.nickname }}</span>
-              <span>
-                收货人：{{ scope.row.receiverName }} {{ scope.row.receiverMobile }}
-                {{ scope.row.receiverAreaName }} {{ scope.row.receiverDetailAddress }}
-              </span>
-            </div>
+
+          <!-- 订单级信息：跨所有订单项行 -->
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '3', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
+            <div class="order-amount">{{ floatToFixed2(scope.row.payPrice!) }}</div>
+            <div class="order-amount-origin">{{ floatToFixed2(scope.row.totalPrice!) }}元</div>
+          </div>
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '4', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
+            {{ formatDate(scope.row.createTime) }}
+          </div>
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '5', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
+            <div>{{ scope.row.user?.nickname || '—' }}</div>
+            <div class="order-sub-text">(ID:{{ scope.row.userId }})</div>
+          </div>
+          <!-- 是否需要发票（2026-10-23 替换原来的「推荐人」列） -->
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '6', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
+            <el-tag v-if="scope.row.invoiceStatus === INVOICE_STATUS.WAITING" type="warning">
+              待开票
+            </el-tag>
+            <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.ISSUED" type="success">
+              已开票
+            </el-tag>
+            <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.CANCELED" type="info">
+              已作废
+            </el-tag>
+            <span v-else class="order-sub-text">否</span>
+          </div>
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '7', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
+            <!-- 快递发货：收件人 -->
+            <template v-if="scope.row.deliveryType === DeliveryTypeEnum.EXPRESS.type">
+              <div>{{ scope.row.receiverName }}</div>
+              <div class="order-sub-text">{{ scope.row.receiverMobile }}</div>
+            </template>
             <!-- 虚拟商品（软件等）：没有收货人，只显示买家（007） -->
-            <div
-              v-if="scope.row.deliveryType === DeliveryTypeEnum.VIRTUAL.type"
-              class="flex flex-col"
-            >
-              <span>买家：{{ scope.row.user?.nickname }}</span>
-            </div>
-            <!-- 自提  -->
-            <div
-              v-if="scope.row.deliveryType === DeliveryTypeEnum.PICK_UP.type"
-              class="flex flex-col"
-            >
-              <span>
-                门店名称：
+            <template v-else-if="scope.row.deliveryType === DeliveryTypeEnum.VIRTUAL.type">
+              <div>买家：{{ scope.row.user?.nickname || '—' }}</div>
+            </template>
+            <!-- 自提 -->
+            <template v-else>
+              <div>
                 {{ pickUpStoreList.find((p) => p.id === scope.row.pickUpStoreId)?.name }}
-              </span>
-              <span>
-                门店手机：
+              </div>
+              <div class="order-sub-text">
                 {{ pickUpStoreList.find((p) => p.id === scope.row.pickUpStoreId)?.phone }}
-              </span>
-              <span>
-                自提门店:
-                {{ pickUpStoreList.find((p) => p.id === scope.row.pickUpStoreId)?.detailAddress }}
-              </span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column align="center" label="配送方式" width="120">
-          <template #default>
-            <dict-tag :type="DICT_TYPE.TRADE_DELIVERY_TYPE" :value="scope.row.deliveryType" />
-          </template>
-        </el-table-column>
-        <el-table-column align="center" label="订单状态" width="120">
-          <template #default>
+              </div>
+            </template>
+          </div>
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '8', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
             <!--
               对公转账「待收款」（008 / FR-200 的运营侧）：状态值仍是「未支付」，
               但运营要一眼看出"这单在等打款"，不能与普通待支付混在一起 ——
@@ -155,144 +156,185 @@
             -->
             <el-tag v-if="scope.row.offlineWaiting" type="warning">待收款</el-tag>
             <dict-tag v-else :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="scope.row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column align="center" fixed="right" label="操作" width="160">
-          <template #default>
+            <!-- 售后状态原来独占一列；收成一列后挂在状态下面，免得"退款中"在列表上看不见 -->
+            <div v-if="hasAfterSale(scope.row)" class="order-after-sale">
+              <dict-tag
+                :type="DICT_TYPE.TRADE_ORDER_ITEM_AFTER_SALE_STATUS"
+                :value="scope.row.afterSaleStatus"
+              />
+            </div>
+          </div>
+          <div
+            class="order-cell"
+            :style="{ gridColumn: '9', gridRow: spanRow(rowSpan(scope.row)) }"
+          >
             <slot :row="scope.row"></slot>
-          </template>
-        </el-table-column>
-      </el-table>
+          </div>
+        </div>
+      </div>
     </template>
   </el-table-column>
 </template>
 <script lang="ts" setup>
-import { nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { DICT_TYPE } from '@/utils/dict'
 import { DeliveryTypeEnum } from '@/utils/constants'
+import { INVOICE_STATUS } from '@/utils/invoice'
 import { formatDate } from '@/utils/formatTime'
 import { floatToFixed2 } from '@/utils'
-import * as TradeOrderApi from '@/api/mall/trade/order'
 import { OrderVO } from '@/api/mall/trade/order'
-import type { TableColumnCtx, TableInstance } from 'element-plus'
 import type { DeliveryPickUpStoreVO } from '@/api/mall/trade/delivery/pickUpStore'
 
 defineOptions({ name: 'OrderTableColumn' })
 
-const props = defineProps<{
+defineProps<{
+  /** 传而不用：列表页按原签名传入，留作以后「整单级」统计用 */
   list: OrderVO[]
   pickUpStoreList: DeliveryPickUpStoreVO[]
 }>()
 
-const headerStyle = ({ row, columnIndex }: any) => {
-  // 表头第一行第一列占 8
-  if (columnIndex === 0) {
-    row[columnIndex].colSpan = 8
-  } else {
-    // 其余的不要
-    row[columnIndex].colSpan = 0
-    return {
-      display: 'none'
-    }
-  }
-  return {}
+/** 订单级格子要跨几行（= 这笔订单有几件商品） */
+const spanRow = (span: number) => `1 / span ${span}`
+
+/** 第 index 个订单项所在的行（从 1 起） */
+const itemRow = (index: string | number) => String(Number(index) + 1)
+
+const rowSpan = (row: OrderVO) => Math.max(row.items?.length ?? 0, 1)
+
+/** 有没有售后（`0` = 无售后，见字典 TRADE_ORDER_ITEM_AFTER_SALE_STATUS） */
+const hasAfterSale = (row: OrderVO) => !!row.afterSaleStatus
+
+const { push } = useRouter()
+
+/** 查看物流：物流轨迹在订单详情页（全站唯一一处实现），这里只负责把人送过去 */
+const openDetail = (id?: number | null) => {
+  if (id) push({ name: 'TradeOrderDetail', params: { id } })
 }
-
-interface SpanMethodProps {
-  row: TradeOrderApi.OrderItemRespVO
-  column: TableColumnCtx<TradeOrderApi.OrderItemRespVO>
-  rowIndex: number
-  columnIndex: number
-}
-
-type spanMethodResp = number[] | { rowspan: number; colspan: number } | undefined
-const spanMethod = ({ row, rowIndex, columnIndex }: SpanMethodProps): spanMethodResp => {
-  const len = props.list.find(
-    (order) => order.items?.findIndex((item) => item.id === row.id) !== -1
-  )?.items?.length
-  // 要合并的列，从零开始
-  const colIndex = [3, 4, 5, 6, 7]
-  if (colIndex.includes(columnIndex)) {
-    // 除了第一行其余的不要
-    if (rowIndex !== 0) {
-      return {
-        rowspan: 0,
-        colspan: 0
-      }
-    }
-    // 动态合并行
-    return {
-      rowspan: len!,
-      colspan: 1
-    }
-  }
-}
-
-const orderTableHeadWidthList = ref([300, 150, 120, 120, 160, 120, 120, 160]) // 头部 col 宽度初始化
-let isFirstTable = false // 标记是否已处理第一个表格
-let firstTableInstance: TableInstance | null = null
-
-/** 解决 ref 在 v-for 中的获取问题*/
-const setOrderTableRef = async (el: TableInstance) => {
-  if (!el) return
-  // 只处理第一个表格实例
-  if (!isFirstTable) {
-    isFirstTable = true
-    firstTableInstance = el
-    // 使用 nextTick 确保 DOM 已完全渲染
-    await nextTick()
-    tableHeadWidthAuto(el)
-  }
-}
-
-/** 头部宽度自适应 */
-const tableHeadWidthAuto = (el: TableInstance) => {
-  if (!el) return
-  const columns = el.store.states.columns.value
-  if (columns.length === 0) {
-    return
-  }
-  columns.forEach((col: TableColumnCtx<TableInstance>, index: number) => {
-    if (col.realWidth) {
-      orderTableHeadWidthList.value[index] = col.realWidth
-    }
-  })
-}
-
-/** 监听窗口大小变化，重新计算表头宽度 */
-const handleResize = async () => {
-  if (firstTableInstance) {
-    await nextTick()
-    tableHeadWidthAuto(firstTableInstance!)
-  }
-}
-
-/** 监听列表数据变化，重新计算表头宽度 */
-watch(
-  () => props.list,
-  async () => {
-    // 数据变化后，等待 DOM 更新完成再重新计算宽度
-    await nextTick()
-    if (firstTableInstance) {
-      // 延迟一小段时间，确保表格已完全渲染
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      tableHeadWidthAuto(firstTableInstance!)
-    }
-  },
-  { deep: true }
-)
-
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
 </script>
 <style lang="scss" scoped>
-:deep(.order-table-col > .cell) {
-  padding: 0;
+/*
+ * 表头与每笔订单的内容共用这套列宽。
+ * ⚠️ 只有这一处定义 —— 表头和数据都读它，不存在"两边各写一遍、改了一边"的可能。
+ */
+.order-grid {
+  display: grid;
+  grid-template-columns: 24fr 6fr 8fr 12fr 10fr 9fr 12fr 9fr 10fr;
+}
+.order-grid-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  text-align: center;
+}
+/* 「产品」列是左对齐的长商品名，居中的表头会显得漂 */
+.order-grid-head > div:first-child {
+  text-align: left;
+}
+
+/*
+ * 订单信息条：中性灰底，替代原来的亮黄色。
+ * 左「订单编号 + 完成时间」，右「快递编号 + 查看物流」。
+ */
+.order-head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  background-color: #f5f7fa;
+  font-size: 12px;
+  color: #606266;
+  white-space: nowrap;
+}
+.order-head-left,
+.order-head-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.order-head-left span,
+.order-head-right span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.order-head-link {
+  font-size: 12px;
+}
+
+/* 数据区：格子即「单元格」，右侧与下方描线，视觉上仍是一张表 */
+.order-grid-body {
+  border-top: 1px solid #ebeef5;
+}
+.order-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  border-right: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+  color: #303133;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.order-cell.is-left {
+  align-items: flex-start;
+  text-align: left;
+}
+/* 每行最后一格不描右边，避免与外层表格右边框叠成双线 */
+.order-cell:nth-last-child(1) {
+  border-right: 0;
+}
+
+/* 产品单元格：缩略图 + 名称/规格 */
+.order-product {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.order-product-pic {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.order-product-info {
+  min-width: 0;
+}
+.order-product-name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.order-product-spec {
+  margin-top: 4px;
+}
+
+/* 金额：实付（红）＋ 原价（灰） */
+.order-amount {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e54d42;
+  line-height: 1.4;
+}
+.order-amount-origin {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+
+/* 售后状态收进「状态」列后的第二行 */
+.order-after-sale {
+  margin-top: 4px;
+}
+
+/* 会员 ID、手机号这类次要信息 */
+.order-sub-text {
+  font-size: 12px;
+  color: #909399;
 }
 </style>
 
@@ -302,8 +344,7 @@ onUnmounted(() => {
   ⚠️ 这段**不能加 scoped**，是刻意的。`.order-table-col` 来自 `el-table-column` 的
   `class-name`，它被打在**外层表格的 `<td>` 上**，而那个 `<td>` 是 el-table 自己渲染的、
   不属于本组件的模板，拿不到本组件的 scope id。加了 scoped 就会编译成
-  `[data-v-x] .order-table-col ...`，要求有一个带本组件 scope id 的祖先 —— **永远匹配不到**
-  （上面那条 `:deep(.order-table-col > .cell)` 就是这种情况，是死代码）。
+  `[data-v-x] .order-table-col ...`，要求有一个带本组件 scope id 的祖先 —— **永远匹配不到**。
   选择器已由 `.order-table-col` 限定，不会外溢到别的页面。
 -->
 <style lang="scss">
@@ -316,13 +357,8 @@ onUnmounted(() => {
   padding: 3px 0 !important;
 }
 
-/* 内层表格的行同样压一遍（8px → 3px） */
-.order-table-col .el-table tr > .el-table__cell {
-  padding: 3px 0;
-}
-
-/* 内层表头那一格整格就是「订单号 / 下单时间」信息条，上下内边距全去掉 */
-.order-table-col .el-table__header-wrapper tr > .el-table__cell {
-  padding: 0;
+/* 外层格子里的 `.cell` 自带左右内边距，会让我们和表头各偏一点；统一压平 */
+.order-table-col .cell {
+  padding: 0 !important;
 }
 </style>

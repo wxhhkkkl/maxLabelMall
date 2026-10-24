@@ -165,6 +165,16 @@
     </el-form>
   </ContentWrap>
 
+  <!--
+    状态标签页（2026-10-23）。
+    默认停在「待发货/已发货」—— 运营每天主要盯的就是这两档，进页面不用再选一次。
+  -->
+  <ContentWrap>
+    <el-tabs v-model="activeTab" @tab-change="onTabChange">
+      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.key" :label="tab.label" :name="tab.key" />
+    </el-tabs>
+  </ContentWrap>
+
   <!-- 列表 -->
   <ContentWrap>
     <!-- 添加 row-key="id" 解决列数据中的 table#header 数据不刷新的问题  -->
@@ -212,10 +222,7 @@
                     没有 `trade:order:confirm-paid` 的人不该看到它（资金动作）。
                     详情页那颗按钮同样是独立权限点。
                   -->
-                  <el-dropdown-item
-                    v-if="canConfirmOfflinePaid(row)"
-                    command="confirmOfflinePaid"
-                  >
+                  <el-dropdown-item v-if="canConfirmOfflinePaid(row)" command="confirmOfflinePaid">
                     <Icon icon="ep:money" />
                     确认收款
                   </el-dropdown-item>
@@ -277,11 +284,43 @@ const loading = ref(true) // 列表的加载中
 const total = ref(2) // 列表的总页数
 const list = ref<TradeOrderApi.OrderVO[]>([]) // 列表的数据
 const queryFormRef = ref<FormInstance>() // 搜索的表单
+
+/**
+ * 顶部状态标签页。
+ *
+ * 「待发货/已发货」是一个标签对两个状态 —— 运营把这两档当成同一批活看（货在手上 or 已发出），
+ * 所以后端新增了 `statuses` 多选筛选（与单选的 `status` 互斥，见 `onTabChange`）。
+ */
+interface StatusTab {
+  key: string
+  label: string
+  /** 该标签对应的订单状态；`undefined` = 不按状态筛（全部订单） */
+  statuses?: number[]
+}
+const STATUS_TABS: StatusTab[] = [
+  { key: 'all', label: '全部订单' },
+  { key: 'unpaid', label: '未付款', statuses: [TradeOrderStatusEnum.UNPAID.status] },
+  {
+    key: 'shipping',
+    label: '待发货/已发货',
+    statuses: [TradeOrderStatusEnum.UNDELIVERED.status, TradeOrderStatusEnum.DELIVERED.status]
+  },
+  { key: 'completed', label: '已完成', statuses: [TradeOrderStatusEnum.COMPLETED.status] },
+  { key: 'canceled', label: '已取消', statuses: [TradeOrderStatusEnum.CANCELED.status] }
+]
+/** 进页面的默认标签（2026-10-23 所有者要求） */
+const DEFAULT_TAB = 'shipping'
+const activeTab = ref<string>(DEFAULT_TAB)
+
+/** 某个标签对应的状态集 */
+const tabStatuses = (key: string) => STATUS_TABS.find((tab) => tab.key === key)?.statuses
+
 // 表单搜索
 const queryParams = ref({
   pageNo: 1, // 页数
   pageSize: 10, // 每页显示数量
-  status: undefined, // 订单状态
+  status: undefined, // 订单状态（下拉单选）
+  statuses: tabStatuses(DEFAULT_TAB), // 订单状态（标签页多选）
   payChannelCode: undefined, // 支付方式
   createTime: undefined, // 创建时间
   terminal: undefined, // 订单来源
@@ -315,6 +354,29 @@ const inputChangeSelect = (val: string) => {
     })
 }
 
+/**
+ * 切换状态标签。
+ *
+ * 标签是「快筛」：会清掉下拉里的单一状态，否则会出现"标签高亮着待发货、实际按已完成筛"
+ * 这种自相矛盾的界面。反过来用下拉选了状态时，标签退回「全部订单」（见下面的 watch）。
+ */
+const onTabChange = (key: string) => {
+  queryParams.value.status = undefined
+  queryParams.value.statuses = tabStatuses(key)
+  queryParams.value.pageNo = 1
+  getList()
+}
+
+// 用下拉选了具体状态 → 不再属于任何一个标签
+watch(
+  () => queryParams.value.status,
+  (status) => {
+    if (status === undefined || status === null) return
+    activeTab.value = 'all'
+    queryParams.value.statuses = undefined
+  }
+)
+
 /** 查询列表 */
 const getList = async () => {
   loading.value = true
@@ -339,12 +401,17 @@ const handleQuery = async () => {
 }
 
 /** 重置按钮操作 */
+/**
+ * 重置：只清搜索表单，**不动当前状态标签** ——
+ * 运营正在看「待发货/已发货」，点重置是要清掉自己填的筛选条件，不是要跳回默认标签。
+ */
 const resetQuery = () => {
   queryFormRef.value?.resetFields()
   queryParams.value = {
     pageNo: 1, // 页数
     pageSize: 10, // 每页显示数量
-    status: undefined, // 订单状态
+    status: undefined, // 订单状态（下拉单选）
+    statuses: tabStatuses(activeTab.value), // 订单状态（标签页多选）
     payChannelCode: undefined, // 支付方式
     createTime: undefined, // 创建时间
     terminal: undefined, // 订单来源

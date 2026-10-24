@@ -17,6 +17,7 @@ import ProductCard from '@/components/ProductCard.vue'
 import MallHome from '@/components/MallHome.vue'
 import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
+import { getLastSearchKeyword, saveLastSearchKeyword } from '@/utils/last-search'
 import '@/styles/mall.css'
 
 // 分类、搜索、排序及分页均由后端处理；展示方式只改变当前商品的布局。
@@ -31,6 +32,9 @@ const total = ref(0)
 const pageNo = ref(1)
 const keyword = ref('')
 const searchInput = ref('')
+/** 上一次搜索的词（本地存储）。输入框为空时作为灰色提示显示，点「搜索」直接复用它 */
+const lastKeyword = ref(getLastSearchKeyword())
+const searchPlaceholder = computed(() => lastKeyword.value || '搜索商品名称、型号或规格')
 const categoryId = ref<number | undefined>(Number.isSafeInteger(initialCategoryId) && initialCategoryId > 0 ? initialCategoryId : undefined)
 const sortKey = ref<'default' | 'sales' | 'priceAsc' | 'priceDesc'>('default')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -116,12 +120,23 @@ async function load(): Promise<boolean> {
 }
 
 
-function onSearch() {
+/** 按给定关键词发起搜索（空串 = 回到「浏览全部」） */
+function runSearch(term: string) {
   browsingAll.value = true
-  keyword.value = searchInput.value.trim()
+  keyword.value = term
   // 搜索要回到第 1 页，否则会停在一个可能为空的高页码上
   pageNo.value = 1
+  if (term) {
+    saveLastSearchKeyword(term)
+    lastKeyword.value = term
+  }
   load()
+}
+
+function onSearch() {
+  // 输入框为空 → 复用上次搜索的词：客户想再搜一次同一个词，不该逼他重打一遍。
+  // 填了内容就按填的搜（`||` 的左边优先），并把它变成新的「上次搜索」。
+  runSearch(searchInput.value.trim() || lastKeyword.value)
 }
 
 function onPickCategory(id?: number) {
@@ -202,7 +217,8 @@ function onPage(n: number) {
 
 function clearSearch() {
   searchInput.value = ''
-  onSearch()
+  // 「清除」是**显式中止**：不能因为输入框空了就又把上次的词搜回来
+  runSearch('')
 }
 
 function browseAllProducts() {
@@ -301,7 +317,7 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
           v-model="searchInput"
           type="search"
           aria-label="搜索商品"
-          placeholder="搜索商品名称、型号或规格"
+          :placeholder="searchPlaceholder"
           autocomplete="off"
         >
         <button

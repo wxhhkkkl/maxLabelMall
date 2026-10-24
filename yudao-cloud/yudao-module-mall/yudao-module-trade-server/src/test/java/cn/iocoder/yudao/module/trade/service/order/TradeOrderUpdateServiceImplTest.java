@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.product.api.comment.ProductCommentApi;
 import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
@@ -24,6 +25,7 @@ import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderItemMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.dal.redis.no.TradeNoRedisDAO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderCancelTypeEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderRefundStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.framework.order.config.TradeOrderProperties;
 import cn.iocoder.yudao.module.trade.service.cart.CartService;
@@ -130,6 +132,8 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         when(payOrderApi.getOrder(any())).thenReturn(CommonResult.success(null));
         // 收货地址：默认"没有默认地址"（结算页那条路会读它）
         when(addressApi.getDefaultAddress(any())).thenReturn(CommonResult.success(null));
+        // 发货订阅消息：sendDeliveryOrderMessage 会调用它，默认 null 会 NPE
+        when(socialClientApi.sendWxaSubscribeMessage(any())).thenReturn(CommonResult.success(true));
     }
 
     // ==================== 造数据 ====================
@@ -149,6 +153,7 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
                 .payChannelCode(payChannelCode).payOrderId(payOrderId)
                 .receiverName("张三").receiverMobile("13800008888").receiverAreaId(110101)
                 .receiverDetailAddress("xx 路 1 号")
+                .refundStatus(TradeOrderRefundStatusEnum.NONE.getStatus())
                 .couponId(0L).couponPrice(0).pointPrice(0)
                 .build();
         // ⚠️ `createTime` 来自 BaseDO，**不在 Lombok 的 builder 里**；必须在 insert 前手工塞。
@@ -417,6 +422,42 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         assertServiceException(() -> orderService.confirmOfflinePaid(
                 confirmReqVO(order.getId(), "2026101600012345"), 249L),
                 ORDER_CONFIRM_OFFLINE_PAID_FAIL_CANCELED);
+    }
+
+    // ==================== 010 追加：发货地址 ====================
+
+    private TradeOrderDeliveryReqVO deliveryReqVO(TradeOrderDO order) {
+        return new TradeOrderDeliveryReqVO().setId(order.getId())
+                .setLogisticsId(1L).setLogisticsNo("SF1234567890");
+    }
+
+    @Test
+    public void testDeliveryOrder_expressWithoutFromAddress_rejected() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNDELIVERED.getStatus(),
+                null, null, LocalDateTime.now());
+
+        assertServiceException(() -> orderService.deliveryOrder(deliveryReqVO(order)),
+                ORDER_DELIVERY_FROM_ADDRESS_REQUIRED);
+
+        // 订单仍是待发货
+        assertEquals(TradeOrderStatusEnum.UNDELIVERED.getStatus(),
+                tradeOrderMapper.selectById(order.getId()).getStatus());
+    }
+
+    @Test
+    public void testDeliveryOrder_expressWithFromAddress_saved() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNDELIVERED.getStatus(),
+                null, null, LocalDateTime.now());
+        TradeOrderDeliveryReqVO reqVO = deliveryReqVO(order)
+                .setDeliveryFromAreaId(110108)
+                .setDeliveryFromAddress("西北旺亮甲店永丰中路100号北京人才教育基地红楼107");
+
+        orderService.deliveryOrder(reqVO);
+
+        TradeOrderDO updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals(TradeOrderStatusEnum.DELIVERED.getStatus(), updated.getStatus());
+        assertEquals(110108, updated.getDeliveryFromAreaId());
+        assertEquals("西北旺亮甲店永丰中路100号北京人才教育基地红楼107", updated.getDeliveryFromAddress());
     }
 
 }

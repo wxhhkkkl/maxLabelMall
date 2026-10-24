@@ -44,6 +44,14 @@ public class Kd100ExpressQueryRespDTO {
      */
     private String result;
     /**
+     * 快递100 的返回码
+     *
+     * 成功为 200；失败如 400（参数/编码错误）、503（签名错误）、601（key 过期/余额不足）。
+     * 用于把「编码无法识别」和「暂时失败」区分开（FR-261）。
+     */
+    @JsonProperty("returnCode")
+    private String returnCode;
+    /**
      * 查询结果失败时的错误信息
      */
     private String message;

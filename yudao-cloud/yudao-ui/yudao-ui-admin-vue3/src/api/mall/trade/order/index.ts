@@ -66,6 +66,13 @@ export interface OrderVO {
     nickname?: string
     avatar?: string
   }
+  /**
+   * 开票状态（订单列表的「是否需要发票」列）
+   *
+   * 取值同 `utils/invoice` 的 `INVOICE_STATUS`：0 待开票 / 10 已开票 / 20 已作废；
+   * **未申请时后端不给值（null）** —— 列上显示「否」。
+   */
+  invoiceStatus?: number | null
   // 订单操作日志
   logs?: OrderLogRespVO[]
 
@@ -146,10 +153,33 @@ export const getOrder = async (id: number | null) => {
   return await request.get<OrderVO>({ url: `/trade/order/get-detail?id=` + id })
 }
 
+/** 物流轨迹（010）。`time` 线上是 epoch 毫秒数，`formatDate` 同时兼容字符串 */
+export interface ExpressTrack {
+  time?: Date | string | number
+  content?: string
+}
+
+/** 该快递公司暂不支持查询（与后端 `ErrorCodeConstants.EXPRESS_QUERY_NOT_SUPPORTED` 对应） */
+export const EXPRESS_QUERY_NOT_SUPPORTED = 1_011_004_103
+/** 物流地图未配置发货地址 / 模板（010 追加） */
+export const EXPRESS_MAP_NOT_CONFIGURED = 1_011_004_104
+/** 物流地图无法生成（历史单缺 region / 无运单号） */
+export const EXPRESS_MAP_NOT_AVAILABLE = 1_011_004_105
+
 // 查询交易订单物流详情
 export const getExpressTrackList = async (id: number | null) => {
-  return await request.get<Array<{ time?: Date | string; content?: string }>>({
-    url: `/trade/order/get-express-track-list?id=` + id
+  return await request.get<ExpressTrack[]>({
+    url: `/trade/order/get-express-track-list?id=` + id,
+    // silent：不弹全局错误通知，并把业务 code 一起 reject，详情页才能内联区分「暂不支持」（FR-261）
+    silent: true
+  })
+}
+
+// 查询交易订单物流地图地址（010 追加）
+export const getExpressMapUrl = async (id: number | null) => {
+  return await request.get<string>({
+    url: `/trade/order/get-express-map-url?id=` + id,
+    silent: true
   })
 }
 
@@ -157,11 +187,27 @@ export interface DeliveryVO {
   id?: number // 订单编号
   logisticsId: number | null // 物流公司编号
   logisticsNo: string // 物流编号
+  /** 发货地址地区编号（010 追加；省市区） */
+  deliveryFromAreaId?: number | null
+  /** 发货地址详情（010 追加） */
+  deliveryFromAddress?: string
+}
+
+export interface DeliveryDefaultAddress {
+  areaId: number | null
+  address: string
 }
 
 // 订单发货
 export const deliveryOrder = async (data: DeliveryVO) => {
   return await request.put({ url: `/trade/order/delivery`, data })
+}
+
+// 获得发货默认地址（010 追加）
+export const getDeliveryDefaultAddress = async () => {
+  return await request.get<DeliveryDefaultAddress>({
+    url: '/trade/order/get-delivery-default-address'
+  })
 }
 
 // 订单备注

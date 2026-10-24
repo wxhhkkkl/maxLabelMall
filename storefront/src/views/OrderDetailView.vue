@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { cancelOrder, getOrderDetail } from '@/api/order'
+import { cancelOrder, getExpressMapUrl, getExpressTrackList, getOrderDetail } from '@/api/order'
 import { getPayOrder, listEnabledChannelCodes, submitPay } from '@/api/pay'
 import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/social'
 import AccountSidebar from '@/components/AccountSidebar.vue'
@@ -15,10 +15,11 @@ import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
 import QrPayDialog from '@/components/QrPayDialog.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
-import type { OrderDetail } from '@/types'
+import type { ExpressTrack, OrderDetail } from '@/types'
 import { InvoiceStatus, OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
+import { mapErrorText, trackErrorText } from '@/utils/expressTrack'
 import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan, reconcile } from '@/utils/money'
 import { OFFLINE_WAITING_TEXT, canCommentItem, orderStatusText } from '@/utils/orderStatus'
@@ -68,6 +69,18 @@ const error = ref(false)
 const message = ref('')
 const cancelOpen = ref(false)
 const paying = ref(false)
+
+/**
+ * 物流轨迹（010）。进入详情后**自动加载**（Q58），失败只影响这一块（FR-258）。
+ */
+const expressTracks = ref<ExpressTrack[]>([])
+const expressLoading = ref(false)
+const expressError = ref('')
+
+/** 物流地图（010 追加）：点击「查看地图」才查询/渲染，避免每次打开详情都计费 */
+const expressMapUrl = ref('')
+const expressMapLoading = ref(false)
+const expressMapError = ref('')
 
 /**
  * 正在申请退款的那个订单项（null = 弹层没开）。
@@ -250,12 +263,65 @@ async function loadChannels() {
   }
 }
 
+/**
+ * 自动加载物流轨迹。**只「有运单号」的订单才查**：
+ * 未发货、虚拟商品、自提都没有运单号，不渲染物流卡（FR-254 / FR-255）。
+ */
+async function loadExpressTracks() {
+  // 每次刷新订单都清掉上一张地图（地图是按订单/地址生成的）
+  expressMapUrl.value = ''
+  expressMapError.value = ''
+  expressMapLoading.value = false
+  const current = order.value
+  if (!current?.logisticsNo) {
+    expressTracks.value = []
+    expressError.value = ''
+    expressLoading.value = false
+    return
+  }
+  // 地图与轨迹并行加载；地图失败只影响地图区
+  void loadExpressMap()
+  expressLoading.value = true
+  expressError.value = ''
+  try {
+    expressTracks.value = await getExpressTrackList(current.id)
+  } catch (e) {
+    // 失败不阻塞订单详情（FR-258）；只按「不支持 / 其它」两类给文案（FR-261）
+    expressTracks.value = []
+    expressError.value = trackErrorText(e)
+  } finally {
+    expressLoading.value = false
+  }
+}
+
+/**
+ * 加载物流地图（默认展示，不要求点击）。
+ *
+ * 地图查询独立计费；服务端 `express_map` 缓存 1 小时，同一运单重复打开不重复计费。
+ */
+async function loadExpressMap() {
+  const current = order.value
+  if (!current?.logisticsNo) return
+  expressMapLoading.value = true
+  expressMapError.value = ''
+  try {
+    expressMapUrl.value = await getExpressMapUrl(current.id)
+  } catch (e) {
+    expressMapUrl.value = ''
+    expressMapError.value = mapErrorText(e)
+  } finally {
+    expressMapLoading.value = false
+  }
+}
+
 async function load(sync = false) {
   loading.value = true
   error.value = false
   try {
     order.value = await getOrderDetail(Number(props.id), sync)
     await loadChannels()
+    // 不 await：轨迹是页面的**次要**内容，不能因为它在途就压住整页渲染
+    void loadExpressTracks()
   } catch {
     error.value = true
     order.value = null
@@ -770,6 +836,43 @@ onMounted(async () => {
         </div>
 
         <!--
+          物流信息（010 / US35）：只在**有运单号**时渲染。
+          未发货 / 虚拟商品 / 自提都没有运单号 —— 不显示空卡片（FR-254 / FR-255）。
+        -->
+        <div v-if="order.logisticsNo" class="ml-card">
+          <div class="ml-card-title">物流信息</div>
+          <div class="addr-line">
+            <b>{{ order.logisticsName || '快递' }}</b>
+            <span>{{ order.logisticsNo }}</span>
+          </div>
+          <p v-if="order.deliveryTime" class="od-text">
+            发货时间：{{ formatDateTime(order.deliveryTime) }}
+          </p>
+          <p v-if="expressLoading" class="od-text">物流信息加载中…</p>
+          <p v-else-if="expressError" class="od-text">{{ expressError }}</p>
+          <p v-else-if="expressTracks.length === 0" class="od-text">暂无轨迹信息</p>
+          <ul v-else class="od-tracks">
+            <li v-for="(t, i) in expressTracks" :key="`${t.time}-${i}`">
+              <div class="od-track-time">{{ formatDateTime(t.time) }}</div>
+              <div class="od-track-content">{{ t.content }}</div>
+            </li>
+          </ul>
+
+          <!-- 物流地图（010 追加）：进入详情自动加载，服务端缓存 1 小时 -->
+          <div class="od-map-actions">
+            <p v-if="expressMapLoading" class="od-text">地图加载中…</p>
+            <p v-if="expressMapError" class="od-text od-map-error">{{ expressMapError }}</p>
+            <iframe
+              v-if="expressMapUrl"
+              :src="expressMapUrl"
+              class="od-map-frame"
+              title="物流地图"
+              loading="lazy"
+            ></iframe>
+          </div>
+        </div>
+
+        <!--
           买家留言：**下单时客户自己填的**（`trade_order.user_remark`），
           与后台那个「商家备注」不是一回事 —— 所以这里只读展示，不给改（FR-182 同理）。
           没填时整块不渲染 —— 空标题比没有更让人犯嘀咕。
@@ -1144,6 +1247,11 @@ onMounted(async () => {
   font-size: 14px;
   color: var(--ml-text-sub);
 }
+/* 「下载发票」与上面那行状态说明之间的间距：全局样式复位把 margin 清零了，
+   不给的话按钮会紧贴上一行；下面那行求助提示自带 .ml-hint 的上间距 */
+.invoice-card #downloadInvoice {
+  margin-top: 12px;
+}
 @media (max-width: 768px) {
   .od-summary-grid { grid-template-columns: 1fr; gap: 16px; }
   .account-order-detail > .ml-card, .od-summary-grid > .ml-card { padding: 24px; }
@@ -1167,5 +1275,24 @@ onMounted(async () => {
   .od-name, .od-text { font-size: 13px; }
   .dl-table .dl-row { grid-template-columns: 64px minmax(0, 1fr); padding: 12px; gap: 10px; }
   .pay-channel { font-size: 12px; padding: 8px 10px; }
+}
+
+/* 物流轨迹（010）：时间在上、描述在下，逐条分隔 */
+.od-tracks { list-style: none; margin: 12px 0 0; padding: 0; }
+.od-tracks li { padding: 10px 0; border-top: 1px solid var(--ml-border); }
+.od-tracks li:first-child { border-top: 0; padding-top: 0; }
+.od-track-time { font-size: 12px; color: var(--ml-text-ph); font-variant-numeric: tabular-nums; }
+.od-track-content { margin-top: 4px; font-size: 14px; color: var(--ml-text); line-height: 1.6; }
+
+/* 物流地图（010 追加） */
+.od-map-actions { margin-top: 14px; }
+.od-map-error { color: var(--ml-orange); font-size: 13px; margin-top: 8px; }
+.od-map-frame {
+  width: 100%;
+  height: 360px;
+  border: 0;
+  border-radius: 8px;
+  margin-top: 12px;
+  background: #F5F8FF;
 }
 </style>

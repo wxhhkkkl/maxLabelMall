@@ -23,4 +23,12 @@ public interface RedisKeyConstants {
      */
     String EXPRESS_TRACK = "express_track";
 
+    /**
+     * 物流地图 URL 的缓存
+     *
+     * KEY 格式：express_map:{code-logisticsNo-phone-to}
+     * VALUE 数据格式 String, 快递100 的 trailUrl
+     */
+    String EXPRESS_MAP = "express_map";
+
 }

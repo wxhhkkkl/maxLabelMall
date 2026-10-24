@@ -1,5 +1,6 @@
 import { del, get, post } from '@/config/http'
 import type {
+  ExpressTrack,
   OrderCreateReq,
   OrderCreateResp,
   OrderDetail,
@@ -144,6 +145,26 @@ export function pageOrders(params: {
 /** 订单详情。`sync=true` 会主动同步支付状态（支付后确认状态用） */
 export function getOrderDetail(id: number, sync = false): Promise<OrderDetail> {
   return get<OrderDetail>('/trade/order/get-detail', sync ? { id, sync: true } : { id })
+}
+
+/**
+ * 物流轨迹（010）。返回按时间**倒序**的 `[{ time, content }]`。
+ *
+ * ⚠️ 失败是**业务错误**（编码不支持 / 三方报错 / 限频），调用方必须 catch 并降级，
+ * 不能让它冒泡成整页错误（FR-258）。未发货时后端返回空数组，不是错误。
+ */
+export function getExpressTrackList(id: number): Promise<ExpressTrack[]> {
+  return get<ExpressTrack[]>('/trade/order/get-express-track-list', { id })
+}
+
+/**
+ * 物流地图地址（010 追加）。返回快递100 的 `trailUrl`，可直接 iframe。
+ *
+ * ⚠️ 地图查询是**独立计费**的；只应在用户点击「查看地图」时调用，
+ * 不要随订单详情自动加载。
+ */
+export function getExpressMapUrl(id: number): Promise<string> {
+  return get<string>('/trade/order/get-express-map-url', { id })
 }
 
 /** 取消订单。**DELETE，且 id 走 query**（仅待支付可用） */

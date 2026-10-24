@@ -2,9 +2,8 @@
 import { computed } from 'vue'
 
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
-import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlCheck from '@/components/base/MlCheck.vue'
-import type { InvoiceApplyForm, InvoiceTitle } from '@/types'
+import type { InvoiceApplyForm } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -25,24 +24,6 @@ const form = defineModel<InvoiceApplyForm>('form', { required: true })
  * 提交时的拦截在 CheckoutView —— 两处用的是**同一个纯函数**，不会各说各话。
  */
 const error = computed(() => (enabled.value ? invoiceFieldError(form.value) : null))
-
-/**
- * 把一条抬头填进表单。
- *
- * 票种保留客户当前的选择（选择器只列本票种的抬头），但**抬头类型要跟着那条抬头走**（Q38）——
- * 客户选中自己那条"个人"抬头，表单却还停在"企业"，下一步就会被要求填一个他根本没有的税号。
- */
-function fillFrom(title: InvoiceTitle) {
-  form.value = {
-    type: form.value.type,
-    titleKind: title.titleKind,
-    titleName: title.titleName,
-    taxNo: title.taxNo ?? '',
-    titleAddress: title.titleAddress ?? '',
-    titlePhone: title.titlePhone ?? '',
-    bankName: title.bankName ?? '',
-  }
-}
 </script>
 
 <template>
@@ -54,16 +35,11 @@ function fillFrom(title: InvoiceTitle) {
       需要开发票
     </MlCheck>
     <p class="invoice-note">
-      默认不开票。需要发票请勾选并填写开票信息，电子发票开出后可在订单详情里下载。
+      默认不开票。需要发票或收据请勾选并填写信息，开好后可在订单详情里下载。
     </p>
 
     <template v-if="enabled">
-      <!-- 已保存的抬头（按当前票种筛）+ 没有就当场新增（Q36） -->
-      <InvoiceTitlePicker
-        :type="form.type"
-        @picked="fillFrom"
-      />
-
+      <!-- 抬头选择器已移入 InvoiceFieldsForm：企业/个人 → 票种 → 抬头（Q64） -->
       <InvoiceFieldsForm v-model="form" />
       <p
         v-if="error"

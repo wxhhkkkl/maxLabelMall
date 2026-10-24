@@ -106,9 +106,9 @@ describe('开票信息校验', () => {
 
   // ==================== 选项与后端枚举对齐 ====================
 
-  it('票种选项与后端枚举逐字对齐（1 普票 / 2 专票），别漂移', () => {
-    expect(INVOICE_TYPE_OPTIONS.map(o => o.value)).toEqual([InvoiceType.NORMAL, InvoiceType.SPECIAL])
-    expect(INVOICE_TYPE_OPTIONS.map(o => o.label)).toEqual(['电子普通发票', '电子增值税专用发票'])
+  it('票种选项与后端枚举逐字对齐（1 普票 / 2 专票 / 3 收据），别漂移', () => {
+    expect(INVOICE_TYPE_OPTIONS.map(o => o.value)).toEqual([InvoiceType.NORMAL, InvoiceType.SPECIAL, InvoiceType.RECEIPT])
+    expect(INVOICE_TYPE_OPTIONS.map(o => o.label)).toEqual(['电子普通发票', '电子增值税专用发票', '收据'])
   })
 
   it('抬头类型选项与后端枚举逐字对齐（1 企业 / 2 个人），别漂移', () => {

@@ -36,20 +36,25 @@ public final class InvoiceValidator {
      */
     private static final Pattern TAX_NO_PATTERN = Pattern.compile("^[0-9A-Z]{15}$|^[0-9A-Z]{18}$|^[0-9A-Z]{20}$");
 
+    /** 邮箱（选填；填了就要像邮箱）—— 只做轻量格式判断，不做存在性验证 */
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
     /** 列宽上限，与 `007-order-invoice.sql` 和 data-model §4 逐字一致 */
     private static final int TITLE_NAME_MAX = 255;
     private static final int TAX_NO_MAX = 64;
     private static final int TITLE_ADDRESS_MAX = 255;
     private static final int TITLE_PHONE_MAX = 64;
     private static final int BANK_NAME_MAX = 255;
+    private static final int EMAIL_MAX = 128;
 
     /**
      * 校验一次**开票信息**（下单 / 补开 / 抬头簿保存三处共用）
      *
-     * **必填随「抬头类型」而变**（Q38）：
-     * · **企业** → 抬头名称 + 纳税人识别号（两种票一致，Q37）
-     * · **个人** → **只要抬头名称**（个人本来就没有纳税人识别号，只开普票）
-     * 地址 / 电话 / 开户行及账号一律**选填**。缺必填项时在报错里**点名是哪一项**（FR-156）。
+     * **必填随「抬头类型 + 票种」而变**（Q37 / Q38 / Q61）：
+     * · **企业 + 普票/专票** → 抬头名称 + 纳税人识别号
+     * · **个人 + 普票** → **只要抬头名称**
+     * · **收据（企业/个人）** → **只要抬头名称**（不是税票，不要求税号）
+     * 地址 / 电话 / 开户行及账号 / 邮箱一律**选填**，填了要合法。缺必填项时在报错里**点名是哪一项**（FR-156）。
      *
      * ⚠️ 个人抬头的税号是**选填、不是禁止** —— 自然人可以用身份证号当纳税人识别号，
      * 写成"个人不许填"会把合法场景挡在门外。
@@ -79,22 +84,24 @@ public final class InvoiceValidator {
         invoice.setTitleAddress(trim(invoice.getTitleAddress()));
         invoice.setTitlePhone(trim(invoice.getTitlePhone()));
         invoice.setBankName(trim(invoice.getBankName()));
+        invoice.setEmail(trim(invoice.getEmail()));
 
         // 必填矩阵：地址 / 电话 / 开户行一律**选填**，专票也一样（客户手边未必有开户行账号，
         // 不该因此存不下抬头、或者提交不了开票申请；那几项财务开票时会核对）
         requireText(invoice.getTitleName(), "抬头名称");
-        if (titleKind == InvoiceTitleKindEnum.COMPANY) {
+        // 收据不是税票：**企业/个人都只要名称**（Q61）；普票 / 专票的企业才要求税号
+        if (titleKind == InvoiceTitleKindEnum.COMPANY && type != InvoiceTypeEnum.RECEIPT) {
             requireText(invoice.getTaxNo(), "纳税人识别号");
         }
         checkFormats(invoice.getTitleName(), invoice.getTaxNo(),
-                invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName());
+                invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName(), invoice.getEmail());
     }
 
     // ==================== 内部 ====================
 
     /** 选填字段"填了就要合法"：税号格式 + 各列长度上限 */
     private static void checkFormats(String titleName, String taxNo, String titleAddress,
-                                     String titlePhone, String bankName) {
+                                     String titlePhone, String bankName, String email) {
         checkLength("抬头名称", titleName, TITLE_NAME_MAX);
         if (!isBlank(taxNo) && !TAX_NO_PATTERN.matcher(taxNo).matches()) {
             throw exception(INVOICE_TAX_NO_INVALID);
@@ -103,6 +110,10 @@ public final class InvoiceValidator {
         checkLength("注册地址", titleAddress, TITLE_ADDRESS_MAX);
         checkLength("注册电话", titlePhone, TITLE_PHONE_MAX);
         checkLength("开户行及账号", bankName, BANK_NAME_MAX);
+        if (!isBlank(email) && !EMAIL_PATTERN.matcher(email).matches()) {
+            throw exception(INVOICE_EMAIL_INVALID);
+        }
+        checkLength("邮箱", email, EMAIL_MAX);
     }
 
     /** 必填：trim 后为空即视为没填（报错点名是哪一项） */

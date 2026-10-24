@@ -3,7 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 
 import { listInvoiceTitles } from '@/api/invoice'
 import InvoiceTitleDialog from '@/components/InvoiceTitleDialog.vue'
-import { InvoiceTitleKind, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, type InvoiceTitle, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types'
 
 /**
  * 「从已保存的抬头里选一条 / 没有就当场新增」的**选择器**（Q36）。
@@ -14,7 +14,11 @@ import { InvoiceTitleKind, type InvoiceTitle, type InvoiceTypeValue } from '@/ty
  * ⚠️ **只列与当前票种相符的抬头**（Q36：普票与专票分开管理）——
  * 选专票时列出普票抬头，客户点一下会得到一条填不全的专票信息，然后被后端拒。
  */
-const props = defineProps<{ type: InvoiceTypeValue }>()
+const props = defineProps<{
+  type: InvoiceTypeValue
+  /** 抬头类型：选择器只列「企业 / 个人 + 票种」都相符的抬头（Q64） */
+  titleKind: InvoiceTitleKindValue
+}>()
 const emit = defineEmits<{ picked: [InvoiceTitle] }>()
 
 /** 与本票种相符的抬头（拉取失败就当作没有 —— 客户当场手填照样能开票） */
@@ -25,14 +29,14 @@ const dialogOpen = ref(false)
 async function load() {
   try {
     const all = await listInvoiceTitles()
-    titles.value = all.filter((t) => t.type === props.type)
+    titles.value = all.filter((t) => t.type === props.type && t.titleKind === props.titleKind)
   } catch {
     titles.value = []
   }
 }
 
-/** 换票种要重新筛，并把选中态清掉（上一条多半不属于新票种） */
-watch(() => props.type, () => {
+/** 换票种 / 换抬头类型都要重新筛，并把选中态清掉（上一条多半不属于新组合） */
+watch([() => props.type, () => props.titleKind], () => {
   pickedId.value = null
   void load()
 })
@@ -96,6 +100,7 @@ onMounted(async () => {
     <InvoiceTitleDialog
       :open="dialogOpen"
       :type="props.type"
+      :title-kind="props.titleKind"
       @close="dialogOpen = false"
       @submitted="onCreated"
     />

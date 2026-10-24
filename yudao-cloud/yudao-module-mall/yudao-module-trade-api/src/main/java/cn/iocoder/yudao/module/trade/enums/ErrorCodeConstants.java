@@ -141,7 +141,8 @@ public interface ErrorCodeConstants {
     ErrorCode INVOICE_TITLE_FIELD_REQUIRED = new ErrorCode(1_011_009_005, "{} 不能为空");
     ErrorCode INVOICE_TAX_NO_INVALID = new ErrorCode(1_011_009_006, "纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）");
     ErrorCode INVOICE_TITLE_KIND_INVALID = new ErrorCode(1_011_009_007, "抬头类型不正确");
-    ErrorCode INVOICE_TITLE_KIND_PERSONAL_SPECIAL = new ErrorCode(1_011_009_008, "增值税专用发票只能开给企业，个人抬头请改选电子普通发票");
+    ErrorCode INVOICE_TITLE_KIND_PERSONAL_SPECIAL = new ErrorCode(1_011_009_008, "增值税专用发票只能开给企业，个人抬头请改选电子普通发票或收据");
+    ErrorCode INVOICE_EMAIL_INVALID = new ErrorCode(1_011_009_009, "邮箱格式不正确");
     // 抬头簿
     ErrorCode INVOICE_TITLE_NOT_FOUND = new ErrorCode(1_011_009_020, "发票抬头不存在");
     // 后台开具

@@ -75,7 +75,7 @@ describe('结算页发票卡片', () => {
     const { w } = mountCard(true)
     expect(w.find('.invoice-fields').exists()).toBe(true)
     expect(w.find('#invoiceTitleName').exists()).toBe(true)
-    expect(w.findAll('.invoice-type')).toHaveLength(2)
+    expect(w.findAll('.invoice-type')).toHaveLength(3) // 普票 / 专票 / 收据（Q61）
     expect(w.findAll('.invoice-kind')).toHaveLength(2)
   })
 
@@ -200,5 +200,30 @@ describe('结算页发票卡片 · 与抬头选择器的接线（US23 / T420）'
     await w.vm.$nextTick()
 
     expect(w.findComponent({ name: 'InvoiceTitlePicker' }).props('type')).toBe(InvoiceType.SPECIAL)
+  })
+})
+
+describe('结算页发票卡片 —— 收据与邮箱（Q61 / Q62）', () => {
+  it('收据：企业也只要名称，不要求税号', async () => {
+    const { w, model } = mountCard(true)
+    await w.findAll('.invoice-type')[2]!.trigger('click')
+    expect(model.type).toBe(InvoiceType.RECEIPT)
+
+    model.titleName = '北京某某科技有限公司'
+    await w.vm.$nextTick()
+    expect(w.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('邮箱选填；填了非法邮箱要点名', async () => {
+    const { w, model } = mountCard(true)
+    model.titleName = '南京路桥机械有限公司'
+    model.taxNo = '91320104660690975E'
+    model.email = 'not-an-email'
+    await w.vm.$nextTick()
+    expect(w.get('[role="alert"]').text()).toContain('邮箱格式不正确')
+
+    model.email = 'finance@example.com'
+    await w.vm.$nextTick()
+    expect(w.find('[role="alert"]').exists()).toBe(false)
   })
 })

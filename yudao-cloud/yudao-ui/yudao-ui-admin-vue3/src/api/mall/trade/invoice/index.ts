@@ -14,7 +14,7 @@ export interface TradeOrderInvoiceVO {
   orderNo?: string // 订单号
   userId?: number // 会员编号
   userNickname?: string // 会员昵称（后端回填）
-  type?: number // 发票类型：1 电子普通发票，2 电子增值税专用发票
+  type?: number // 票种：1 电子普通发票，2 电子增值税专用发票，3 收据
   typeName?: string // 发票类型名（后端给，前端不自行命名）
   titleKind?: number // 抬头类型：1 企业，2 个人（Q38）
   titleKindName?: string // 抬头类型名（后端给）
@@ -27,7 +27,8 @@ export interface TradeOrderInvoiceVO {
   taxNo?: string // 纳税人识别号
   titleAddress?: string // 注册地址
   titlePhone?: string // 注册电话
-  bankName?: string // 开户行及账号
+  bankName?: string // 开户行及账号
+  email?: string // 接收发票 / 收据的邮箱（选填）
   invoiceFileUrl?: string // 发票文件地址（已开票才有）
   issueTime?: Date // 开票时间
   issueUserId?: number // 开具人

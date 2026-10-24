@@ -66,19 +66,20 @@ beforeEach(async () => {
 })
 
 describe('发票抬头簿页面', () => {
-  it('**按票种分两段**（Q36：普票 / 专票分开管理），各自有「新增」入口', async () => {
+  it('**按票种分三段**（Q36/Q61：普票 / 专票 / 收据分开管理），各自有「新增」入口', async () => {
     const w = await mountView([
       { ...TITLE, id: 1, type: 1, titleName: '普票公司', defaultStatus: false },
       { ...TITLE, id: 2, type: 2, titleName: '专票公司', defaultStatus: true },
     ])
 
     const groups = w.findAll('[data-invoice-group]')
-    expect(groups).toHaveLength(2)
+    expect(groups).toHaveLength(3)
     expect(groups[0]!.text()).toContain('普票公司')
-    expect(groups[0]!.text()).not.toContain('专票公司') // 两段不混
+    expect(groups[0]!.text()).not.toContain('专票公司') // 三段不混
     expect(groups[1]!.text()).toContain('专票公司')
+    expect(groups[2]!.text()).toContain('收据')
     // 每段各有自己的"新增"（点它会把票种带进弹层）
-    expect(w.findAll('[data-add-title]')).toHaveLength(2)
+    expect(w.findAll('[data-add-title]')).toHaveLength(3)
   })
 
   it('新增时把该段的票种带进弹层', async () => {
@@ -96,14 +97,15 @@ describe('发票抬头簿页面', () => {
     expect(w.text()).toContain('默认')
   })
 
-  it('一条都没有时：两段各自给出空态与「新增」入口（不是空白页）', async () => {
+  it('一条都没有时：三段各自给出空态与「新增」入口（不是空白页）', async () => {
     const w = await mountView([])
 
     // 分段之后不再是整页 EmptyState：每一段都要说清"这一段还没有"并给出新增入口
-    expect(w.findAll('[data-invoice-group]')).toHaveLength(2)
+    expect(w.findAll('[data-invoice-group]')).toHaveLength(3)
     expect(w.text()).toContain('还没有电子普通发票的抬头')
     expect(w.text()).toContain('还没有电子增值税专用发票的抬头')
-    expect(w.findAll('[data-add-title]')).toHaveLength(2)
+    expect(w.text()).toContain('还没有收据的抬头')
+    expect(w.findAll('[data-add-title]')).toHaveLength(3)
   })
 
   it('删除后重新拉列表（以服务端为准）', async () => {
@@ -135,6 +137,7 @@ describe('发票抬头簿页面', () => {
       titleAddress: '南京市玄武区某某路 1 号',
       titlePhone: '18913984596',
       bankName: '工商银行南京分行 6222',
+      email: '',
       defaultStatus: true,
     })
     expect(listInvoiceTitles).toHaveBeenCalledTimes(2)

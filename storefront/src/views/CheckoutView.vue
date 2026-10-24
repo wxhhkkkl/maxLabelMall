@@ -113,6 +113,7 @@ const invoiceForm = ref<InvoiceApplyForm>({
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  email: '',
 })
 
 const price = computed(() => data.value?.price ?? null)

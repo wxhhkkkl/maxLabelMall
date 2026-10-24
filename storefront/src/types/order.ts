@@ -121,6 +121,12 @@ export interface OrderPageItem {
    */
   invoiceStatus?: number | null
   /**
+   * 票种（011）：1 电子普通发票 / 2 电子增值税专用发票 / 3 收据。
+   *
+   * 与 `invoiceStatus` 同源、同时为 `null` —— 列表上在「待开票」下面显示它。
+   */
+  invoiceType?: number | null
+  /**
    * 是不是**还没确认收款的对公转账单**（008 / FR-200）。
    *
    * ⚠️ 列表上用它把状态显示成「**待收款**」而不是「待支付」，**并去掉「立即支付」入口** ——

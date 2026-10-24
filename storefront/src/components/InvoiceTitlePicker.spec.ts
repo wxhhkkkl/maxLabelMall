@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { InvoiceTitleKind, InvoiceType, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, InvoiceType, type InvoiceTitle, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types'
 
 const listInvoiceTitles = vi.fn()
 const createInvoiceTitle = vi.fn()
@@ -38,9 +38,10 @@ const PERSONAL_TITLE: InvoiceTitle = {
   titleName: '张三', taxNo: null, defaultStatus: false,
 }
 
-function mountPicker(type: InvoiceTypeValue = InvoiceType.NORMAL, titles: InvoiceTitle[] = []) {
+function mountPicker(type: InvoiceTypeValue = InvoiceType.NORMAL, titles: InvoiceTitle[] = [],
+                     titleKind: InvoiceTitleKindValue = InvoiceTitleKind.COMPANY) {
   listInvoiceTitles.mockResolvedValue(titles)
-  return mount(InvoiceTitlePicker, { props: { type } })
+  return mount(InvoiceTitlePicker, { props: { type, titleKind } })
 }
 
 beforeEach(() => {
@@ -110,7 +111,7 @@ describe('发票抬头选择器', () => {
   })
 
   it('把**整条抬头**抛给调用方（含 `titleKind`）—— 调用方要靠它把抬头类型一起填上（Q38）', async () => {
-    const w = mountPicker(InvoiceType.NORMAL, [PERSONAL_TITLE])
+    const w = mountPicker(InvoiceType.NORMAL, [PERSONAL_TITLE], InvoiceTitleKind.PERSONAL)
     await flushPromises()
 
     await w.get('[data-invoice-title="5"]').trigger('click')
@@ -121,7 +122,7 @@ describe('发票抬头选择器', () => {
 
   it('抬头列表拉不到 → 不显示条目，但**照常能手填**（不阻塞开票）', async () => {
     listInvoiceTitles.mockRejectedValue(new Error('offline'))
-    const w = mount(InvoiceTitlePicker, { props: { type: InvoiceType.NORMAL } })
+    const w = mount(InvoiceTitlePicker, { props: { type: InvoiceType.NORMAL, titleKind: InvoiceTitleKind.COMPANY } })
     await flushPromises()
 
     expect(w.find('.invoice-picker-item').exists()).toBe(false)

@@ -46,6 +46,9 @@ public class AppOrderInvoiceRespVO {
     @Schema(description = "开户行及账号")
     private String bankName;
 
+    @Schema(description = "接收发票 / 收据的邮箱（选填）", example = "finance@example.com")
+    private String email;
+
     @Schema(description = "开票金额，单位：分（= 申请时的订单实付快照）", example = "7800")
     private Integer amount;
 

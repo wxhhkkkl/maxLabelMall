@@ -37,10 +37,12 @@
     <el-table v-loading="loading" :data="list">
       <el-table-column label="订单号" prop="orderNo" min-width="170" />
       <el-table-column label="下单客户" prop="userNickname" min-width="110" />
-      <el-table-column label="发票类型" prop="typeName" min-width="170" />
+      <el-table-column label="票据类型" prop="typeName" min-width="170" />
       <!-- 抬头类型（Q38）：个人抬头没有税号，财务不用靠"税号怎么空着"去猜 -->
       <el-table-column label="抬头类型" prop="titleKindName" min-width="100" />
       <el-table-column label="抬头" prop="titleName" min-width="170" show-overflow-tooltip />
+      <!-- 邮箱（Q62）：开好后运营按这个邮箱发；不填就是 — -->
+      <el-table-column label="邮箱" prop="email" min-width="180" show-overflow-tooltip />
       <!--
         开票金额是**申请时**的快照；订单实付 / 已退是**当前**的数。
         部分退款不会改前者（Q33），两个并排放才看得出差异。
@@ -70,7 +72,7 @@
       <el-table-column label="操作" fixed="right" width="170">
         <template #default="{ row }">
           <el-button v-if="row.invoiceFileUrl" link type="primary" @click="openInvoiceFile(row)">
-            查看发票
+            查看{{ row.type === 3 ? '收据' : '发票' }}
           </el-button>
           <!-- ⚠️ 权限点必须在 system_menu 里，否则这个按钮连超管都看不到（004 踩过） -->
           <el-button
@@ -80,7 +82,7 @@
             type="primary"
             @click="openIssueForm(row)"
           >
-            {{ row.status === INVOICE_STATUS.ISSUED ? '重新上传' : '开具发票' }}
+            {{ row.status === INVOICE_STATUS.ISSUED ? '重新上传' : `开具${row.type === 3 ? '收据' : '发票'}` }}
           </el-button>
         </template>
       </el-table-column>

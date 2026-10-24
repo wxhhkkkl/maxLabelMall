@@ -31,7 +31,7 @@ const creatingType = ref<InvoiceTypeValue>(InvoiceType.NORMAL)
  * 按票种**分两段**展示（Q36）。顺序固定：普票在前。
  * ⚠️ 每段只列本票种的抬头 —— 混在一起就等于没分开管理。
  */
-const groups = computed(() => ([InvoiceType.NORMAL, InvoiceType.SPECIAL] as const).map(type => ({
+const groups = computed(() => ([InvoiceType.NORMAL, InvoiceType.SPECIAL, InvoiceType.RECEIPT] as const).map(type => ({
   type,
   label: INVOICE_TYPE_NAME[type],
   list: list.value.filter(t => t.type === type),
@@ -88,6 +88,7 @@ async function onSetDefault(title: InvoiceTitle) {
       titleAddress: title.titleAddress ?? '',
       titlePhone: title.titlePhone ?? '',
       bankName: title.bankName ?? '',
+      email: title.email ?? '',
       defaultStatus: true,
     })
     toast.success('已设为默认')
@@ -118,7 +119,7 @@ onMounted(load)
             Q36：不再有"全局新增"—— 普票与专票分开管理，**每一段各有自己的「新增」**。
             一个不分票种的新增按钮，客户点下去还得再想"这是哪一类"。
           -->
-          <div><h1>发票抬头</h1><p>普票与专票分开管理；存好后下单开票时直接选，不用每次重填。</p></div>
+          <div><h1>发票抬头</h1><p>普票、专票与收据分开管理；存好后下单开票时直接选，不用每次重填。</p></div>
         </div>
 
         <div class="account-content-card">
@@ -206,6 +207,12 @@ onMounted(load)
                   >
                     开户行：{{ t.bankName }}
                   </p>
+                  <p
+                    v-if="t.email"
+                    class="invoice-title-line"
+                  >
+                    邮箱：{{ t.email }}
+                  </p>
                   <div class="invoice-title-actions">
                     <button
                       class="btn-cart"
@@ -243,8 +250,8 @@ onMounted(load)
         </div>
 
         <div class="account-content-card invoice-title-note">
-          <h2>关于发票</h2>
-          <p>开票信息在下单时提交，提交后不可修改；需要修改请在开票前联系客服。</p>
+          <h2>关于发票 / 收据</h2>
+          <p>开票 / 收据信息在下单时提交，提交后不可修改；需要修改请在开具前联系客服。</p>
           <p>修改或删除这里的抬头，<strong>不会影响任何历史订单</strong>——那些订单里存的是当时填的那一份。</p>
         </div>
       </div>

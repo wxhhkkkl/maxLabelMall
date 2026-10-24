@@ -9,9 +9,9 @@ import LoadingState from '@/components/LoadingState.vue'
 import Pagination from '@/components/Pagination.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
-import type { InvoiceStatusValue, OrderPageItem } from '@/types'
+import type { InvoiceStatusValue, InvoiceTypeValue, OrderPageItem } from '@/types'
 import { OrderStatus } from '@/types'
-import { invoiceStatusName } from '@/utils/invoice'
+import { invoiceStatusName, invoiceTypeName } from '@/utils/invoice'
 import { formatYuan } from '@/utils/money'
 import { OFFLINE_WAITING_TEXT, canCommentOrder, orderStatusFilters } from '@/utils/orderStatus'
 import { formatDateTime } from '@/utils/time'
@@ -158,8 +158,12 @@ onMounted(load)
           <div class="oc-head">
             <span class="oc-no">订单号 {{ o.no }}</span>
             <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
-            <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null） -->
-            <span v-if="o.invoiceStatus != null" class="oc-invoice">发票·{{ invoiceStatusName(o.invoiceStatus as InvoiceStatusValue) }}</span>
+            <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null）；
+                 票种（011）显示在状态下面 -->
+            <span v-if="o.invoiceStatus != null" class="oc-invoice">
+              <span>发票·{{ invoiceStatusName(o.invoiceStatus as InvoiceStatusValue) }}</span>
+              <span v-if="o.invoiceType != null" class="oc-invoice-type">{{ invoiceTypeName(o.invoiceType as InvoiceTypeValue) }}</span>
+            </span>
             <!-- 对公待收款单：底层仍是「未支付」，但说辞要换（008 / FR-200） -->
             <MlPill
               :status="o.status"
@@ -305,10 +309,14 @@ onMounted(load)
 }
 /* 开票状态（006 / FR-178）：比订单状态淡一档，它是次要信息 */
 .oc-invoice {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
   font-size: 12px;
   color: var(--ml-text-sub);
   white-space: nowrap;
 }
+.oc-invoice-type { color: var(--ml-text-ph); }
 .oc-item {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto auto;

@@ -82,6 +82,10 @@ public class TradeInvoiceTitleDO extends BaseDO {
      */
     private String bankName;
     /**
+     * 接收发票 / 收据的邮箱（选填，选这条抬头时自动带出）
+     */
+    private String email;
+    /**
      * 是否默认
      */
     private Boolean defaultStatus;

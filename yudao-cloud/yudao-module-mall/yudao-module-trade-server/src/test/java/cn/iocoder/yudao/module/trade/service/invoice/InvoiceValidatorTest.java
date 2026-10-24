@@ -185,12 +185,53 @@ class InvoiceValidatorTest {
 
     @Test
     void testValidateApply_typeInvalid_fail() {
-        for (Integer type : new Integer[]{null, 0, 3, 99}) {
+        // 3 = 收据（Q61 新增），不在非法列表里
+        for (Integer type : new Integer[]{null, 0, 4, 99}) {
             AppInvoiceApplyBaseVO vo = fullSpecialInvoice();
             vo.setType(type);
             ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo));
             assertEquals(INVOICE_TYPE_INVALID.getCode(), e.getCode(), "票种 " + type + " 应当被拒");
         }
+    }
+
+    // ==================== 收据（Q61）与邮箱 ====================
+
+    @Test
+    void testValidateApply_receipt_companyOnlyTitleName_pass() {
+        // 收据不是税票：企业也只要求名称，**税号可以不填**
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
+                apply(InvoiceTypeEnum.RECEIPT.getType(), "北京某某科技有限公司", null, null, null, null)));
+    }
+
+    @Test
+    void testValidateApply_receipt_personalOnlyTitleName_pass() {
+        // 个人 + 收据也允许（个人只被禁止开专票）
+        assertDoesNotThrow(() -> InvoiceValidator.validate(
+                apply(InvoiceTypeEnum.RECEIPT.getType(), InvoiceTitleKindEnum.PERSONAL.getKind(),
+                        "张三", null, null, null, null)));
+    }
+
+    @Test
+    void testValidateApply_receipt_titleNameRequired() {
+        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(
+                apply(InvoiceTypeEnum.RECEIPT.getType(), "   ", null, null, null, null)));
+        assertTrue(e.getMessage().contains("抬头名称"), "实际：" + e.getMessage());
+    }
+
+    @Test
+    void testValidateApply_email_optionalAndTrimmedAndChecked() {
+        AppInvoiceApplyBaseVO vo = apply(InvoiceTypeEnum.E_NORMAL.getType(), "南京路桥机械有限公司",
+                "91320104660690975E", null, null, null);
+        // 不填：通过
+        assertDoesNotThrow(() -> InvoiceValidator.validate(vo));
+        // 填了：trim 后保留；格式合法通过
+        vo.setEmail("  finance@example.com  ");
+        assertDoesNotThrow(() -> InvoiceValidator.validate(vo));
+        assertEquals("finance@example.com", vo.getEmail());
+        // 填了但不像邮箱：拒
+        vo.setEmail("not-an-email");
+        ServiceException e = assertThrows(ServiceException.class, () -> InvoiceValidator.validate(vo));
+        assertEquals(INVOICE_EMAIL_INVALID.getCode(), e.getCode());
     }
 
     // ==================== 抬头簿（Q36 之后与申请**同一套规则**） ====================

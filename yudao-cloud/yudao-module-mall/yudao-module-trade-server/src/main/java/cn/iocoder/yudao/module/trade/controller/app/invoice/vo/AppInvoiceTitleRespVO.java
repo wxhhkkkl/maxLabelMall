@@ -31,6 +31,9 @@ public class AppInvoiceTitleRespVO {
     @Schema(description = "开户行及账号")
     private String bankName;
 
+    @Schema(description = "接收发票 / 收据的邮箱（选填）", example = "finance@example.com")
+    private String email;
+
     @Schema(description = "是否默认（结算页会预选它）", example = "true")
     private Boolean defaultStatus;
 

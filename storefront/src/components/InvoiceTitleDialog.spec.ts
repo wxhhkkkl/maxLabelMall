@@ -70,6 +70,7 @@ describe('发票抬头弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      email: '',
       defaultStatus: false,
     })
     expect(w.emitted('submitted')).toHaveLength(1)
@@ -100,6 +101,7 @@ describe('发票抬头弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      email: '',
       defaultStatus: false,
     })
   })

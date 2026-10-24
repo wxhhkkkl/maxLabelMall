@@ -108,6 +108,10 @@ public class TradeOrderInvoiceDO extends BaseDO {
      */
     private String bankName;
     /**
+     * 接收发票 / 收据的邮箱（选填，申请时快照）
+     */
+    private String email;
+    /**
      * 开好的发票文件地址
      *
      * ⚠️ **只留最新一份**（Q31）：重新上传是覆盖，不保留历次版本。

@@ -5,7 +5,7 @@ import { createInvoiceTitle, updateInvoiceTitle } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
 import MlCheck from '@/components/base/MlCheck.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle, type InvoiceTypeValue } from '@/types'
+import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -20,17 +20,20 @@ const props = defineProps<{
   title?: InvoiceTitle | null
   /** **预选票种**（Q36）：从结算页/补开弹层点「新增抬头」时，跟着当前选的票种走 */
   type?: InvoiceTypeValue
+  /** **预选抬头类型**（Q64）：与票种一起决定选择器里的组合 */
+  titleKind?: InvoiceTitleKindValue
 }>()
 const emit = defineEmits<{ close: []; submitted: [] }>()
 
 const emptyForm = (): InvoiceApplyForm => ({
   type: props.type ?? InvoiceType.NORMAL,
-  titleKind: InvoiceTitleKind.COMPANY,
+  titleKind: props.titleKind ?? InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  email: '',
 })
 
 const form = ref<InvoiceApplyForm>(emptyForm())
@@ -55,6 +58,7 @@ watch(() => props.open, (value) => {
         titleAddress: title.titleAddress ?? '',
         titlePhone: title.titlePhone ?? '',
         bankName: title.bankName ?? '',
+        email: title.email ?? '',
       }
     : emptyForm()
   isDefault.value = title?.defaultStatus === true
@@ -80,6 +84,7 @@ async function onSubmit() {
       titleAddress: form.value.titleAddress,
       titlePhone: form.value.titlePhone,
       bankName: form.value.bankName,
+      email: form.value.email,
       defaultStatus: isDefault.value,
     }
     if (isEdit.value) {
@@ -103,7 +108,7 @@ async function onSubmit() {
     :title="isEdit ? '编辑发票抬头' : '新增发票抬头'"
     @close="emit('close')"
   >
-    <InvoiceFieldsForm v-model="form" />
+    <InvoiceFieldsForm v-model="form" :show-picker="false" />
     <MlCheck v-model="isDefault">
       设为默认抬头
     </MlCheck>

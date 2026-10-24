@@ -1,13 +1,15 @@
 /**
- * 发票类型（票种）—— 与后端 `InvoiceTypeEnum` **逐字对齐**，不得自定义命名（006 Q27）。
+ * 票种（发票 / 收据）—— 与后端 `InvoiceTypeEnum` **逐字对齐**，不得自定义命名。
  *
- * 两者**都是电子票**：本特性不提供纸质发票、也不涉及邮寄。
+ * 全部是电子票，不提供纸质发票、也不涉及邮寄。
  */
 export const InvoiceType = {
   /** 电子普通发票。企业与个人都能开 */
   NORMAL: 1,
   /** 电子增值税专用发票。**只能开给企业**（Q38）——个人抬头选不了它 */
   SPECIAL: 2,
+  /** 收据（Q61）：不是税票，**只要抬头名称**；企业与个人都能开 */
+  RECEIPT: 3,
 } as const
 
 export type InvoiceTypeValue = (typeof InvoiceType)[keyof typeof InvoiceType]
@@ -16,6 +18,7 @@ export type InvoiceTypeValue = (typeof InvoiceType)[keyof typeof InvoiceType]
 export const INVOICE_TYPE_NAME: Record<InvoiceTypeValue, string> = {
   [InvoiceType.NORMAL]: '电子普通发票',
   [InvoiceType.SPECIAL]: '电子增值税专用发票',
+  [InvoiceType.RECEIPT]: '收据',
 }
 
 /**
@@ -65,6 +68,8 @@ export interface InvoiceTitleFields {
   titleAddress?: string | null
   titlePhone?: string | null
   bankName?: string | null
+  /** 接收发票 / 收据的邮箱（选填；Q62/Q63：申请与抬头簿都存） */
+  email?: string | null
 }
 
 /**

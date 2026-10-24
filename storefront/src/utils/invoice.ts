@@ -1,4 +1,4 @@
-import { InvoiceStatus, InvoiceTitleKind, InvoiceType, type InvoiceStatusValue, type InvoiceTitleFields, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types/invoice'
+import { INVOICE_TYPE_NAME, InvoiceStatus, InvoiceTitleKind, InvoiceType, type InvoiceStatusValue, type InvoiceTitleFields, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types/invoice'
 
 /**
  * 开票信息的**前端校验**（FR-155 / FR-156）。
@@ -10,8 +10,9 @@ import { InvoiceStatus, InvoiceTitleKind, InvoiceType, type InvoiceStatusValue, 
 
 /** 票种选项 —— 顺序即界面顺序；`label` 与后端 `InvoiceTypeEnum.name` 逐字一致 */
 export const INVOICE_TYPE_OPTIONS: Array<{ value: InvoiceTypeValue; label: string; hint: string }> = [
-  { value: InvoiceType.NORMAL, label: '电子普通发票', hint: '企业与个人都能开；个人只需填姓名' },
+  { value: InvoiceType.NORMAL, label: '电子普通发票', hint: '企业与个人都能开；企业要名称 + 税号，个人只要名称' },
   { value: InvoiceType.SPECIAL, label: '电子增值税专用发票', hint: '只能开给企业；名称与税号必填，地址、电话、开户行选填' },
+  { value: InvoiceType.RECEIPT, label: '收据', hint: '企业与个人都能开；只要抬头名称，不要求税号' },
 ]
 
 /**
@@ -38,8 +39,16 @@ export function invoiceStatusName(status: InvoiceStatusValue): string {
   return '未知状态'
 }
 
+/** 票种的中文名（展示用）—— 与 `INVOICE_TYPE_NAME` 同一份表，未知值不抛错 */
+export function invoiceTypeName(type: InvoiceTypeValue): string {
+  return INVOICE_TYPE_NAME[type] ?? '未知票种'
+}
+
 /** 15 位（老税号）/ 18 位（统一社会信用代码）/ 20 位，数字与大写字母 —— 与后端同一个规则 */
 const TAX_NO_PATTERN = /^[0-9A-Z]{15}$|^[0-9A-Z]{18}$|^[0-9A-Z]{20}$/
+
+/** 邮箱（选填）—— 与后端 `InvoiceValidator` 同一个轻量规则 */
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 export function isTaxNoValid(taxNo: string): boolean {
   return TAX_NO_PATTERN.test(taxNo)
@@ -67,17 +76,23 @@ export function invoiceFieldError(form: Partial<InvoiceTitleFields> & { type?: I
   if (!(form.titleName ?? '').trim()) {
     return '请填写抬头名称'
   }
-  // 个人只能开普票：增值税专用发票按税法只能开给一般纳税人企业，收下来财务也开不出
+  // 个人只能开普票 / 收据：增值税专用发票按税法只能开给一般纳税人企业
   if (form.titleKind === InvoiceTitleKind.PERSONAL && form.type === InvoiceType.SPECIAL) {
-    return '增值税专用发票只能开给企业，请改选电子普通发票'
+    return '增值税专用发票只能开给企业，请改选电子普通发票或收据'
   }
   const taxNo = (form.taxNo ?? '').trim()
-  if (form.titleKind === InvoiceTitleKind.COMPANY && !taxNo) {
+  // 收据不是税票：企业也只要求名称（Q61）
+  if (form.type !== InvoiceType.RECEIPT && form.titleKind === InvoiceTitleKind.COMPANY && !taxNo) {
     return '请填写纳税人识别号'
   }
   // 个人抬头的税号可以不填 —— 但**填了就要合法**（选填不等于不校验）
   if (taxNo && !isTaxNoValid(taxNo)) {
     return '纳税人识别号格式不正确（应为 15 / 18 / 20 位数字或大写字母）'
+  }
+  // 邮箱选填；填了就要像邮箱
+  const email = (form.email ?? '').trim()
+  if (email && !EMAIL_PATTERN.test(email)) {
+    return '邮箱格式不正确'
   }
   return null
 }

@@ -3,9 +3,8 @@ import { computed, ref, watch } from 'vue'
 
 import { createOrderInvoice } from '@/api/invoice'
 import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
-import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlModal from '@/components/base/MlModal.vue'
-import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types/invoice'
+import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm } from '@/types/invoice'
 import { invoiceFieldError } from '@/utils/invoice'
 
 /**
@@ -28,6 +27,7 @@ const emptyForm = (): InvoiceApplyForm => ({
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  email: '',
 })
 
 const form = ref<InvoiceApplyForm>(emptyForm())
@@ -44,22 +44,6 @@ watch(() => props.open, (value) => {
     error.value = ''
   }
 })
-
-/**
- * 选中一条已保存的抬头：只覆盖字段，**票种保留当前选择**（选择器只列本票种的），
- * 但**抬头类型跟着那条抬头走**（Q38）—— 个人抬头被选中后不该还要求填税号
- */
-function fillFrom(title: InvoiceTitle) {
-  form.value = {
-    type: form.value.type,
-    titleKind: title.titleKind,
-    titleName: title.titleName,
-    taxNo: title.taxNo ?? '',
-    titleAddress: title.titleAddress ?? '',
-    titlePhone: title.titlePhone ?? '',
-    bankName: title.bankName ?? '',
-  }
-}
 
 async function onSubmit() {
   if (submitting.value) return
@@ -90,12 +74,9 @@ async function onSubmit() {
     @close="emit('close')"
   >
     <p class="invoice-apply-note">
-      发票开出后可在这笔订单的详情里下载。开票信息提交后不可修改，请核对无误。
+      发票 / 收据开出后可在这笔订单的详情里下载。信息提交后不可修改，请核对无误。
     </p>
-    <InvoiceTitlePicker
-      :type="form.type"
-      @picked="fillFrom"
-    />
+    <!-- 抬头选择器在 InvoiceFieldsForm 内部：企业/个人 → 票种 → 抬头（Q64） -->
     <InvoiceFieldsForm v-model="form" />
     <p
       v-if="error"

@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderI
 import cn.iocoder.yudao.module.trade.convert.invoice.InvoiceConvert;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.delivery.DeliveryExpressDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.config.TradeConfigDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertMap;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
@@ -194,12 +196,19 @@ public class AppTradeOrderController {
                 convertSet(pageResult.getList(), TradeOrderDO::getId));
         // 最终组合
         PageResult<AppTradeOrderPageItemRespVO> page = TradeOrderConvert.INSTANCE.convertPage02(pageResult, orderItems);
-        // 开票状态（006 / FR-178）：**一次 IN 批量查**，不许逐笔查（一页 12 条会变成 13 次查询）。
+        // 开票状态 + 票种（006 / FR-178；011）：**一次 IN 批量查**，不许逐笔查（一页 12 条会变成 13 次查询）。
         // 没申请的订单拿不到值 → 字段保持 null → 列表上什么都不显示
         if (page != null && CollUtil.isNotEmpty(page.getList())) {
-            Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(
+            List<TradeOrderInvoiceDO> invoices = tradeOrderInvoiceService.getInvoiceListByOrderIds(
                     convertSet(page.getList(), AppTradeOrderPageItemRespVO::getId));
-            page.getList().forEach(item -> item.setInvoiceStatus(invoiceStatusMap.get(item.getId())));
+            Map<Long, Integer> invoiceStatusMap = convertMap(invoices,
+                    TradeOrderInvoiceDO::getOrderId, TradeOrderInvoiceDO::getStatus);
+            Map<Long, Integer> invoiceTypeMap = convertMap(invoices,
+                    TradeOrderInvoiceDO::getOrderId, TradeOrderInvoiceDO::getType);
+            page.getList().forEach(item -> {
+                item.setInvoiceStatus(invoiceStatusMap.get(item.getId()));
+                item.setInvoiceType(invoiceTypeMap.get(item.getId()));
+            });
 
             // 对公转账「待收款」（008 / FR-200）：同样**一次 IN 批量查**。
             // 列表上要把它显示成「待收款」、并且**去掉「立即支付」入口**（对公单在客户侧

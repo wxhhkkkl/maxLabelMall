@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlField from '@/components/base/MlField.vue'
-import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm } from '@/types/invoice'
+import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm, type InvoiceTitle } from '@/types/invoice'
 import { INVOICE_TITLE_KIND_OPTIONS, INVOICE_TYPE_OPTIONS } from '@/utils/invoice'
 
 /**
@@ -15,6 +16,12 @@ import { INVOICE_TITLE_KIND_OPTIONS, INVOICE_TYPE_OPTIONS } from '@/utils/invoic
  * `invoiceFieldError(form)`（与后端 `InvoiceValidator` 同一套规则）。
  */
 const model = defineModel<InvoiceApplyForm>({ required: true })
+
+/**
+ * 是否展示「从已保存抬头里选一条」。
+ * 开票申请（结算页 / 补开弹层）展示；抬头簿的编辑弹层不展示（它就是在编辑某一条）。
+ */
+const props = withDefaults(defineProps<{ showPicker?: boolean }>(), { showPicker: true })
 
 /**
  * 专票才**显示**地址 / 电话 / 开户行三栏（**选填**，见 `invoiceFieldError`）。
@@ -33,6 +40,20 @@ function typeDisabled(value: number): boolean {
 }
 function kindDisabled(value: number): boolean {
   return value === InvoiceTitleKind.PERSONAL && isSpecial.value
+}
+
+/** 选中一条已保存抬头：覆盖抬头字段与邮箱，**票种保留当前选择** */
+function fillFrom(title: InvoiceTitle) {
+  model.value = {
+    ...model.value,
+    titleKind: title.titleKind,
+    titleName: title.titleName,
+    taxNo: title.taxNo ?? '',
+    titleAddress: title.titleAddress ?? '',
+    titlePhone: title.titlePhone ?? '',
+    bankName: title.bankName ?? '',
+    email: title.email ?? '',
+  }
 }
 </script>
 
@@ -65,7 +86,7 @@ function kindDisabled(value: number): boolean {
     <div
       class="invoice-types"
       role="radiogroup"
-      aria-label="发票类型"
+      aria-label="票种"
     >
       <button
         v-for="option in INVOICE_TYPE_OPTIONS"
@@ -85,6 +106,17 @@ function kindDisabled(value: number): boolean {
     <p class="invoice-type-hint">
       {{ INVOICE_TYPE_OPTIONS.find(o => o.value === model.type)?.hint }}
     </p>
+
+    <!--
+      选择抬头的顺序（Q64）：企业/个人 → 票种（普票/专票/收据）→ 再选抬头。
+      所以选择器放在这两个选择器**之后**，且按「抬头类型 + 票种」双重过滤。
+    -->
+    <InvoiceTitlePicker
+      v-if="props.showPicker"
+      :type="model.type"
+      :title-kind="model.titleKind"
+      @picked="fillFrom"
+    />
 
     <MlField
       label="抬头名称"
@@ -141,6 +173,17 @@ function kindDisabled(value: number): boolean {
         >
       </MlField>
     </template>
+
+    <MlField label="邮箱">
+      <input
+        id="invoiceEmail"
+        v-model="model.email"
+        class="ml-input"
+        type="email"
+        placeholder="选填"
+        autocomplete="off"
+      >
+    </MlField>
   </div>
 </template>
 

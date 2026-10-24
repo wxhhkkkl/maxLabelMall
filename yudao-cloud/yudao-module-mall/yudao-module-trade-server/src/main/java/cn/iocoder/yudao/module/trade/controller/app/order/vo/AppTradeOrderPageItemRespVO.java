@@ -74,6 +74,14 @@ public class AppTradeOrderPageItemRespVO {
     private Integer invoiceStatus;
 
     /**
+     * 票种（011）：1 电子普通发票 / 2 电子增值税专用发票 / 3 收据
+     *
+     * ⚠️ 与 {@link #invoiceStatus} 同源、同时为 `null` —— 列表上「待开票」下面要带出票种。
+     */
+    @Schema(description = "票种：1 电子普通发票，2 电子增值税专用发票，3 收据；未申请为 null", example = "1")
+    private Integer invoiceType;
+
+    /**
      * 是不是**还没确认收款的对公转账单**（008 / FR-200）
      *
      * = 是对公单 **且** 订单还没付、也没确认收款。

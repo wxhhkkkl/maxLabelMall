@@ -39,4 +39,7 @@ public class AppInvoiceApplyBaseVO {
     @Schema(description = "开户行及账号（选填，填了要合法）", example = "工商银行南京分行 6222…")
     private String bankName;
 
+    @Schema(description = "接收发票 / 收据的邮箱（选填；后台展示，人工发送）", example = "finance@example.com")
+    private String email;
+
 }

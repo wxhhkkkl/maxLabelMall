@@ -255,6 +255,24 @@ describe('OrderListView —— 开票状态（006 / FR-178）', () => {
     expect(w.text()).toContain('发票·已作废')
   })
 
+  it('「待开票」下面显示票种（011）', async () => {
+    const w = await mountList([
+      order(1, { invoiceStatus: 0, invoiceType: 1 }),
+      order(2, { invoiceStatus: 0, invoiceType: 3 }),
+    ])
+
+    const types = w.findAll('.oc-invoice-type').map(t => t.text())
+    expect(types).toEqual(['电子普通发票', '收据'])
+    expect(w.findAll('.oc-invoice')[0].text()).toContain('待开票')
+  })
+
+  it('票种字段缺失 → 只显示状态，不显示票种', async () => {
+    const w = await mountList([order(1, { invoiceStatus: 0 })])
+
+    expect(w.find('.oc-invoice').text()).toContain('待开票')
+    expect(w.find('.oc-invoice-type').exists()).toBe(false)
+  })
+
   it('**没申请开票（null / 缺字段）→ 什么都不显示**，不是"未申请"三个字', async () => {
     const w = await mountList([order(1, { invoiceStatus: null }), order(2)])
 

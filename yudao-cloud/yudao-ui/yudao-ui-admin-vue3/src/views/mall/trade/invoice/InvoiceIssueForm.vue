@@ -4,6 +4,9 @@
       <el-form-item label="订单号">
         <span>{{ formData.orderNo }}</span>
       </el-form-item>
+      <el-form-item label="票据类型">
+        <span>{{ formData.typeName || '—' }}</span>
+      </el-form-item>
       <el-form-item label="抬头">
         <span>{{ formData.titleName }}</span>
       </el-form-item>
@@ -14,7 +17,11 @@
       <el-form-item label="开票金额">
         <span>{{ fenToYuan(formData.amount) }} 元</span>
       </el-form-item>
-      <el-form-item label="发票文件" prop="invoiceFileUrl">
+      <!-- 邮箱（Q62）：选填；运营开好后按它发送 -->
+      <el-form-item label="邮箱">
+        <span>{{ formData.email || '—' }}</span>
+      </el-form-item>
+      <el-form-item label="票据文件" prop="invoiceFileUrl">
         <!--
           ⚠️ `disabled` 由**权限**决定：没拿到 `trade:order-invoice:issue` 的人连传都传不了。
           前端这层只是体验，真正的门在接口的 @PreAuthorize（Q29）。
@@ -60,8 +67,10 @@ const formData = ref<InvoiceApi.TradeOrderInvoiceVO>({})
 /** 权限：能不能开具（与按钮的 `v-hasPermi` 同一个权限点） */
 const canIssuePermi = computed(() => checkPermi(['trade:order-invoice:issue']))
 
+/** 票据的称呼：收据不是发票，按钮/标题按票种说 */
+const ticketName = computed(() => (formData.value.type === 3 ? '收据' : '发票'))
 const dialogTitle = computed(() =>
-  formData.value.status === INVOICE_STATUS.ISSUED ? '重新上传发票' : '开具发票'
+  formData.value.status === INVOICE_STATUS.ISSUED ? `重新上传${ticketName.value}` : `开具${ticketName.value}`
 )
 
 /** 打开弹窗（列表页点「开具发票 / 重新上传」时调用） */
@@ -75,13 +84,13 @@ defineExpose({ open })
 
 const submitForm = async () => {
   if (!formData.value.invoiceFileUrl) {
-    message.warning('请先上传发票文件')
+    message.warning('请先上传票据文件')
     return
   }
   saving.value = true
   try {
     await InvoiceApi.issueInvoice(formData.value.id!, formData.value.invoiceFileUrl)
-    message.success(formData.value.status === INVOICE_STATUS.ISSUED ? '发票已重新上传' : '已标记为已开票')
+    message.success(formData.value.status === INVOICE_STATUS.ISSUED ? `${ticketName.value}已重新上传` : '已标记为已开具')
     dialogVisible.value = false
     emit('success')
   } finally {

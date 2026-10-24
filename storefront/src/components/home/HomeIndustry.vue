@@ -50,7 +50,8 @@ const industries = [
 
 <style scoped>
 .home-industry { padding: 76px 0 80px; background: linear-gradient(180deg, #F5F8FF, #FFFFFF); }
-.home-industry-container { width: min(1200px, calc(100% - 96px)); margin-inline: auto; }
+/* 与其余楼层同一个内容宽度（design.css 的 `.home-floor`）：1600 上限 + 两侧 48px */
+.home-industry-container { width: min(1600px, calc(100% - 96px)); margin-inline: auto; }
 .home-industry-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
 .home-industry h2 { margin: 0; font-size: 34px; line-height: 1.45; font-weight: 750; letter-spacing: -.035em; color: #0C2148; }
 .home-industry-head p { margin: 10px 0 0; color: #5B6C8F; font-size: 16px; line-height: 1.8; }

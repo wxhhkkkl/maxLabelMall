@@ -53,7 +53,8 @@
 .home-banner { position: relative; isolation: isolate; background: linear-gradient(110deg, #F5F8FF, #EAF1FF); overflow: hidden; }
 .home-banner-devices { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 63%; }
 .home-banner-image { width: 100%; height: auto; aspect-ratio: 1.65; object-fit: cover; object-position: right center; mask-image: linear-gradient(90deg, transparent, #000 3%), linear-gradient(180deg, transparent, #000 6%, #000 94%, transparent); mask-composite: intersect; }
-.home-banner-container { display: flex; align-items: center; min-height: 570px; width: min(1200px, calc(100% - 96px)); margin-inline: auto; padding-block: 56px; }
+/* 与其余楼层同一个内容宽度（design.css 的 `.home-floor`）：1600 上限 + 两侧 48px */
+.home-banner-container { display: flex; align-items: center; min-height: 570px; width: min(1600px, calc(100% - 96px)); margin-inline: auto; padding-block: 56px; }
 .home-banner-copy { width: 34%; max-width: 440px; }
 .home-banner-eyebrow { margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #2E7CD6; }
 .home-banner h1 { margin: 0; color: #0C2148; font-size: clamp(28px, 3vw, 44px); font-weight: 800; line-height: 1.3; letter-spacing: -.045em; }

@@ -117,7 +117,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
   <HomeHero />
 
   <!-- 商城商品区：真实商品 -->
-  <section class="mall">
+  <section class="mall home-floor">
     <div class="section-head">
       <div>
         <h2 class="section-title">
@@ -182,7 +182,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
   </section>
 
   <!-- 软件功能特性（静态内容，还原设计稿） -->
-  <section class="features">
+  <section class="features home-floor">
     <div>
       <h2
         class="section-title"
@@ -306,7 +306,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
   </section>
 
   <!-- 三步使用流程（静态） -->
-  <section class="steps">
+  <section class="steps home-floor">
     <div>
       <h2
         class="section-title"
@@ -352,7 +352,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
     经 PendingText 渲染（FR-056）。其中 6 个第三方公司名若未获授权，公开宣传
     可能构成虚假宣传与商标侵权，故 MUST 由业务方确认后方可作为事实展示。
   -->
-  <section class="trust">
+  <section class="trust home-floor">
     <div class="stats-row">
       <div
         v-for="s in trustStats"
@@ -391,7 +391,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
   </section>
 
   <!-- 服务支持（静态） -->
-  <section class="support-home">
+  <section class="support-home home-floor">
     <div>
       <h2
         class="section-title"
@@ -493,7 +493,7 @@ const testimonial = RENDERED.inheritedClaims.testimonial
   </section>
 
   <!-- 底部 CTA -->
-  <section class="final-cta">
+  <section class="final-cta home-floor">
     <h2 class="cta-title">
       开启高效标签打印之旅
     </h2>

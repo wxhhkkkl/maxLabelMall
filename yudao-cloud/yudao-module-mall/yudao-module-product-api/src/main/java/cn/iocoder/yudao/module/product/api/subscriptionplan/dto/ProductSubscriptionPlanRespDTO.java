@@ -14,6 +14,8 @@ public class ProductSubscriptionPlanRespDTO {
     private Integer periodMonths;
     /** 类别：1 个人 2 企业 */
     private Integer scope;
+    /** 桌面端版本：standard / professional / enterprise */
+    private String edition;
     private Boolean enabled;
 
 }

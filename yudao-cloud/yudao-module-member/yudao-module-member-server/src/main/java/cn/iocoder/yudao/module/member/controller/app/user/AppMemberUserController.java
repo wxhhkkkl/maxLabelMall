@@ -36,7 +36,11 @@ public class AppMemberUserController {
     public CommonResult<AppMemberUserInfoRespVO> getUserInfo() {
         MemberUserDO user = userService.getUser(getLoginUserId());
         MemberLevelDO level = levelService.getLevel(user.getLevelId());
-        return success(MemberUserConvert.INSTANCE.convert(user, level));
+        AppMemberUserInfoRespVO vo = MemberUserConvert.INSTANCE.convert(user, level);
+        // 桌面端 017 契约读 companyName/avatarUrl，与既有 company/avatar 同值
+        vo.setCompanyName(user.getCompany());
+        vo.setAvatarUrl(user.getAvatar());
+        return success(vo);
     }
 
     @PutMapping("/update")

@@ -180,7 +180,7 @@ public class MemberSubscriptionServiceImplTest extends BaseDbUnitTest {
         LocalDateTime end = expired ? today.minusDays(1).atStartOfDay()
                 : today.plusMonths(months).plusDays(1).atStartOfDay();
         orgLicenseMapper.insert(MaxLabelOrgLicenseDO.builder()
-                .orgId(org.getId()).planId(1L).spuId(1L).skuId(1L)
+                .orgId(org.getId()).planId(1L).edition("enterprise").spuId(1L).skuId(1L)
                 .periodMonths(months).seatsTotal(1)
                 .startTime(start).endTime(end)
                 .sourceOrderId(8001L).sourceOrderItemId(9001L).sourceOrderNo("o8001")
@@ -248,6 +248,53 @@ public class MemberSubscriptionServiceImplTest extends BaseDbUnitTest {
         var current = subscriptionService.getCurrent(memberId);
         assertFalse(current.getActive());
         assertEquals(1, current.getSourceType());
+    }
+
+    // ==================== 桌面端版本（edition） ====================
+
+    @Test
+    void personalSubscriptionExposesPlanEdition() {
+        MemberSubscriptionGrantReqDTO req = request(12, 1, 9001L);
+        req.setEdition("professional");
+        subscriptionService.grant(req);
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertEquals("professional", current.getEdition());
+        assertEquals(List.of("professional"), current.getActiveEditions());
+    }
+
+    @Test
+    void enterpriseSeatExposesEnterpriseEdition() {
+        createEnterpriseSource(12, true, false);
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertEquals("enterprise", current.getEdition());
+        assertEquals(List.of("enterprise"), current.getActiveEditions());
+    }
+
+    @Test
+    void highestEditionWinsAcrossSources() {
+        MemberSubscriptionGrantReqDTO req = request(24, 1, 9001L);
+        req.setEdition("standard");
+        subscriptionService.grant(req);
+        createEnterpriseSource(12, true, false);
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertEquals("enterprise", current.getEdition());
+        assertEquals(List.of("enterprise", "standard"), current.getActiveEditions());
+    }
+
+    @Test
+    void expiredSubscriptionExposesNoEdition() {
+        MemberSubscriptionGrantReqDTO req = request(1, 1, 9001L);
+        req.setEdition("professional");
+        MemberSubscriptionDO row = subscriptionService.grant(req);
+        row.setEndTime(LocalDate.now().atStartOfDay());
+        subscriptionMapper.updateById(row);
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertNull(current.getEdition());
+        assertNull(current.getActiveEditions());
     }
 
 }

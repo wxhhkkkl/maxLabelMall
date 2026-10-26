@@ -11,6 +11,8 @@ public class AppMaxLabelSubscriptionPlanRespVO {
     private Long skuId;
     private String name;
     private Integer periodMonths;
+    /** 桌面端版本：standard / professional / enterprise */
+    private String edition;
     private Integer price;
     private String picUrl;
     private Integer stock;

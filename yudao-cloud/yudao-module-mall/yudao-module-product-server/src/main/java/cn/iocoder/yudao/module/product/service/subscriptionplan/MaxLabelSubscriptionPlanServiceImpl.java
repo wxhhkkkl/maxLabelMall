@@ -35,6 +35,9 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
     /** 虚拟商品配送方式，对应 DeliveryTypeEnum.VIRTUAL */
     private static final int DELIVERY_TYPE_VIRTUAL = 3;
 
+    /** 未指定桌面端版本时的默认档位（见 017 契约：标准版） */
+    private static final String DEFAULT_EDITION = "standard";
+
     @Resource
     private MaxLabelSubscriptionPlanMapper planMapper;
     @Resource
@@ -57,6 +60,7 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
                 .skuId(reqVO.getSkuId())
                 .periodMonths(reqVO.getPeriodMonths())
                 .scope(scope)
+                .edition(reqVO.getEdition() == null ? DEFAULT_EDITION : reqVO.getEdition())
                 .enabled(Boolean.TRUE.equals(reqVO.getEnabled()))
                 .sort(reqVO.getSort() == null ? 0 : reqVO.getSort())
                 .build();
@@ -77,6 +81,9 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
         }
         plan.setPeriodMonths(reqVO.getPeriodMonths());
         plan.setScope(scope);
+        if (reqVO.getEdition() != null) {
+            plan.setEdition(reqVO.getEdition());
+        }
         plan.setEnabled(Boolean.TRUE.equals(reqVO.getEnabled()));
         plan.setSort(reqVO.getSort() == null ? 0 : reqVO.getSort());
         planMapper.updateById(plan);
@@ -129,6 +136,7 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
         vo.setSkuId(plan.getSkuId());
         vo.setName(spu.getName());
         vo.setPeriodMonths(plan.getPeriodMonths());
+        vo.setEdition(plan.getEdition());
         vo.setPrice(sku.getPrice());
         vo.setPicUrl(sku.getPicUrl() != null ? sku.getPicUrl() : spu.getPicUrl());
         vo.setStock(sku.getStock());
@@ -156,6 +164,7 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
             vo.setSkuId(plan.getSkuId());
             vo.setName(spu.getName());
             vo.setPeriodMonths(plan.getPeriodMonths());
+            vo.setEdition(plan.getEdition());
             vo.setPrice(sku.getPrice());
             vo.setPicUrl(sku.getPicUrl() != null ? sku.getPicUrl() : spu.getPicUrl());
             vo.setStock(sku.getStock());

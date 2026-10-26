@@ -27,13 +27,16 @@ import org.springframework.validation.annotation.Validated;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
@@ -48,6 +51,9 @@ import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
 public class MemberSubscriptionServiceImpl implements MemberSubscriptionService {
 
     private static final int MAX_GRANT_MONTHS = 12000;
+
+    /** 桌面端版本由低到高；解析时取最高档。 */
+    private static final List<String> EDITION_ORDER = List.of("standard", "professional", "enterprise");
 
     @Resource
     private MemberSubscriptionMapper subscriptionMapper;
@@ -98,6 +104,7 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         MemberSubscriptionDO subscription = MemberSubscriptionDO.builder()
                 .memberId(reqDTO.getMemberId())
                 .planId(reqDTO.getPlanId())
+                .edition(reqDTO.getEdition())
                 .spuId(reqDTO.getSpuId())
                 .skuId(reqDTO.getSkuId())
                 .periodMonths((int) months)
@@ -126,7 +133,8 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         resp.setSourceType(1);
 
         // 1. 个人来源
-        MemberSubscriptionDO latestPersonal = subscriptionMapper.selectListByMemberId(memberId).stream()
+        List<MemberSubscriptionDO> personalRows = subscriptionMapper.selectListByMemberId(memberId);
+        MemberSubscriptionDO latestPersonal = personalRows.stream()
                 .filter(row -> row.getEndTime() != null)
                 .max(Comparator.comparing(MemberSubscriptionDO::getEndTime))
                 .orElse(null);
@@ -180,6 +188,25 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
             resp.setPeriodMonths(latestPersonal.getPeriodMonths());
             resp.setSourceOrderNo(latestPersonal.getSourceOrderNo());
         }
+
+        // 4. 桌面端版本：所有有效来源中的最高档（个人订阅 / 企业席位）
+        //    版本是发放时的快照，之后改计划不影响已发放的权益。
+        LinkedHashSet<String> editions = new LinkedHashSet<>();
+        for (MemberSubscriptionDO row : personalRows) {
+            if (row.getEndTime() != null && row.getEndTime().isAfter(LocalDateTime.now())) {
+                addEdition(editions, row.getEdition());
+            }
+        }
+        for (MaxLabelOrgLicenseDO license : orgLicenses) {
+            addEdition(editions, license.getEdition());
+        }
+        if (!editions.isEmpty()) {
+            List<String> ordered = EDITION_ORDER.stream().filter(editions::contains).toList();
+            List<String> highestFirst = new ArrayList<>(ordered);
+            Collections.reverse(highestFirst);
+            resp.setEdition(highestFirst.get(0));
+            resp.setActiveEditions(highestFirst);
+        }
         return resp;
     }
 
@@ -217,6 +244,12 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
                 .eq(MemberSubscriptionDO::getSourceOrderItemId, orderItemId)
                 .set(MemberSubscriptionDO::getRefunded, true));
         orgLicenseMapper.updateRefundedByOrderItemId(orderItemId);
+    }
+
+    private static void addEdition(Set<String> target, String edition) {
+        if (edition != null && EDITION_ORDER.contains(edition)) {
+            target.add(edition);
+        }
     }
 
     private void validateGrantRequest(MemberSubscriptionGrantReqDTO reqDTO) {

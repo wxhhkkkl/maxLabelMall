@@ -13,6 +13,8 @@ public class MemberSubscriptionGrantReqDTO {
     private Long orderItemId;
     private String orderNo;
     private Long planId;
+    /** 计划对应的桌面端版本快照：standard / professional / enterprise */
+    private String edition;
     private Long spuId;
     private Long skuId;
     /**

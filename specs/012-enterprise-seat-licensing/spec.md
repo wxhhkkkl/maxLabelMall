@@ -120,6 +120,13 @@
   并给出可理解的提示。**运营后台 MUST 保留人工退款通道**（特殊情况由平台处理）；
   后台退款后仍按 Q76 给批次打「已退款」标记。未支付订单的取消不受影响（没有资金往来）。
 
+- **Q80 桌面端三档版本（标准版/专业版/企业版）怎么落地？**（2026-10-26 所有者拍板）
+  → A: 商城侧补 `edition`：`maxlabel_subscription_plan.edition` 配置档位，发放时快照到
+  `member_subscription` / `maxlabel_org_license`；`GET /member/subscription/get` 返回有效来源中的
+  **最高档** `edition` 与 `activeEditions`。口径：**个人登录（未付费）= 标准版；个人会员授权 = 专业版；
+  企业授权 = 企业版**。桌面端只在「未登录且无加密狗」时只读，已登录即至少标准版。
+  ⚠️ 本条只补「档位下发」，不改变 Q69 的「来源不影响云端能力」：个人与企业来源的差异仅在档位本身。
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 企业购买按席位的软件授权 (Priority: P1 · US40)

@@ -53,6 +53,7 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
         plan.setSpuId(300L);
         plan.setSkuId(301L);
         plan.setPeriodMonths(12);
+        plan.setEdition("professional");
         plan.setEnabled(true);
         return plan;
     }
@@ -71,6 +72,7 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
         assertEquals(9001L, req.getOrderItemId());
         assertEquals(12, req.getPeriodMonths());
         assertEquals(2, req.getCount());
+        assertEquals("professional", req.getEdition());
     }
 
     @Test
@@ -110,6 +112,7 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
     void grantsEnterpriseLicenseForEnterprisePlan() {
         ProductSubscriptionPlanRespDTO enterprise = plan();
         enterprise.setScope(2);
+        enterprise.setEdition("enterprise");
         when(planApi.getBySkuId(301L)).thenReturn(success(enterprise));
         when(memberOrgApi.grantLicense(any())).thenReturn(success(true));
 
@@ -123,6 +126,7 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
         assertEquals(88L, captor.getValue().getOrgId());
         assertEquals(12, captor.getValue().getPeriodMonths());
         assertEquals(2, captor.getValue().getSeatsTotal());
+        assertEquals("enterprise", captor.getValue().getEdition());
         verify(subscriptionApi, never()).grant(any());
     }
 

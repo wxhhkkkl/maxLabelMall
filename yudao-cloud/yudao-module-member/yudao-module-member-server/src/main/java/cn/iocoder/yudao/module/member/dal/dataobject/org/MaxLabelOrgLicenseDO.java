@@ -30,6 +30,8 @@ public class MaxLabelOrgLicenseDO extends BaseDO {
     private Long id;
     private Long orgId;
     private Long planId;
+    /** 发放时的桌面端版本快照：standard 标准版 / professional 专业版 / enterprise 企业版 */
+    private String edition;
     private Long spuId;
     private Long skuId;
     /** 本段**购买的**月数（plan.periodMonths；折算进来的剩余时长不并入这里，以起止日期为准） */

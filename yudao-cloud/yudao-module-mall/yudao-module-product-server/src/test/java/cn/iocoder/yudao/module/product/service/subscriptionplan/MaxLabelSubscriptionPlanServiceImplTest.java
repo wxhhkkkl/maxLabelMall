@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +22,7 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +70,58 @@ public class MaxLabelSubscriptionPlanServiceImplTest {
         });
 
         assertEquals(11L, planService.createPlan(request()));
+    }
+
+    @Test
+    void keepsEditionFromRequest() {
+        when(skuService.getSku(301L)).thenReturn(sku);
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu);
+        when(planMapper.selectBySkuId(301L)).thenReturn(null);
+        when(planMapper.selectEnabledList()).thenReturn(List.of());
+        when(planMapper.insert(any(MaxLabelSubscriptionPlanDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, MaxLabelSubscriptionPlanDO.class).setId(11L);
+            return 1;
+        });
+
+        MaxLabelSubscriptionPlanCreateReqVO req = request();
+        req.setEdition("professional");
+        planService.createPlan(req);
+
+        ArgumentCaptor<MaxLabelSubscriptionPlanDO> captor =
+                ArgumentCaptor.forClass(MaxLabelSubscriptionPlanDO.class);
+        verify(planMapper).insert(captor.capture());
+        assertEquals("professional", captor.getValue().getEdition());
+    }
+
+    @Test
+    void defaultsEditionToStandard() {
+        when(skuService.getSku(301L)).thenReturn(sku);
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu);
+        when(planMapper.selectBySkuId(301L)).thenReturn(null);
+        when(planMapper.selectEnabledList()).thenReturn(List.of());
+        when(planMapper.insert(any(MaxLabelSubscriptionPlanDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, MaxLabelSubscriptionPlanDO.class).setId(11L);
+            return 1;
+        });
+
+        planService.createPlan(request());
+
+        ArgumentCaptor<MaxLabelSubscriptionPlanDO> captor =
+                ArgumentCaptor.forClass(MaxLabelSubscriptionPlanDO.class);
+        verify(planMapper).insert(captor.capture());
+        assertEquals("standard", captor.getValue().getEdition());
+    }
+
+    @Test
+    void exposesEditionOnEnabledPlanList() {
+        when(planMapper.selectEnabledList()).thenReturn(List.of(
+                MaxLabelSubscriptionPlanDO.builder()
+                        .id(1L).spuId(300L).skuId(301L).scope(1)
+                        .periodMonths(12).edition("professional").enabled(true).build()));
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu);
+        when(skuService.getSku(301L)).thenReturn(sku);
+
+        assertEquals("professional", planService.getEnabledPlanListWithProduct().get(0).getEdition());
     }
 
     @Test

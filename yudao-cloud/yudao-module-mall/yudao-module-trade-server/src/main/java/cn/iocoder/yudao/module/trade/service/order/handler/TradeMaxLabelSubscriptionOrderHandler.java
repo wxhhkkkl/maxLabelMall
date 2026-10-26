@@ -53,6 +53,7 @@ public class TradeMaxLabelSubscriptionOrderHandler implements TradeOrderHandler 
                 orgReqDTO.setOrderItemId(orderItem.getId());
                 orgReqDTO.setOrderNo(order.getNo());
                 orgReqDTO.setPlanId(plan.getId());
+                orgReqDTO.setEdition(plan.getEdition());
                 orgReqDTO.setSpuId(orderItem.getSpuId());
                 orgReqDTO.setSkuId(orderItem.getSkuId());
                 orgReqDTO.setPeriodMonths(plan.getPeriodMonths());
@@ -66,6 +67,7 @@ public class TradeMaxLabelSubscriptionOrderHandler implements TradeOrderHandler 
             reqDTO.setOrderItemId(orderItem.getId());
             reqDTO.setOrderNo(order.getNo());
             reqDTO.setPlanId(plan.getId());
+            reqDTO.setEdition(plan.getEdition());
             reqDTO.setSpuId(orderItem.getSpuId());
             reqDTO.setSkuId(orderItem.getSkuId());
             reqDTO.setPeriodMonths(plan.getPeriodMonths());

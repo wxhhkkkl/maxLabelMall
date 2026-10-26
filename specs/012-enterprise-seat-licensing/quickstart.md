@@ -10,7 +10,7 @@
 
 | 项 | 要求 |
 |---|---|
-| 数据库 | MySQL；已执行 `021-enterprise-seat-licensing.sql` 与 `022-enterprise-license-folded.sql` |
+| 数据库 | MySQL；已执行 `021-enterprise-seat-licensing.sql`、`022-enterprise-license-folded.sql` 与 `023-plan-edition.sql` |
 | 后端 | `java -jar yudao-server/target/yudao-server.jar`（约 70 秒启动）；**不要加 `--spring.profiles.active=local`** |
 | 前端 | `storefront`（Vite）、`yudao-ui-admin-vue3`、桌面端 `../maxlabel` |
 | 租户 | 162；请求头 `tenant-id: 162` |
@@ -21,6 +21,7 @@
 ```bash
 python scripts/apply_003_filter_dimension.py --file yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql
 python scripts/apply_003_filter_dimension.py --file yudao-cloud/sql/mysql/022-enterprise-license-folded.sql
+python scripts/apply_003_filter_dimension.py --file yudao-cloud/sql/mysql/023-plan-edition.sql
 ```
 
 回查：
@@ -34,12 +35,17 @@ SELECT column_name FROM information_schema.columns
  WHERE table_schema = DATABASE()
    AND (table_name, column_name) IN
        (('maxlabel_subscription_plan','scope'),('product_spu','enterprise_only'),
-        ('trade_order','maxlabel_org_id'),('maxlabel_org_license','folded_time'));
+        ('trade_order','maxlabel_org_id'),('maxlabel_org_license','folded_time'),
+        ('maxlabel_subscription_plan','edition'),('member_subscription','edition'),
+        ('maxlabel_org_license','edition'));
 
 SELECT COUNT(*) FROM maxlabel_org_license WHERE folded_time IS NOT NULL;
 ```
 
-预期：4 张表、4 列全部存在；`021`/`022` 重复执行不报错、不重复插入菜单。
+预期：4 张表、7 列全部存在；`021`/`022`/`023` 重复执行不报错、不重复插入菜单。
+
+档位口径（Q80）：`maxlabel_subscription_plan.edition` 存量回填为「个人=professional、
+企业=enterprise」；`member_subscription` / `maxlabel_org_license` 按 `plan_id` 回填快照。
 
 ### 0.2 准备测试账号
 
@@ -91,7 +97,7 @@ SELECT COUNT(*) FROM maxlabel_org_license WHERE folded_time IS NOT NULL;
 | 3.2 | 再分配一次给 B | 幂等或明确提示“已有有效席位”，不重复占容量 | FR-303 |
 | 3.3 | 把最后一个席位分配给会员 C（非本企业成员） | 被拒绝 | FR-305 |
 | 3.4 | 用会员 A 给第三个成员分配（容量已满） | 被拒绝并提示“席位已用完” | FR-302/SC-109 |
-| 3.5 | 会员 B 在桌面端刷新账户 / 打开 `/member/subscription/get` | `active=true`、`sourceType=2`、`orgName=企业名`、到期日正确 | SC-108 |
+| 3.5 | 会员 B 在桌面端刷新账户 / 打开 `/member/subscription/get` | `active=true`、`sourceType=2`、`orgName=企业名`、`edition=enterprise`、到期日正确；桌面端左栏显示「企业版」与「企业授权 · 企业名」 | SC-108 |
 | 3.6 | 会员 B 上传一个 `.msdx` 模板 | 上传成功（企业席位与个人订阅等价） | Q69/SC-116 |
 | 3.7 | 会员 B 同时有个人订阅且更晚到期 | 到期日显示两者较晚者，`sourceType=1` | Q67/SC-112 |
 | 3.8 | 会员 A 撤销 B 的席位 | 席位释放、可用 +1 | FR-304 |

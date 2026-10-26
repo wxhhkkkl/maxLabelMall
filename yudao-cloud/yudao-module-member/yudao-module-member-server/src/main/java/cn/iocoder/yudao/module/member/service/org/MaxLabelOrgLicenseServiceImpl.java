@@ -81,6 +81,7 @@ public class MaxLabelOrgLicenseServiceImpl implements MaxLabelOrgLicenseService 
         MaxLabelOrgLicenseDO license = MaxLabelOrgLicenseDO.builder()
                 .orgId(reqDTO.getOrgId())
                 .planId(reqDTO.getPlanId())
+                .edition(reqDTO.getEdition())
                 .spuId(reqDTO.getSpuId())
                 .skuId(reqDTO.getSkuId())
                 .periodMonths(reqDTO.getPeriodMonths())

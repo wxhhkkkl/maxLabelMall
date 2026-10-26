@@ -71,6 +71,9 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="桌面端版本" width="110">
+        <template #default="{ row }">{{ editionLabel(row.edition) }}</template>
+      </el-table-column>
       <el-table-column label="价格（分）" prop="price" width="110" />
       <el-table-column label="启用" width="90">
         <template #default="{ row }">
@@ -144,6 +147,13 @@ const queryParams = reactive<{
   scope: undefined,
   enabled: undefined
 })
+
+const EDITION_LABELS: Record<string, string> = {
+  standard: '标准版',
+  professional: '专业版',
+  enterprise: '企业版'
+}
+const editionLabel = (edition?: string) => EDITION_LABELS[edition ?? ''] ?? '标准版'
 
 const coverageWarning = computed(() => {
   const enabled = list.value.filter((plan) => plan.enabled)

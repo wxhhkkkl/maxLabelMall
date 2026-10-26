@@ -224,6 +224,7 @@ CREATE TABLE IF NOT EXISTS "maxlabel_subscription_plan"
     "sku_id"        bigint NOT NULL,
     "period_months" int NOT NULL,
     "scope"         tinyint NOT NULL DEFAULT 1,
+    "edition"       varchar(16) NOT NULL DEFAULT 'standard',
     "enabled"       bit NOT NULL DEFAULT TRUE,
     "sort"          int NOT NULL DEFAULT 0,
     "creator"       varchar DEFAULT '',

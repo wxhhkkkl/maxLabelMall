@@ -40,6 +40,10 @@ public class MaxLabelSubscriptionPlanDO extends BaseDO {
      */
     private Integer scope;
     /**
+     * 桌面端版本：standard 标准版 / professional 专业版 / enterprise 企业版
+     */
+    private String edition;
+    /**
      * 是否启用
      */
     private Boolean enabled;

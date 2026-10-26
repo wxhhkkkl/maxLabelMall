@@ -21,10 +21,22 @@ public class AppMemberUserInfoRespVO {
     private String avatar;
 
     /**
+     * 头像 URL，与 {@link #avatar} 同值 —— 桌面端 017 契约读取的字段名。
+     */
+    @Schema(description = "头像 URL（桌面端契约字段，与 avatar 同值）", example = "https://www.iocoder.cn/xxx.png")
+    private String avatarUrl;
+
+    /**
      * 公司名称。**选填**，可能是 null —— 它在「个人资料」里可看可改（Q24）
      */
     @Schema(description = "公司名称", example = "某某印刷厂")
     private String company;
+
+    /**
+     * 公司名称，与 {@link #company} 同值 —— 桌面端 017 契约读取的字段名。
+     */
+    @Schema(description = "公司名称（桌面端契约字段，与 company 同值）", example = "某某印刷厂")
+    private String companyName;
 
     @Schema(description = "用户手机号", requiredMode = Schema.RequiredMode.REQUIRED, example = "15601691300")
     private String mobile;

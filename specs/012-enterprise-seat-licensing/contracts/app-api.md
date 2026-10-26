@@ -53,7 +53,13 @@
 | `endDate` | 较晚来源的最后有效自然日；到期日当天全天有效 |
 | `sourceType` | `1` 个人订阅 / `2` 企业席位；表示**决定 `endDate` 的来源** |
 | `orgId` / `orgName` | 会员有有效企业席位时返回；否则为 `null` |
+| `edition` | 有效来源中的**最高档**：`standard` / `professional` / `enterprise`；无有效订阅为 `null` |
+| `activeEditions` | 所有有效来源的档位（去重，最高档在前）；无有效订阅为 `null` |
 | 其余字段 | 语义不变；企业来源下 `periodMonths/sourceOrderNo` 可能为 `null` |
+
+> 档位是**发放时的快照**：`member_subscription.edition` / `maxlabel_org_license.edition`，
+> 之后改计划不回溯。口径（Q80）：个人登录=标准版（不落库，桌面端按登录态处理）、
+> 个人会员授权=专业版、企业授权=企业版。
 
 > ⚠️ 既有客户端把 `sourceType` 当未知字段忽略即可；**不允许**把新增字段设为必填。
 
@@ -195,7 +201,7 @@ OWNER/ADMIN 可访问。
 ```jsonc
 { "code": 0, "data": [{
   "spuId": 501, "skuId": 601, "name": "MaxLabel 企业授权 · 每席位",
-  "periodMonths": 12, "price": 99000, "picUrl": "https://…",
+  "periodMonths": 12, "edition": "enterprise", "price": 99000, "picUrl": "https://…",
   "stock": 9999, "sort": 0
 }], "msg": "" }
 ```
@@ -215,7 +221,7 @@ OWNER/ADMIN 可访问。
 | `POST /product/favorite/create` | 非企业 OWNER、ADMIN 收藏 `enterprise_only=1` → `SPU_ENTERPRISE_ONLY` |
 | `GET /product/favorite/page` | 非企业 OWNER、ADMIN → 过滤企业商品（处理历史收藏残留） |
 | `GET /product/browse-history/page` | 非企业 OWNER、ADMIN → 过滤企业商品（处理历史浏览残留） |
-| `GET /product/subscription-plan/list` | **只返回个人计划**（`scope=1`），保持桌面端/门面站现有行为 |
+| `GET /product/subscription-plan/list` | **只返回个人计划**（`scope=1`），保持桌面端/门面站现有行为；每项新增 `edition`（Q80） |
 
 > `ProductSpuApi#getSpuList`（RPC）**不**加过滤：trade 校验订单项、促销活动内部读取都走它，
 > 过滤会连带影响企业订单。过滤只做在 C 端公开控制器（`AppProductSpuController#getSpuList`、

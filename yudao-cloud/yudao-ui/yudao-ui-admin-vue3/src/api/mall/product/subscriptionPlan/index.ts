@@ -10,6 +10,8 @@ export interface SubscriptionPlanVO {
   periodMonths: number
   /** 类别：1 个人 2 企业 */
   scope: number
+  /** 桌面端版本：standard / professional / enterprise */
+  edition?: string
   enabled: boolean
   sort: number
   createTime?: string
@@ -22,6 +24,8 @@ export interface SubscriptionPlanSaveVO {
   periodMonths: number
   /** 类别：1 个人 2 企业 */
   scope?: number
+  /** 桌面端版本：standard / professional / enterprise */
+  edition?: string
   enabled: boolean
   sort?: number
 }

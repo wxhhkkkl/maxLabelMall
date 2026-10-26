@@ -45,12 +45,22 @@
         </el-select>
       </el-form-item>
       <el-form-item label="类别" prop="scope">
-        <el-select v-model="formData.scope" class="!w-240px">
+        <el-select v-model="formData.scope" class="!w-240px" @change="handleScopeChange">
           <el-option label="个人" :value="1" />
           <el-option label="企业" :value="2" />
         </el-select>
         <span class="ml-10px text-12px text-gray-500">
           企业类别必须绑定勾选「企业专享」的商品
+        </span>
+      </el-form-item>
+      <el-form-item label="桌面端版本" prop="edition">
+        <el-select v-model="formData.edition" class="!w-240px">
+          <el-option label="标准版" value="standard" />
+          <el-option label="专业版" value="professional" />
+          <el-option label="企业版" value="enterprise" />
+        </el-select>
+        <span class="ml-10px text-12px text-gray-500">
+          决定桌面端解锁的功能档位；发放后不随计划修改
         </span>
       </el-form-item>
       <el-form-item label="授予周期（月）" prop="periodMonths">
@@ -98,6 +108,7 @@ const formData = reactive<SubscriptionPlanSaveVO>({
   skuId: undefined as never,
   periodMonths: 12,
   scope: 1,
+  edition: 'professional',
   enabled: true,
   sort: 0
 })
@@ -105,6 +116,7 @@ const formRules = reactive({
   spuId: [{ required: true, message: '请选择商品 SPU', trigger: 'change' }],
   skuId: [{ required: true, message: '请选择商品 SKU', trigger: 'change' }],
   scope: [{ required: true, message: '请选择类别', trigger: 'change' }],
+  edition: [{ required: true, message: '请选择桌面端版本', trigger: 'change' }],
   periodMonths: [{ required: true, message: '授予周期不能为空', trigger: 'blur' }]
 })
 
@@ -148,6 +160,11 @@ const loadSkuOptions = async (spuId?: number) => {
   }
 }
 
+/** 类别切换时给出版位默认值：企业 → 企业版，个人 → 专业版；仍可手动改。 */
+const handleScopeChange = (scope?: number) => {
+  formData.edition = scope === 2 ? 'enterprise' : 'professional'
+}
+
 const handleSpuChange = async (spuId?: number) => {
   formData.skuId = undefined as never
   await loadSkuOptions(spuId)
@@ -163,6 +180,8 @@ const resetForm = () => {
   formData.spuId = undefined as never
   formData.skuId = undefined as never
   formData.periodMonths = 12
+  formData.scope = 1
+  formData.edition = 'professional'
   formData.enabled = true
   formData.sort = 0
   formRef.value?.resetFields()

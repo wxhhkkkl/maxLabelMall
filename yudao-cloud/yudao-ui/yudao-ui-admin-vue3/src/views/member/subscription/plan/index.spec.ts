@@ -49,6 +49,19 @@ describe('会员授权商品页', () => {
     expect(wrapper.text()).toContain('企业授权')
   })
 
+  it('展示桌面端版本档位', async () => {
+    getPage.mockResolvedValue({
+      total: 1,
+      list: [
+        { id: 11, spuId: 300, skuId: 301, spuName: '企业授权', periodMonths: 12, scope: 2, edition: 'enterprise', enabled: true, sort: 1, price: 99000 }
+      ]
+    })
+    const wrapper = mount(PlanIndex, { global: { plugins: [createPinia()], directives: { hasPermi: directive } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('桌面端版本')
+    expect(wrapper.text()).toContain('企业版')
+  })
+
   it('停用后不再提示周期缺失（仅剩停用计划时提示没有启用计划）', async () => {
     getPage.mockResolvedValue({
       total: 1,

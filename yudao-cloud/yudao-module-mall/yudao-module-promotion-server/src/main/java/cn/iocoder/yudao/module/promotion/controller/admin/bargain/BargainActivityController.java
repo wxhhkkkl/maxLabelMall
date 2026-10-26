@@ -25,8 +25,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
 
 @Tag(name = "管理后台 - 砍价活动")
 @RestController
@@ -48,6 +50,7 @@ public class BargainActivityController {
     @Operation(summary = "创建砍价活动")
     @PreAuthorize("@ss.hasPermission('promotion:bargain-activity:create')")
     public CommonResult<Long> createBargainActivity(@Valid @RequestBody BargainActivityCreateReqVO createReqVO) {
+        validateEnterpriseProducts(List.of(createReqVO.getSpuId()));
         return success(bargainActivityService.createBargainActivity(createReqVO));
     }
 
@@ -55,6 +58,7 @@ public class BargainActivityController {
     @Operation(summary = "更新砍价活动")
     @PreAuthorize("@ss.hasPermission('promotion:bargain-activity:update')")
     public CommonResult<Boolean> updateBargainActivity(@Valid @RequestBody BargainActivityUpdateReqVO updateReqVO) {
+        validateEnterpriseProducts(List.of(updateReqVO.getSpuId()));
         bargainActivityService.updateBargainActivity(updateReqVO);
         return success(true);
     }
@@ -106,6 +110,18 @@ public class BargainActivityController {
         Map<Long, Integer> helpUserCountMap = bargainHelpService.getBargainHelpUserCountMapByActivity(activityIds);
         return success(BargainActivityConvert.INSTANCE.convertPage(pageResult, spuList,
                 recordUserCountMap, recordSuccessUserCountMap, helpUserCountMap));
+    }
+
+    /** 企业专享商品不得进入公开促销活动（012 / R66） */
+    private void validateEnterpriseProducts(Collection<Long> spuIds) {
+        if (CollUtil.isEmpty(spuIds)) {
+            return;
+        }
+        boolean enterprise = spuApi.getSpuList(spuIds).getCheckedData().stream()
+                .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
+        if (enterprise) {
+            throw exception(SPU_ENTERPRISE_ONLY);
+        }
     }
 
 }

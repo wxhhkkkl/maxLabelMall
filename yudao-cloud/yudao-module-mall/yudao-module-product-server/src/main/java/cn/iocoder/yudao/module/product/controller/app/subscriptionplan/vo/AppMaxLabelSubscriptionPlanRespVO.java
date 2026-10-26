@@ -15,5 +15,6 @@ public class AppMaxLabelSubscriptionPlanRespVO {
     private String picUrl;
     private Integer stock;
     private Integer sort;
+    private String description;
 
 }

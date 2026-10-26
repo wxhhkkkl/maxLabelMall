@@ -72,4 +72,18 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_PRINT_RECORD_INVALID = new ErrorCode(1_004_014_007, "打印记录字段不合法");
     ErrorCode MEMBER_SUBSCRIPTION_PERIOD_INVALID = new ErrorCode(1_004_014_008, "会员订阅周期不合法");
 
+    //========== MaxLabel 企业会员 1-004-015-000 ==========
+    ErrorCode MEMBER_ORG_NOT_EXISTS = new ErrorCode(1_004_015_000, "企业不存在");
+    ErrorCode MEMBER_ORG_DISABLED = new ErrorCode(1_004_015_001, "企业已停用");
+    ErrorCode MEMBER_ORG_NOT_ADMIN = new ErrorCode(1_004_015_002, "仅企业管理员可执行该操作");
+    ErrorCode MEMBER_ORG_MOBILE_NOT_REGISTERED = new ErrorCode(1_004_015_003, "该手机号尚未注册，请对方先注册");
+    ErrorCode MEMBER_ORG_MEMBER_IN_OTHER = new ErrorCode(1_004_015_004, "该会员已属于其他企业，请先退出原企业");
+    ErrorCode MEMBER_ORG_MEMBER_ALREADY = new ErrorCode(1_004_015_005, "该会员已在本企业");
+    ErrorCode MEMBER_ORG_NOT_MEMBER = new ErrorCode(1_004_015_006, "该会员不是本企业成员");
+    ErrorCode MEMBER_ORG_OWNER_REQUIRED = new ErrorCode(1_004_015_007, "企业必须保留一个 OWNER");
+    ErrorCode MEMBER_ORG_OWNER_CANNOT_LEAVE = new ErrorCode(1_004_015_008, "OWNER 不能直接退出，请先转交");
+    ErrorCode MEMBER_ORG_SEAT_FULL = new ErrorCode(1_004_015_009, "企业席位已用完");
+    ErrorCode MEMBER_ORG_SEAT_ALREADY = new ErrorCode(1_004_015_010, "该会员已有有效席位");
+    ErrorCode MEMBER_ORG_SEAT_NOT_EXISTS = new ErrorCode(1_004_015_011, "该会员没有有效席位");
+
 }

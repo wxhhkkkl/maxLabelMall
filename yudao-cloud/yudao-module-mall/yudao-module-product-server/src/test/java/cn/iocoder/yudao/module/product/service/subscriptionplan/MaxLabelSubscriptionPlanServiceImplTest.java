@@ -113,4 +113,44 @@ public class MaxLabelSubscriptionPlanServiceImplTest {
         assertEquals(MEMBER_SUBSCRIPTION_PLAN_DUPLICATE.getCode(), exception.getCode());
     }
 
+    @Test
+    void enterpriseScopeRequiresEnterpriseOnlySpu() {
+        when(skuService.getSku(301L)).thenReturn(sku);
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu); // enterpriseOnly = false
+
+        MaxLabelSubscriptionPlanCreateReqVO req = request();
+        req.setScope(2);
+        ServiceException exception = assertThrows(ServiceException.class, () -> planService.createPlan(req));
+        assertEquals(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH.getCode(), exception.getCode());
+    }
+
+    @Test
+    void personalScopeRejectsEnterpriseOnlySpu() {
+        virtualSpu.setEnterpriseOnly(true);
+        when(skuService.getSku(301L)).thenReturn(sku);
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu);
+
+        MaxLabelSubscriptionPlanCreateReqVO req = request();
+        req.setScope(1);
+        ServiceException exception = assertThrows(ServiceException.class, () -> planService.createPlan(req));
+        assertEquals(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH.getCode(), exception.getCode());
+    }
+
+    @Test
+    void enterprisePlanCreatesWhenSpuIsEnterpriseOnly() {
+        virtualSpu.setEnterpriseOnly(true);
+        when(skuService.getSku(301L)).thenReturn(sku);
+        when(spuService.getSpu(300L)).thenReturn(virtualSpu);
+        when(planMapper.selectBySkuId(301L)).thenReturn(null);
+        when(planMapper.selectEnabledList()).thenReturn(List.of());
+        when(planMapper.insert(any(MaxLabelSubscriptionPlanDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, MaxLabelSubscriptionPlanDO.class).setId(12L);
+            return 1;
+        });
+
+        MaxLabelSubscriptionPlanCreateReqVO req = request();
+        req.setScope(2);
+        assertEquals(12L, planService.createPlan(req));
+    }
+
 }

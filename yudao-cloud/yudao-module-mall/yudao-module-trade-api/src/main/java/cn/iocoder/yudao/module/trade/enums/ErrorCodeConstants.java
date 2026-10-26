@@ -151,4 +151,9 @@ public interface ErrorCodeConstants {
     ErrorCode INVOICE_FILE_TYPE_NOT_ALLOWED = new ErrorCode(1_011_009_042, "发票文件格式不支持，只允许 PDF 或图片（jpg / jpeg / png）");
     ErrorCode INVOICE_ISSUE_FAIL_ORDER_NOT_PAID = new ErrorCode(1_011_009_043, "订单还未支付，不能开具发票");
 
+    // ========== MaxLabel 企业授权订单 1-011-010-000 ==========
+    ErrorCode ENTERPRISE_ORDER_BUYER_NOT_ADMIN = new ErrorCode(1_011_010_000, "仅企业管理员可购买企业授权");
+    ErrorCode ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED = new ErrorCode(1_011_010_001, "企业授权订单必须使用企业类型的发票抬头");
+    ErrorCode ENTERPRISE_PRODUCT_NOT_AVAILABLE = new ErrorCode(1_011_010_002, "企业商品仅可由企业管理员在企业中心购买");
+
 }

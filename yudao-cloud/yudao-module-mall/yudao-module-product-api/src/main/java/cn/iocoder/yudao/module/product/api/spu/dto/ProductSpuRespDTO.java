@@ -92,6 +92,11 @@ public class ProductSpuRespDTO {
      */
     private Long deliveryTemplateId;
 
+    /**
+     * 是否企业专享：不在公开商城展示
+     */
+    private Boolean enterpriseOnly;
+
     // ========== 营销相关字段 =========
 
     /**

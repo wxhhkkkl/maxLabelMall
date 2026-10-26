@@ -12,6 +12,8 @@ public class ProductSubscriptionPlanRespDTO {
     private Long spuId;
     private Long skuId;
     private Integer periodMonths;
+    /** 类别：1 个人 2 企业 */
+    private Integer scope;
     private Boolean enabled;
 
 }

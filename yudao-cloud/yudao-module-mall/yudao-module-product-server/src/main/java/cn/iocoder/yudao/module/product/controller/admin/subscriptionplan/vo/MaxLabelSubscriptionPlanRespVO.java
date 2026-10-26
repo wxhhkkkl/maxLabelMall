@@ -16,6 +16,7 @@ public class MaxLabelSubscriptionPlanRespVO {
     private String skuName;
     private Integer price;
     private Integer periodMonths;
+    private Integer scope;
     private Boolean enabled;
     private Integer sort;
     private LocalDateTime createTime;

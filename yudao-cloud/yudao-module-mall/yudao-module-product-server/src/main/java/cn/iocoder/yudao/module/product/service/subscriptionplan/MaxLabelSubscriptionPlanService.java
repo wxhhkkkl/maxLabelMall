@@ -25,4 +25,8 @@ public interface MaxLabelSubscriptionPlanService {
 
     List<AppMaxLabelSubscriptionPlanRespVO> getEnabledPlanListWithProduct();
 
+    List<AppMaxLabelSubscriptionPlanRespVO> getEnabledEnterprisePlanListWithProduct();
+
+    AppMaxLabelSubscriptionPlanRespVO getEnterprisePlanDetail(Long skuId);
+
 }

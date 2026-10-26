@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.product.controller.app.favorite;
 import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.controller.app.favorite.vo.AppFavoritePageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.favorite.vo.AppFavoriteReqVO;
 import cn.iocoder.yudao.module.product.controller.app.favorite.vo.AppFavoriteRespVO;
@@ -32,6 +34,8 @@ public class AppFavoriteController {
     private ProductFavoriteService productFavoriteService;
     @Resource
     private ProductSpuService productSpuService;
+    @Resource
+    private MemberOrgApi memberOrgApi;
 
     @PostMapping(value = "/create")
     @Operation(summary = "添加商品收藏")
@@ -49,7 +53,10 @@ public class AppFavoriteController {
     @GetMapping(value = "/page")
     @Operation(summary = "获得商品收藏分页")
     public CommonResult<PageResult<AppFavoriteRespVO>> getFavoritePage(AppFavoritePageReqVO reqVO) {
-        PageResult<ProductFavoriteDO> favoritePage = productFavoriteService.getFavoritePage(getLoginUserId(), reqVO);
+        Long userId = getLoginUserId();
+        PageResult<ProductFavoriteDO> favoritePage = isEnterpriseAdmin()
+                ? productFavoriteService.getFavoritePage(userId, reqVO)
+                : productFavoriteService.getFavoritePageExcludingEnterprise(userId, reqVO);
         if (CollUtil.isEmpty(favoritePage.getList())) {
             return success(PageResult.empty());
         }
@@ -58,6 +65,10 @@ public class AppFavoriteController {
         List<ProductFavoriteDO> favorites = favoritePage.getList();
         List<Long> spuIds = convertList(favorites, ProductFavoriteDO::getSpuId);
         List<ProductSpuDO> spus = productSpuService.getSpuList(spuIds);
+        // 非企业管理员不展示企业专享商品（历史收藏残留）
+        if (!isEnterpriseAdmin()) {
+            spus = spus.stream().filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList();
+        }
 
         // 转换 VO 结果
         PageResult<AppFavoriteRespVO> pageResult = new PageResult<>(favoritePage.getTotal());
@@ -76,6 +87,16 @@ public class AppFavoriteController {
     @Operation(summary = "获得商品收藏数量")
     public CommonResult<Long> getFavoriteCount() {
         return success(productFavoriteService.getFavoriteCount(getLoginUserId()));
+    }
+
+    private boolean isEnterpriseAdmin() {
+        Long userId = getLoginUserId();
+        if (userId == null) {
+            return false;
+        }
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        return org != null && Integer.valueOf(0).equals(org.getStatus())
+                && (Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()));
     }
 
 }

@@ -4,6 +4,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuDetailRespVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO;
@@ -32,6 +34,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_NOT_ENABLE;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_NOT_EXISTS;
 
@@ -47,6 +50,8 @@ public class AppProductSpuController {
     private ProductSkuService productSkuService;
     @Resource
     private ProductBrowseHistoryService productBrowseHistoryService;
+    @Resource
+    private MemberOrgApi memberOrgApi;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -57,10 +62,13 @@ public class AppProductSpuController {
         if (CollUtil.isEmpty(list)) {
             return success(Collections.emptyList());
         }
+        // 企业专享商品：只对企业 OWNER/ADMIN 返回（购物车/订单渲染需要；012 / Q72）
+        List<ProductSpuDO> visibleList = isEnterpriseAdmin() ? list
+                : list.stream().filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList();
 
         // 拼接返回
-        list.forEach(spu -> spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount()));
-        List<AppProductSpuRespVO> voList = BeanUtils.toBean(list, AppProductSpuRespVO.class);
+        visibleList.forEach(spu -> spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount()));
+        List<AppProductSpuRespVO> voList = BeanUtils.toBean(visibleList, AppProductSpuRespVO.class);
         return success(voList);
     }
 
@@ -89,6 +97,10 @@ public class AppProductSpuController {
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
         }
+        // 企业专享商品不通过公开详情暴露（企业管理员走企业计划专用接口）
+        if (Boolean.TRUE.equals(spu.getEnterpriseOnly())) {
+            throw exception(SPU_ENTERPRISE_ONLY);
+        }
         if (!ProductSpuStatusEnum.isEnable(spu.getStatus())) {
             throw exception(SPU_NOT_ENABLE, spu.getName());
         }
@@ -105,6 +117,17 @@ public class AppProductSpuController {
         AppProductSpuDetailRespVO spuVO = BeanUtils.toBean(spu, AppProductSpuDetailRespVO.class)
                 .setSkus(BeanUtils.toBean(skus, AppProductSpuDetailRespVO.Sku.class));
         return success(spuVO);
+    }
+
+    /** 当前登录会员是否是启用企业的 OWNER/ADMIN */
+    private boolean isEnterpriseAdmin() {
+        Long userId = getLoginUserId();
+        if (userId == null) {
+            return false;
+        }
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        return org != null && Integer.valueOf(0).equals(org.getStatus())
+                && (Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()));
     }
 
 }

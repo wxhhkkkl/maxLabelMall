@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.trade.service.cart;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
@@ -21,6 +23,7 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_NOT_EXISTS;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_STOCK_NOT_ENOUGH;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.CARD_ITEM_NOT_FOUND;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_PRODUCT_NOT_AVAILABLE;
 import static java.util.Collections.emptyList;
 
 /**
@@ -40,6 +43,8 @@ public class CartServiceImpl implements CartService {
     @Resource
     private ProductSpuApi productSpuApi;
     @Resource
+    private MemberOrgApi memberOrgApi;
+    @Resource
     private ProductSkuApi productSkuApi;
 
     @Override
@@ -48,7 +53,7 @@ public class CartServiceImpl implements CartService {
         CartDO cart = cartMapper.selectByUserIdAndSkuId(userId, addReqVO.getSkuId());
         // 校验 SKU
         Integer count = addReqVO.getCount();
-        ProductSkuRespDTO sku = checkProductSku(addReqVO.getSkuId(), count);
+        ProductSkuRespDTO sku = checkProductSku(userId, addReqVO.getSkuId(), count);
 
         // 情况一：存在，则进行数量更新
         if (cart != null) {
@@ -72,7 +77,7 @@ public class CartServiceImpl implements CartService {
             throw exception(CARD_ITEM_NOT_FOUND);
         }
         // 校验商品 SKU
-        checkProductSku(cart.getSkuId(), updateReqVO.getCount());
+        checkProductSku(userId, cart.getSkuId(), updateReqVO.getCount());
 
         // 更新数量
         cartMapper.updateById(new CartDO().setId(cart.getId())
@@ -182,15 +187,29 @@ public class CartServiceImpl implements CartService {
      * @param count 商品数量
      * @return 商品 SKU
      */
-    private ProductSkuRespDTO checkProductSku(Long skuId, Integer count) {
+    private ProductSkuRespDTO checkProductSku(Long userId, Long skuId, Integer count) {
         ProductSkuRespDTO sku = productSkuApi.getSku(skuId).getCheckedData();
         if (sku == null) {
             throw exception(SKU_NOT_EXISTS);
+        }
+        // 企业专享商品只能由企业 OWNER/ADMIN 加购（012 / R75）
+        ProductSpuRespDTO spu = productSpuApi.getSpu(sku.getSpuId()).getCheckedData();
+        if (spu != null && Boolean.TRUE.equals(spu.getEnterpriseOnly()) && !isEnterpriseAdmin(userId)) {
+            throw exception(ENTERPRISE_PRODUCT_NOT_AVAILABLE);
         }
         if (count > sku.getStock()) {
             throw exception(SKU_STOCK_NOT_ENOUGH);
         }
         return sku;
+    }
+
+    private boolean isEnterpriseAdmin(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        return org != null && Integer.valueOf(0).equals(org.getStatus())
+                && (Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()));
     }
 
 }

@@ -81,4 +81,10 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_SUBSCRIPTION_PLAN_MULTI_SPU = new ErrorCode(1_008_010_004, "同一租户只能配置一个启用的会员商品 SPU");
     ErrorCode MEMBER_SUBSCRIPTION_PLAN_INVALID_PERIOD = new ErrorCode(1_008_010_005, "会员授权周期必须在 1-120 个月之间");
 
+    //========== MaxLabel 企业商品 1-008-011-000 ==========
+    ErrorCode SPU_ENTERPRISE_ONLY = new ErrorCode(1_008_011_000, "该商品仅对企业客户开放");
+    ErrorCode ENTERPRISE_PLAN_FORBIDDEN = new ErrorCode(1_008_011_001, "仅企业管理员可购买企业授权");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_SCOPE_INVALID = new ErrorCode(1_008_011_002, "会员授权商品类别不合法");
+    ErrorCode MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH = new ErrorCode(1_008_011_003, "计划类别与商品企业专享标记不一致");
+
 }

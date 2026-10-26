@@ -4,6 +4,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.controller.admin.history.vo.ProductBrowseHistoryPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.history.vo.AppProductBrowseHistoryDeleteReqVO;
 import cn.iocoder.yudao.module.product.controller.app.history.vo.AppProductBrowseHistoryPageReqVO;
@@ -18,6 +20,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +39,8 @@ public class AppProductBrowseHistoryController {
     private ProductBrowseHistoryService productBrowseHistoryService;
     @Resource
     private ProductSpuService productSpuService;
+    @Resource
+    private MemberOrgApi memberOrgApi;
 
     @DeleteMapping(value = "/delete")
     @Operation(summary = "删除商品浏览记录")
@@ -64,11 +69,28 @@ public class AppProductBrowseHistoryController {
 
         // 得到商品 spu 信息
         Set<Long> spuIds = convertSet(pageResult.getList(), ProductBrowseHistoryDO::getSpuId);
-        Map<Long, ProductSpuDO> spuMap = convertMap(productSpuService.getSpuList(spuIds), ProductSpuDO::getId);
+        List<ProductSpuDO> spus = productSpuService.getSpuList(spuIds);
+        // 非企业管理员不展示企业专享商品（历史浏览残留）
+        if (!isEnterpriseAdmin()) {
+            spus = spus.stream().filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList();
+        }
+        Map<Long, ProductSpuDO> spuMap = convertMap(spus, ProductSpuDO::getId);
+        pageResult.setList(pageResult.getList().stream()
+                .filter(history -> spuMap.containsKey(history.getSpuId())).toList());
         return success(BeanUtils.toBean(pageResult, AppProductBrowseHistoryRespVO.class,
                 vo -> Optional.ofNullable(spuMap.get(vo.getSpuId()))
                         .ifPresent(spu -> vo.setSpuName(spu.getName()).setPicUrl(spu.getPicUrl()).setPrice(spu.getPrice())
                                 .setSalesCount(spu.getSalesCount()).setStock(spu.getStock()))));
+    }
+
+    private boolean isEnterpriseAdmin() {
+        Long userId = getLoginUserId();
+        if (userId == null) {
+            return false;
+        }
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        return org != null && Integer.valueOf(0).equals(org.getStatus())
+                && (Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()));
     }
 
 }

@@ -132,6 +132,14 @@ public class TradePriceServiceImpl implements TradePriceService {
 
     @Override
     public List<AppTradeProductSettlementRespVO> calculateProductPrice(Long userId, List<Long> spuIds) {
+        // 0. 企业专享商品不在公开价格接口展示（012 / R75）
+        var visibleSpuIds = convertSet(productSpuApi.getSpuList(spuIds).getCheckedData().stream()
+                .filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList(),
+                ProductSpuRespDTO::getId);
+        spuIds = spuIds.stream().filter(visibleSpuIds::contains).toList();
+        if (spuIds.isEmpty()) {
+            return List.of();
+        }
         // 1.1 获得 SPU 与 SKU 的映射
         List<ProductSkuRespDTO> allSkuList = productSkuApi.getSkuListBySpuId(spuIds).getCheckedData();
         Map<Long, List<ProductSkuRespDTO>> spuIdAndSkuListMap = convertMultiMap(allSkuList, ProductSkuRespDTO::getSpuId);

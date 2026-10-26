@@ -23,6 +23,19 @@ public interface ProductFavoriteMapper extends BaseMapperX<ProductFavoriteDO> {
                 .orderByDesc(ProductFavoriteDO::getId));
     }
 
+    /**
+     * 非企业管理员：分页时直接排除企业专享 SPU，保证 total 与列表一致（012 / R75）
+     */
+    default PageResult<ProductFavoriteDO> selectPageByUserAndTypeExcludingEnterprise(
+            Long userId, AppFavoritePageReqVO reqVO) {
+        return selectPage(reqVO, new LambdaQueryWrapperX<ProductFavoriteDO>()
+                .eq(ProductFavoriteDO::getUserId, userId)
+                .exists("SELECT 1 FROM product_spu ps WHERE ps.id = product_favorite.spu_id"
+                        + " AND ps.deleted = 0"
+                        + " AND (ps.enterprise_only = 0 OR ps.enterprise_only IS NULL)")
+                .orderByDesc(ProductFavoriteDO::getId));
+    }
+
     default PageResult<ProductFavoriteDO> selectPageByUserId(ProductFavoritePageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<ProductFavoriteDO>()
                 .eqIfPresent(ProductFavoriteDO::getUserId, reqVO.getUserId())

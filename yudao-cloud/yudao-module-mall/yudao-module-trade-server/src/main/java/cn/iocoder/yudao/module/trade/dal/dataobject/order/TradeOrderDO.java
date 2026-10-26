@@ -80,6 +80,10 @@ public class TradeOrderDO extends BaseDO {
      */
     private String userRemark;
     /**
+     * MaxLabel 企业编号（企业授权订单快照；个人订单为 null）
+     */
+    private Long maxlabelOrgId;
+    /**
      * 订单状态
      *
      * 枚举 {@link TradeOrderStatusEnum}

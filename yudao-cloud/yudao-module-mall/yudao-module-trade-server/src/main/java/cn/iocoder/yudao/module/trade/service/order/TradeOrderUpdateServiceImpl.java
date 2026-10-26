@@ -15,6 +15,8 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.number.MoneyUtils;
 import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
 import cn.iocoder.yudao.module.member.api.address.dto.MemberAddressRespDTO;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
@@ -25,6 +27,9 @@ import cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum;
 import cn.iocoder.yudao.module.pay.enums.refund.PayRefundStatusEnum;
 import cn.iocoder.yudao.module.product.api.comment.ProductCommentApi;
 import cn.iocoder.yudao.module.product.api.comment.dto.ProductCommentCreateReqDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.dto.ProductSubscriptionPlanRespDTO;
+import cn.iocoder.yudao.module.product.enums.subscriptionplan.MaxLabelSubscriptionScopeEnum;
 import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
 import cn.iocoder.yudao.module.promotion.api.combination.dto.CombinationRecordRespDTO;
 import cn.iocoder.yudao.module.promotion.enums.combination.CombinationRecordStatusEnum;
@@ -135,6 +140,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Resource
     private ProductCommentApi productCommentApi;
     @Resource
+    private ProductSubscriptionPlanApi productSubscriptionPlanApi;
+    @Resource
+    private MemberOrgApi memberOrgApi;
+    @Resource
     public SocialClientApi socialClientApi;
     @Resource
     public PayRefundApi payRefundApi;
@@ -156,6 +165,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 2. 计算价格
         TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, settlementReqVO);
+        // 2.1 企业商品：非企业管理员不允许结算（避免价格泄露）
+        validateEnterpriseSettlement(userId, calculateRespBO.getItems());
 
         // 3. 拼接返回
         AppTradeOrderSettlementRespVO respVO = TradeOrderConvert.INSTANCE.convert(calculateRespBO, address);
@@ -214,6 +225,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
         List<TradeOrderItemDO> orderItems = buildTradeOrderItems(order, calculateRespBO);
+        // 1.3 企业订单：买家必须是企业 OWNER/ADMIN、必须用企业抬头，并快照企业
+        validateEnterpriseOrder(userId, createReqVO, orderItems, order);
 
         // 2. 订单创建前的逻辑
         tradeOrderHandlers.forEach(handler -> handler.beforeOrderCreate(order, orderItems));
@@ -286,6 +299,50 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     private List<TradeOrderItemDO> buildTradeOrderItems(TradeOrderDO tradeOrderDO,
                                                         TradePriceCalculateRespBO calculateRespBO) {
         return TradeOrderConvert.INSTANCE.convertList(tradeOrderDO, calculateRespBO);
+    }
+
+    /**
+     * 企业订单：买家必须是启用企业的 OWNER/ADMIN，必须使用企业抬头，并把企业快照进订单。
+     * 纯个人订单在这里直接返回，行为不变（FR-296 / Q73）。
+     */
+    private void validateEnterpriseOrder(Long userId, AppTradeOrderCreateReqVO createReqVO,
+                                         List<TradeOrderItemDO> orderItems, TradeOrderDO order) {
+        if (orderItems == null || orderItems.stream().noneMatch(item -> isEnterprisePlan(item.getSkuId()))) {
+            return;
+        }
+        MemberOrgRespDTO org = requireEnterpriseAdmin(userId);
+        if (createReqVO.getInvoice() == null
+                || !Integer.valueOf(1).equals(createReqVO.getInvoice().getTitleKind())) {
+            throw exception(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED);
+        }
+        order.setMaxlabelOrgId(org.getOrgId());
+    }
+
+    private void validateEnterpriseSettlement(Long userId,
+                                              List<TradePriceCalculateRespBO.OrderItem> items) {
+        if (items == null || items.stream().noneMatch(item -> isEnterprisePlan(item.getSkuId()))) {
+            return;
+        }
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        if (org == null || !Integer.valueOf(0).equals(org.getStatus())
+                || !(Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()))) {
+            throw exception(ENTERPRISE_PRODUCT_NOT_AVAILABLE);
+        }
+    }
+
+    private boolean isEnterprisePlan(Long skuId) {
+        ProductSubscriptionPlanRespDTO plan = productSubscriptionPlanApi.getBySkuId(skuId).getCheckedData();
+        return plan != null && Boolean.TRUE.equals(plan.getEnabled())
+                && MaxLabelSubscriptionScopeEnum.ENTERPRISE.getScope().equals(plan.getScope());
+    }
+
+    private MemberOrgRespDTO requireEnterpriseAdmin(Long userId) {
+        MemberOrgRespDTO org = memberOrgApi.getByMemberId(userId).getCheckedData();
+        if (org == null || !Integer.valueOf(0).equals(org.getStatus())
+                || !(Integer.valueOf(1).equals(org.getRole()) || Integer.valueOf(2).equals(org.getRole()))) {
+            throw exception(ENTERPRISE_ORDER_BUYER_NOT_ADMIN);
+        }
+        return org;
     }
 
     /**

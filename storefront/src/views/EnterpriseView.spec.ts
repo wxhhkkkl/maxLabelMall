@@ -50,6 +50,15 @@ describe('EnterpriseView —— 权益（FR-047）', () => {
   })
 })
 
+describe('EnterpriseView —— 企业中心入口（012）', () => {
+  it('提供进入登录后的企业中心入口', async () => {
+    const w = await mountView()
+    const entry = w.findAll('a').find((a) => a.text() === '进入企业中心')
+    expect(entry).toBeTruthy()
+    expect(entry!.attributes('href')).toBe('/enterprise/center')
+  })
+})
+
 describe('EnterpriseView —— 联系方式（FR-047 / FR-061）', () => {
   it('给出至少一种联系途径', async () => {
     const w = await mountView()

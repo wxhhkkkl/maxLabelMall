@@ -1,7 +1,11 @@
 package cn.iocoder.yudao.module.trade.service.order;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.dto.ProductSubscriptionPlanRespDTO;
 import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
@@ -14,8 +18,11 @@ import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
+import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -43,6 +50,7 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -95,6 +103,10 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     @MockitoBean
     private ProductCommentApi productCommentApi;
     @MockitoBean
+    private cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi productSubscriptionPlanApi;
+    @MockitoBean
+    private cn.iocoder.yudao.module.member.api.org.MemberOrgApi memberOrgApi;
+    @MockitoBean
     private SocialClientApi socialClientApi;
     @MockitoBean
     private CombinationRecordApi combinationRecordApi;
@@ -132,6 +144,9 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         when(payOrderApi.getOrder(any())).thenReturn(CommonResult.success(null));
         // 收货地址：默认"没有默认地址"（结算页那条路会读它）
         when(addressApi.getDefaultAddress(any())).thenReturn(CommonResult.success(null));
+        // 012：默认不是企业计划 / 不是企业会员 —— 既有用例全部走个人路径
+        lenient().when(productSubscriptionPlanApi.getBySkuId(any())).thenReturn(CommonResult.success(null));
+        lenient().when(memberOrgApi.getByMemberId(any())).thenReturn(CommonResult.success(null));
         // 发货订阅消息：sendDeliveryOrderMessage 会调用它，默认 null 会 NPE
         when(socialClientApi.sendWxaSubscribeMessage(any())).thenReturn(CommonResult.success(true));
     }
@@ -332,6 +347,137 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         // 没有配置 → 对公转账不开放（默认关），但页面照常能用
         assertNotNull(respVO);
         assertEquals(Boolean.FALSE, respVO.getOfflinePayEnabled());
+    }
+
+    @Test
+    public void testSettlementOrder_enterpriseSkuForNonAdmin_shouldReject() {
+        when(tradeConfigService.getTradeConfig()).thenReturn(null);
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setPrice(new TradePriceCalculateRespBO.Price());
+        TradePriceCalculateRespBO.OrderItem orderItem = new TradePriceCalculateRespBO.OrderItem();
+        orderItem.setSkuId(301L);
+        orderItem.setCount(1);
+        calculateRespBO.setItems(List.of(orderItem));
+        when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
+        when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+
+        ProductSubscriptionPlanRespDTO enterprisePlan = new ProductSubscriptionPlanRespDTO();
+        enterprisePlan.setId(11L);
+        enterprisePlan.setPeriodMonths(12);
+        enterprisePlan.setScope(2);
+        enterprisePlan.setEnabled(true);
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(null));
+
+        AppTradeOrderSettlementReqVO reqVO = new AppTradeOrderSettlementReqVO();
+        AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
+        item.setSkuId(301L);
+        item.setCount(1);
+        reqVO.setItems(List.of(item));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> orderService.settlementOrder(88L, reqVO));
+        assertEquals(ENTERPRISE_PRODUCT_NOT_AVAILABLE.getCode(), exception.getCode());
+    }
+
+    private ProductSubscriptionPlanRespDTO enterprisePlan() {
+        ProductSubscriptionPlanRespDTO plan = new ProductSubscriptionPlanRespDTO();
+        plan.setId(11L);
+        plan.setSpuId(500L);
+        plan.setSkuId(301L);
+        plan.setPeriodMonths(12);
+        plan.setScope(2);
+        plan.setEnabled(true);
+        return plan;
+    }
+
+    private MemberOrgRespDTO enterpriseOrg(int role) {
+        MemberOrgRespDTO org = new MemberOrgRespDTO();
+        org.setOrgId(88L);
+        org.setRole(role);
+        org.setStatus(0);
+        return org;
+    }
+
+    private AppTradeOrderCreateReqVO enterpriseCreateReq(Integer titleKind) {
+        AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
+        item.setSkuId(301L);
+        item.setCount(2);
+        AppTradeOrderCreateReqVO reqVO = new AppTradeOrderCreateReqVO();
+        reqVO.setItems(List.of(item));
+        reqVO.setCouponId(0L);
+        if (titleKind != null) {
+            AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
+            invoice.setType(1);
+            invoice.setTitleKind(titleKind);
+            invoice.setTitleName("测试企业");
+            invoice.setTaxNo("91320104660690975E");
+            reqVO.setInvoice(invoice);
+        }
+        return reqVO;
+    }
+
+    private void mockEnterprisePrice() {
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setDeliveryType(3); // 纯虚拟商品
+        TradePriceCalculateRespBO.Price price = new TradePriceCalculateRespBO.Price();
+        price.setTotalPrice(198000);
+        price.setDiscountPrice(0);
+        price.setDeliveryPrice(0);
+        price.setCouponPrice(0);
+        price.setPointPrice(0);
+        price.setVipPrice(0);
+        price.setPayPrice(198000);
+        calculateRespBO.setPrice(price);
+        TradePriceCalculateRespBO.OrderItem item = new TradePriceCalculateRespBO.OrderItem();
+        item.setSpuId(500L).setSkuId(301L).setCount(2)
+                .setPrice(99000).setDiscountPrice(0).setPayPrice(198000).setSpuName("企业授权");
+        calculateRespBO.setItems(List.of(item));
+        when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
+        when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+    }
+
+    @Test
+    public void testCreateOrder_enterpriseAdminWithCompanyInvoice_snapshotsOrg() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockEnterprisePrice();
+
+        // user_ip / terminal 来自 ServletUtils / WebFrameworkUtils，单测里没有请求上下文
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            TradeOrderDO order = orderService.createOrder(88L, enterpriseCreateReq(1));
+            assertEquals(88L, order.getMaxlabelOrgId());
+        }
+    }
+
+    @Test
+    public void testCreateOrder_nonAdminBuyerRejected() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(null));
+        mockEnterprisePrice();
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> orderService.createOrder(88L, enterpriseCreateReq(1)));
+        assertEquals(ENTERPRISE_ORDER_BUYER_NOT_ADMIN.getCode(), exception.getCode());
+    }
+
+    @Test
+    public void testCreateOrder_personalInvoiceRejected() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        mockEnterprisePrice();
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> orderService.createOrder(88L, enterpriseCreateReq(2)));
+        assertEquals(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED.getCode(), exception.getCode());
     }
 
     // ==================== 超时自动取消：对公单必须被跳过（T481 / FR-212 / SC-075）====================

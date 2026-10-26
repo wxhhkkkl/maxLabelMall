@@ -23,6 +23,12 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="类别" prop="scope">
+        <el-select v-model="queryParams.scope" class="!w-160px" clearable placeholder="全部">
+          <el-option label="个人" :value="1" />
+          <el-option label="企业" :value="2" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="启用" prop="enabled">
         <el-select v-model="queryParams.enabled" class="!w-160px" clearable placeholder="全部">
           <el-option label="启用" :value="true" />
@@ -57,6 +63,13 @@
       <el-table-column label="规格" prop="skuName" min-width="140" />
       <el-table-column label="周期" width="100">
         <template #default="{ row }">{{ row.periodMonths }} 个月</template>
+      </el-table-column>
+      <el-table-column label="类别" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.scope === 2 ? 'warning' : 'info'">
+            {{ row.scope === 2 ? '企业' : '个人' }}
+          </el-tag>
+        </template>
       </el-table-column>
       <el-table-column label="价格（分）" prop="price" width="110" />
       <el-table-column label="启用" width="90">
@@ -122,11 +135,13 @@ const queryParams = reactive<{
   pageNo: number
   pageSize: number
   spuId?: number
+  scope?: number
   enabled?: boolean
 }>({
   pageNo: 1,
   pageSize: 10,
   spuId: undefined,
+  scope: undefined,
   enabled: undefined
 })
 

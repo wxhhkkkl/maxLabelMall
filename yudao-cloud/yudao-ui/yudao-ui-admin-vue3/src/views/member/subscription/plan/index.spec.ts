@@ -36,6 +36,19 @@ describe('会员授权商品页', () => {
     expect(wrapper.text()).toContain('缺少 1 个月或 12 个月周期')
   })
 
+  it('展示计划类别（企业 / 个人）', async () => {
+    getPage.mockResolvedValue({
+      total: 1,
+      list: [
+        { id: 11, spuId: 300, skuId: 301, spuName: '企业授权', periodMonths: 12, scope: 2, enabled: true, sort: 1, price: 99000 }
+      ]
+    })
+    const wrapper = mount(PlanIndex, { global: { plugins: [createPinia()], directives: { hasPermi: directive } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('企业')
+    expect(wrapper.text()).toContain('企业授权')
+  })
+
   it('停用后不再提示周期缺失（仅剩停用计划时提示没有启用计划）', async () => {
     getPage.mockResolvedValue({
       total: 1,

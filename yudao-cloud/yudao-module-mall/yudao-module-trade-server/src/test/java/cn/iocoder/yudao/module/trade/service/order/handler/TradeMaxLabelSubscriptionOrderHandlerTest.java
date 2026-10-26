@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.trade.service.order.handler;
 
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
+import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgLicenseGrantReqDTO;
 import cn.iocoder.yudao.module.member.api.subscription.MemberSubscriptionApi;
 import cn.iocoder.yudao.module.member.api.subscription.dto.MemberSubscriptionGrantReqDTO;
 import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
@@ -16,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -27,6 +29,8 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
     private ProductSubscriptionPlanApi planApi;
     @Mock
     private MemberSubscriptionApi subscriptionApi;
+    @Mock
+    private MemberOrgApi memberOrgApi;
     @InjectMocks
     private TradeMaxLabelSubscriptionOrderHandler handler;
 
@@ -100,6 +104,36 @@ public class TradeMaxLabelSubscriptionOrderHandlerTest {
 
         verify(subscriptionApi).markRefundedByOrder(8001L);
         verify(subscriptionApi).markRefundedByOrderItem(9001L);
+    }
+
+    @Test
+    void grantsEnterpriseLicenseForEnterprisePlan() {
+        ProductSubscriptionPlanRespDTO enterprise = plan();
+        enterprise.setScope(2);
+        when(planApi.getBySkuId(301L)).thenReturn(success(enterprise));
+        when(memberOrgApi.grantLicense(any())).thenReturn(success(true));
+
+        TradeOrderDO order = order();
+        order.setMaxlabelOrgId(88L);
+        handler.afterPayOrder(order, List.of(item(9001L, 301L, 2)));
+
+        ArgumentCaptor<MemberOrgLicenseGrantReqDTO> captor =
+                ArgumentCaptor.forClass(MemberOrgLicenseGrantReqDTO.class);
+        verify(memberOrgApi).grantLicense(captor.capture());
+        assertEquals(88L, captor.getValue().getOrgId());
+        assertEquals(12, captor.getValue().getPeriodMonths());
+        assertEquals(2, captor.getValue().getSeatsTotal());
+        verify(subscriptionApi, never()).grant(any());
+    }
+
+    @Test
+    void enterprisePlanWithoutOrgSnapshotFails() {
+        ProductSubscriptionPlanRespDTO enterprise = plan();
+        enterprise.setScope(2);
+        when(planApi.getBySkuId(301L)).thenReturn(success(enterprise));
+
+        assertThrows(IllegalStateException.class,
+                () -> handler.afterPayOrder(order(), List.of(item(9001L, 301L, 1))));
     }
 
 }

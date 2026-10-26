@@ -82,7 +82,7 @@
    **同一租户只有一个启用 SPU**。订单项只快照 `spu_id/sku_id`，发放时落周期快照，
    后续改价改配置不影响历史。
 3. **R50 订阅是「授予流水」**：每次支付插一行 `member_subscription`；
-   `startDate = max(today, 上段 end_time 的日期)`（**不要再 +1 天**），
+   `startDate = max(today, 上段 end_time 的日期 − 1 天)`（**原到期日**；`end_time` 已是最后有效日 + 1 天），
    `endDate = startDate + period × count`；
    `end_time` 为最后有效自然日的**次日 00:00（不含当日）**，有效/过期由 `end_time > now` 推导，
    不维护额外状态机。退款只打 `refunded` 标记（整单 `afterCancelOrder` / 订单项

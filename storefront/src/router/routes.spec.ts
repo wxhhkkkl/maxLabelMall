@@ -94,7 +94,8 @@ describe('路由表', () => {
     //             · 订单开票的 /account/invoice（个人中心 · 发票抬头）（31 → 32）
     // 2026-10-16：main 上并行的打印管理系统介绍页 /print-management（32 → 33）
     // 2026-10-20：MaxLabel 会员体系新增 /membership（33 → 34）
-    expect(paths).toHaveLength(34)
+    // 2026-10-26：企业客户与席位授权新增 /enterprise/center、/enterprise/plan/:skuId（34 → 36）
+    expect(paths).toHaveLength(36)
     expect(paths).toContain('/')
   })
 

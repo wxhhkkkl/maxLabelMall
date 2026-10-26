@@ -26,6 +26,7 @@ public interface MaxLabelSubscriptionPlanMapper extends BaseMapperX<MaxLabelSubs
     default PageResult<MaxLabelSubscriptionPlanDO> selectPage(MaxLabelSubscriptionPlanPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<MaxLabelSubscriptionPlanDO>()
                 .eqIfPresent(MaxLabelSubscriptionPlanDO::getSpuId, reqVO.getSpuId())
+                .eqIfPresent(MaxLabelSubscriptionPlanDO::getScope, reqVO.getScope())
                 .eqIfPresent(MaxLabelSubscriptionPlanDO::getEnabled, reqVO.getEnabled())
                 .orderByAsc(MaxLabelSubscriptionPlanDO::getSort)
                 .orderByDesc(MaxLabelSubscriptionPlanDO::getId));

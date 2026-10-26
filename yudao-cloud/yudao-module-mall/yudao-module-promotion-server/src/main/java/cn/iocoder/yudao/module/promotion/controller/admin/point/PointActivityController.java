@@ -23,13 +23,16 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.framework.common.util.collection.MapUtils.findAndThen;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
 
 @Tag(name = "管理后台 - 积分商城活动")
 @RestController
@@ -46,6 +49,7 @@ public class PointActivityController {
     @Operation(summary = "创建积分商城活动")
     @PreAuthorize("@ss.hasPermission('promotion:point-activity:create')")
     public CommonResult<Long> createPointActivity(@Valid @RequestBody PointActivitySaveReqVO createReqVO) {
+        validateEnterpriseProducts(List.of(createReqVO.getSpuId()));
         return success(pointActivityService.createPointActivity(createReqVO));
     }
 
@@ -53,6 +57,7 @@ public class PointActivityController {
     @Operation(summary = "更新积分商城活动")
     @PreAuthorize("@ss.hasPermission('promotion:point-activity:update')")
     public CommonResult<Boolean> updatePointActivity(@Valid @RequestBody PointActivitySaveReqVO updateReqVO) {
+        validateEnterpriseProducts(List.of(updateReqVO.getSpuId()));
         pointActivityService.updatePointActivity(updateReqVO);
         return success(true);
     }
@@ -136,6 +141,18 @@ public class PointActivityController {
                     spu -> activity.setSpuName(spu.getName()).setPicUrl(spu.getPicUrl()).setMarketPrice(spu.getMarketPrice()));
         });
         return result;
+    }
+
+    /** 企业专享商品不得进入公开促销活动（012 / R66） */
+    private void validateEnterpriseProducts(Collection<Long> spuIds) {
+        if (CollUtil.isEmpty(spuIds)) {
+            return;
+        }
+        boolean enterprise = productSpuApi.getSpuList(spuIds).getCheckedData().stream()
+                .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
+        if (enterprise) {
+            throw exception(SPU_ENTERPRISE_ONLY);
+        }
     }
 
 }

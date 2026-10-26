@@ -75,6 +75,9 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 .inIfPresent(ProductSpuDO::getCategoryId, categoryIds);
         // 上架状态 且有库存
         query.eq(ProductSpuDO::getStatus, ProductSpuStatusEnum.ENABLE.getStatus());
+        // 企业专享商品不进入公开商城（012 / Q72）
+        query.and(w -> w.isNull(ProductSpuDO::getEnterpriseOnly)
+                .or().eq(ProductSpuDO::getEnterpriseOnly, false));
 
         // 筛选维度（特性 003 / FR-101）：
         // **每个已选值一条等值 EXISTS**，多条之间自然就是 AND。

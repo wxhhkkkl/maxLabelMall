@@ -105,4 +105,31 @@ public class LabelTemplateServiceImplTest {
         assertEquals(MEMBER_TEMPLATE_NOT_FOUND.getCode(), exception.getCode());
     }
 
+    @Test
+    void enterpriseSeatAllowsCreate() {
+        AppMemberSubscriptionRespVO subscription = new AppMemberSubscriptionRespVO();
+        subscription.setActive(true);
+        subscription.setSourceType(2);
+        subscription.setOrgName("测试企业");
+        when(subscriptionService.getCurrent(MEMBER_ID)).thenReturn(subscription);
+        when(templateMapper.selectListByMemberId(MEMBER_ID)).thenReturn(List.of());
+        when(templateMapper.insert(any(MaxLabelLabelTemplateDO.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, MaxLabelLabelTemplateDO.class).setId(10L);
+            return 1;
+        });
+
+        assertEquals(10L, templateService.create(MEMBER_ID, request("{}")));
+    }
+
+    @Test
+    void expiredEnterpriseSeatRejectsCreate() {
+        AppMemberSubscriptionRespVO subscription = new AppMemberSubscriptionRespVO();
+        subscription.setActive(false);
+        when(subscriptionService.getCurrent(MEMBER_ID)).thenReturn(subscription);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> templateService.create(MEMBER_ID, request("{}")));
+        assertEquals(MEMBER_SUBSCRIPTION_REQUIRED.getCode(), exception.getCode());
+    }
+
 }

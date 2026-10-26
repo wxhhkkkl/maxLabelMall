@@ -76,8 +76,8 @@ trade-server 已依赖 `product-api`，handler 直接调用，**member-server �
 
 1. `SELECT id FROM member_user WHERE id = ? FOR UPDATE`（以会员行为并发锚点）；
 2. `SELECT MAX(end_time) FROM member_subscription WHERE member_id = ?` → `latestEndTime`；
-3. `startDate = max(today, latestEndTime.toLocalDate())`
-   （**不要再 +1 天**：`end_time` 已是"最后有效日+1天 00:00"），
+3. `startDate = max(today, latestEndTime.toLocalDate().minusDays(1))`
+   （取 `end_time` 的前一天 = **原到期日**；否则每次续费多 1 天），
    `endDate = startDate + period_months × item.count`（按 Asia/Shanghai 加自然月，月末按 `plusMonths` 钳制）；
    `start_time = startDate 00:00:00`，`end_time = endDate + 1 天 00:00:00`（不含当日）；
 4. 插入流水行；重复键 `(tenant_id, source_order_item_id)` 直接返回已有行。
@@ -88,7 +88,7 @@ trade-server 已依赖 `product-api`，handler 直接调用，**member-server �
 **Rationale**：
 
 - 规格 FR-225 要求"每一段订阅"可见，流水模型天然满足；单行覆盖会丢历史。
-- 续费必须"从原到期日顺延、不清零"（Q48/SC-078），`max(today, latestEndTime.toLocalDate())`
+- 续费必须"从原到期日顺延、不清零"（Q48/SC-078），`max(today, latestEndTime.toLocalDate().minusDays(1))`
   同时覆盖已过期后续费与未到期续费；到期日当天仍有效（`end_time=次日00:00`，不含当日）。
 - 并发锚点选 `member_user` 行：该行一定存在，且比"锁不存在的最大订阅行"可靠；
   避免两个首购并发各插一段重叠周期。

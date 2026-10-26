@@ -25,6 +25,12 @@
         class="w-80!"
       />
     </el-form-item>
+    <el-form-item label="企业专享" prop="enterpriseOnly">
+      <el-switch v-model="formData.enterpriseOnly" />
+      <span class="ml-10px text-12px text-gray-500">
+        勾选后不在公开商城展示，仅企业中心可见
+      </span>
+    </el-form-item>
   </el-form>
 </template>
 <script lang="ts" setup>
@@ -50,7 +56,8 @@ const formRef = ref() // 表单Ref
 const formData = ref<Spu>({
   sort: 0, // 商品排序
   giveIntegral: 0, // 赠送积分
-  virtualSalesCount: 0 // 虚拟销量
+  virtualSalesCount: 0, // 虚拟销量
+  enterpriseOnly: false // 是否企业专享
 })
 // 表单规则
 const rules = reactive({

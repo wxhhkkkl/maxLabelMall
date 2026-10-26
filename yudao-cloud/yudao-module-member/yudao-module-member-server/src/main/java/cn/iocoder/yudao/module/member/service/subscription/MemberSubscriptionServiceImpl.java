@@ -6,10 +6,17 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.member.api.subscription.dto.MemberSubscriptionGrantReqDTO;
 import cn.iocoder.yudao.module.member.controller.app.subscription.vo.AppMemberSubscriptionRespVO;
+import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgLicenseDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgSeatDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.subscription.MemberSubscriptionDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgLicenseMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgSeatMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.subscription.MemberSubscriptionMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
+import cn.iocoder.yudao.module.member.enums.org.MaxLabelOrgStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
@@ -22,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +53,12 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
     private MemberSubscriptionMapper subscriptionMapper;
     @Resource
     private MemberUserMapper memberUserMapper;
+    @Resource
+    private MaxLabelOrgSeatMapper orgSeatMapper;
+    @Resource
+    private MaxLabelOrgMapper orgMapper;
+    @Resource
+    private MaxLabelOrgLicenseMapper orgLicenseMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -74,8 +88,11 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
         LocalDate today = LocalDate.now();
+        // end_time 是"最后有效日 + 1 天的 00:00"；续费应从**原到期日**（最后有效日）接续，
+        // 否则每续一次会多出 1 天，违反 SC-078 的"误差 0 天"。
         LocalDate startDate = latestEndTime == null ? today
-                : latestEndTime.toLocalDate().isAfter(today) ? latestEndTime.toLocalDate() : today;
+                : latestEndTime.toLocalDate().minusDays(1).isAfter(today)
+                        ? latestEndTime.toLocalDate().minusDays(1) : today;
         LocalDate endDate = startDate.plusMonths(months);
 
         MemberSubscriptionDO subscription = MemberSubscriptionDO.builder()
@@ -106,27 +123,63 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         resp.setMemberId(memberId);
         resp.setActive(false);
         resp.setRemainingDays(0L);
-        List<MemberSubscriptionDO> rows = subscriptionMapper.selectListByMemberId(memberId);
-        if (CollUtil.isEmpty(rows)) {
-            return resp;
-        }
-        MemberSubscriptionDO latest = rows.stream()
+        resp.setSourceType(1);
+
+        // 1. 个人来源
+        MemberSubscriptionDO latestPersonal = subscriptionMapper.selectListByMemberId(memberId).stream()
                 .filter(row -> row.getEndTime() != null)
-                .max((left, right) -> left.getEndTime().compareTo(right.getEndTime()))
+                .max(Comparator.comparing(MemberSubscriptionDO::getEndTime))
                 .orElse(null);
-        if (latest == null) {
+        LocalDateTime personalEnd = latestPersonal == null ? null : latestPersonal.getEndTime();
+
+        // 2. 企业来源：有效席位 + 企业启用 + 至少一条未过期批次
+        MaxLabelOrgSeatDO seat = orgSeatMapper.selectActiveByMemberId(memberId);
+        MaxLabelOrgDO org = seat == null ? null : orgMapper.selectById(seat.getOrgId());
+        List<MaxLabelOrgLicenseDO> orgLicenses = org != null
+                && MaxLabelOrgStatusEnum.ENABLE.getStatus().equals(org.getStatus())
+                ? orgLicenseMapper.selectUnexpiredListByOrgId(org.getId(), LocalDateTime.now())
+                : Collections.emptyList();
+        LocalDateTime orgEnd = orgLicenses.stream()
+                .map(MaxLabelOrgLicenseDO::getEndTime)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+
+        // 3. 取较晚者；并列时以个人为准
+        LocalDateTime effectiveEnd = personalEnd == null ? orgEnd
+                : orgEnd == null ? personalEnd
+                : (orgEnd.isAfter(personalEnd) ? orgEnd : personalEnd);
+        if (effectiveEnd == null) {
             return resp;
         }
-        LocalDateTime now = LocalDateTime.now();
-        LocalDate endDate = latest.getEndTime().toLocalDate().minusDays(1);
-        resp.setActive(latest.getEndTime().isAfter(now));
-        resp.setStartDate(latest.getStartTime().toLocalDate());
+        boolean orgWins = orgEnd != null && (personalEnd == null || orgEnd.isAfter(personalEnd));
+        LocalDate endDate = effectiveEnd.toLocalDate().minusDays(1);
+        resp.setActive(effectiveEnd.isAfter(LocalDateTime.now()));
         resp.setEndDate(endDate);
-        resp.setStartTime(latest.getStartTime());
-        resp.setEndTime(latest.getEndTime());
+        resp.setEndTime(effectiveEnd);
         resp.setRemainingDays(Math.max(0, ChronoUnit.DAYS.between(LocalDate.now(), endDate)));
-        resp.setPeriodMonths(latest.getPeriodMonths());
-        resp.setSourceOrderNo(latest.getSourceOrderNo());
+        resp.setSourceType(orgWins ? 2 : 1);
+        // 有有效企业席位就返回企业信息；sourceType 只表示谁决定 endDate
+        if (orgEnd != null) {
+            resp.setOrgId(org.getId());
+            resp.setOrgName(org.getName());
+        }
+        if (orgWins) {
+            LocalDateTime orgStart = orgLicenses.stream()
+                    .map(MaxLabelOrgLicenseDO::getStartTime)
+                    .filter(Objects::nonNull)
+                    .min(Comparator.naturalOrder())
+                    .orElse(null);
+            resp.setStartTime(orgStart);
+            resp.setStartDate(orgStart == null ? null : orgStart.toLocalDate());
+            resp.setPeriodMonths(null);
+            resp.setSourceOrderNo(null);
+        } else if (latestPersonal != null) {
+            resp.setStartTime(latestPersonal.getStartTime());
+            resp.setStartDate(latestPersonal.getStartTime().toLocalDate());
+            resp.setPeriodMonths(latestPersonal.getPeriodMonths());
+            resp.setSourceOrderNo(latestPersonal.getSourceOrderNo());
+        }
         return resp;
     }
 
@@ -155,6 +208,7 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         subscriptionMapper.update(null, new LambdaUpdateWrapper<MemberSubscriptionDO>()
                 .eq(MemberSubscriptionDO::getSourceOrderId, orderId)
                 .set(MemberSubscriptionDO::getRefunded, true));
+        orgLicenseMapper.updateRefundedByOrderId(orderId);
     }
 
     @Override
@@ -162,6 +216,7 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         subscriptionMapper.update(null, new LambdaUpdateWrapper<MemberSubscriptionDO>()
                 .eq(MemberSubscriptionDO::getSourceOrderItemId, orderItemId)
                 .set(MemberSubscriptionDO::getRefunded, true));
+        orgLicenseMapper.updateRefundedByOrderItemId(orderItemId);
     }
 
     private void validateGrantRequest(MemberSubscriptionGrantReqDTO reqDTO) {

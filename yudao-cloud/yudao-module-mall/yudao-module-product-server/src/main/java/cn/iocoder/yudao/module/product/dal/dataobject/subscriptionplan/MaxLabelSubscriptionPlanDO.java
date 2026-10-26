@@ -36,6 +36,10 @@ public class MaxLabelSubscriptionPlanDO extends BaseDO {
      */
     private Integer periodMonths;
     /**
+     * 类别：1 个人 2 企业，见 MaxLabelSubscriptionScopeEnum
+     */
+    private Integer scope;
+    /**
      * 是否启用
      */
     private Boolean enabled;

@@ -13,6 +13,9 @@ public class MaxLabelSubscriptionPlanPageReqVO extends PageParam {
     @Schema(description = "商品 SPU 编号", example = "300")
     private Long spuId;
 
+    @Schema(description = "类别：1 个人 2 企业", example = "1")
+    private Integer scope;
+
     @Schema(description = "是否启用", example = "true")
     private Boolean enabled;
 

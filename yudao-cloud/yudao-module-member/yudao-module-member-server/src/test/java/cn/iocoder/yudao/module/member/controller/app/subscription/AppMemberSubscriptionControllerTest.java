@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -60,6 +61,20 @@ public class AppMemberSubscriptionControllerTest {
         when(subscriptionService.getCurrent(1001L)).thenReturn(vo);
 
         assertFalse(controller.getCurrent().getData().getActive());
+    }
+
+    @Test
+    void returnsEnterpriseSourceAndOrgName() {
+        AppMemberSubscriptionRespVO vo = new AppMemberSubscriptionRespVO();
+        vo.setMemberId(1001L);
+        vo.setActive(true);
+        vo.setSourceType(2);
+        vo.setOrgName("测试企业");
+        when(subscriptionService.getCurrent(1001L)).thenReturn(vo);
+
+        AppMemberSubscriptionRespVO result = controller.getCurrent().getData();
+        assertEquals(2, result.getSourceType());
+        assertEquals("测试企业", result.getOrgName());
     }
 
 }

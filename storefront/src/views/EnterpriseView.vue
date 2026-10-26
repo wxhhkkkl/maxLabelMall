@@ -23,6 +23,7 @@ const ent = RENDERED.enterprise
       <p class="sw-hero-sub"><PendingText :value="ent.subtitle" /></p>
       <div class="hero-cta">
         <RouterLink class="btn-cyan" to="/mall">浏览商品</RouterLink>
+        <RouterLink class="btn-ghost-white" to="/enterprise/center">进入企业中心</RouterLink>
         <RouterLink class="btn-ghost-white" to="/contact">联系我们</RouterLink>
       </div>
     </div>

@@ -171,7 +171,7 @@ cd ../maxlabel/app && env -u ELECTRON_RUN_AS_NODE npm test
 | 桌面端请求 400「租户标识未传递」 | 是否带 `tenant-id: 162` |
 | 登录窗口拿不到令牌 | 窗口 origin 是否等于配置的商城地址；localStorage 键名是否仍是 `MAXLABEL_ACCESS_TOKEN` |
 | 支付成功但订阅没开通 | `pay_notify_task` 是否成功回调 `/trade/order/update-paid`；订单项 SKU 是否有计划映射；唯一键是否已存在 |
-| 续费没有顺延 | `member_subscription` 最新 `start_time` 是否 = `max(今天, 上段 end_time 的日期) 00:00`（不要再 +1 天），`end_time` 是否为最后有效自然日的次日 00:00 |
+| 续费没有顺延 | `member_subscription` 最新 `start_time` 是否 = `max(今天, 上段 end_time 的日期 − 1 天) 00:00`（原到期日），`end_time` 是否为最后有效自然日的次日 00:00 |
 | 模板上传 403 | 订阅是否有效；`member_id` 是否本人 |
 | 共享列表为空 | `audit_status` 是否为 1；是否被下架 |
 | 后台按钮不显示 | `system_menu` 是否插了对应 `permission` 行 |

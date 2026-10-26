@@ -23,15 +23,18 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static cn.hutool.core.collection.CollectionUtil.newArrayList;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
 
 @Tag(name = "管理后台 - 拼团活动")
 @RestController
@@ -51,6 +54,7 @@ public class CombinationActivityController {
     @Operation(summary = "创建拼团活动")
     @PreAuthorize("@ss.hasPermission('promotion:combination-activity:create')")
     public CommonResult<Long> createCombinationActivity(@Valid @RequestBody CombinationActivityCreateReqVO createReqVO) {
+        validateEnterpriseProducts(List.of(createReqVO.getSpuId()));
         return success(combinationActivityService.createCombinationActivity(createReqVO));
     }
 
@@ -58,6 +62,7 @@ public class CombinationActivityController {
     @Operation(summary = "更新拼团活动")
     @PreAuthorize("@ss.hasPermission('promotion:combination-activity:update')")
     public CommonResult<Boolean> updateCombinationActivity(@Valid @RequestBody CombinationActivityUpdateReqVO updateReqVO) {
+        validateEnterpriseProducts(List.of(updateReqVO.getSpuId()));
         combinationActivityService.updateCombinationActivity(updateReqVO);
         return success(true);
     }
@@ -133,6 +138,18 @@ public class CombinationActivityController {
                 convertSet(pageResult.getList(), CombinationActivityDO::getSpuId)).getCheckedData();
         return success(CombinationActivityConvert.INSTANCE.convertPage(pageResult, products,
                 groupCountMap, groupSuccessCountMap, recordCountMap, spus));
+    }
+
+    /** 企业专享商品不得进入公开促销活动（012 / R66） */
+    private void validateEnterpriseProducts(Collection<Long> spuIds) {
+        if (CollUtil.isEmpty(spuIds)) {
+            return;
+        }
+        boolean enterprise = productSpuApi.getSpuList(spuIds).getCheckedData().stream()
+                .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
+        if (enterprise) {
+            throw exception(SPU_ENTERPRISE_ONLY);
+        }
     }
 
 }

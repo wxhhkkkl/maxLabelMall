@@ -35,6 +35,16 @@
           </el-descriptions-item>
           <el-descriptions-item>
             <template #label>
+              <descriptions-item-label icon="ep:office-building" label="所属企业" />
+            </template>
+            <span v-if="orgInfo?.orgId">
+              {{ orgInfo.orgName }}（{{ roleLabel(orgInfo.role) }}，
+              {{ orgInfo.seatActive ? `席位有效至 ${orgInfo.seatEndDate}` : '未分配席位' }}）
+            </span>
+            <span v-else>未加入</span>
+          </el-descriptions-item>
+          <el-descriptions-item>
+            <template #label>
               <descriptions-item-label icon="ep:message" label="邮箱" />
             </template>
             {{ user.email || '空' }}
@@ -149,11 +159,32 @@
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
 import * as UserApi from '@/api/member/user'
+import { getOrgByMember } from '@/api/member/org'
 import { DescriptionsItemLabel } from '@/components/Descriptions/index'
 
-withDefaults(defineProps<{ user: UserApi.UserVO; mode?: string }>(), {
+const props = withDefaults(defineProps<{ user: UserApi.UserVO; mode?: string }>(), {
   mode: 'member'
 })
+
+const orgInfo = ref<{
+  orgId?: number
+  orgName?: string
+  role?: number
+  seatActive?: boolean
+  seatEndDate?: string
+}>()
+
+const roleLabel = (role?: number) =>
+  role === 1 ? 'OWNER' : role === 2 ? '管理员' : '成员'
+
+watch(
+  () => props.user?.id,
+  async (id) => {
+    if (!id) return
+    orgInfo.value = await getOrgByMember(id)
+  },
+  { immediate: true }
+)
 </script>
 <style lang="scss" scoped>
 .card-header {

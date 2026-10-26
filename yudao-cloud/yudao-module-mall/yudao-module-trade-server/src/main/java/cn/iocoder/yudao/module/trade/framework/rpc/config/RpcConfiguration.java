@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.framework.rpc.config;
 import cn.iocoder.yudao.module.member.api.address.MemberAddressApi;
 import cn.iocoder.yudao.module.member.api.config.MemberConfigApi;
 import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
+import cn.iocoder.yudao.module.member.api.org.MemberOrgApi;
 import cn.iocoder.yudao.module.member.api.point.MemberPointApi;
 import cn.iocoder.yudao.module.member.api.subscription.MemberSubscriptionApi;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
@@ -35,7 +36,7 @@ import org.springframework.context.annotation.Configuration;
         BargainActivityApi.class, BargainRecordApi.class, CombinationRecordApi.class,
         CouponApi.class, DiscountActivityApi.class, RewardActivityApi.class, SeckillActivityApi.class, PointActivityApi.class,
         MemberUserApi.class, MemberPointApi.class, MemberLevelApi.class, MemberAddressApi.class, MemberConfigApi.class,
-        MemberSubscriptionApi.class,
+        MemberSubscriptionApi.class, MemberOrgApi.class,
         ProductSpuApi.class, ProductSkuApi.class, ProductCommentApi.class, ProductCategoryApi.class,
         ProductSubscriptionPlanApi.class,
         PayOrderApi.class, PayRefundApi.class, PayTransferApi.class, PayWalletApi.class,

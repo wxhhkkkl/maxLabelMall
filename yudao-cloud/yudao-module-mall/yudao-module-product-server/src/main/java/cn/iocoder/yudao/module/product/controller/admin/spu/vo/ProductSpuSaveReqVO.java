@@ -66,6 +66,9 @@ public class ProductSpuSaveReqVO {
     @Schema(description = "物流配置模板编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "111")
     private Long deliveryTemplateId;
 
+    @Schema(description = "是否企业专享：不在公开商城展示", example = "false")
+    private Boolean enterpriseOnly;
+
     // ========== 营销相关字段 =========
 
     @Schema(description = "赠送积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "111")

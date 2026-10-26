@@ -24,6 +24,9 @@ public class MaxLabelSubscriptionPlanCreateReqVO {
     @Max(value = 120, message = "授予周期必须小于等于 120 个月")
     private Integer periodMonths;
 
+    @Schema(description = "类别：1 个人 2 企业（默认个人）", example = "1")
+    private Integer scope;
+
     @Schema(description = "是否启用", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     @NotNull(message = "是否启用不能为空")
     private Boolean enabled;

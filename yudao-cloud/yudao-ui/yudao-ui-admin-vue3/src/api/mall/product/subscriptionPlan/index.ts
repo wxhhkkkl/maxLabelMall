@@ -8,6 +8,8 @@ export interface SubscriptionPlanVO {
   skuName?: string
   price?: number
   periodMonths: number
+  /** 类别：1 个人 2 企业 */
+  scope: number
   enabled: boolean
   sort: number
   createTime?: string
@@ -18,6 +20,8 @@ export interface SubscriptionPlanSaveVO {
   spuId: number
   skuId: number
   periodMonths: number
+  /** 类别：1 个人 2 企业 */
+  scope?: number
   enabled: boolean
   sort?: number
 }
@@ -26,6 +30,7 @@ export const getSubscriptionPlanPage = async (params: {
   pageNo: number
   pageSize: number
   spuId?: number
+  scope?: number
   enabled?: boolean
 }) => {
   return await request.get<{ list: SubscriptionPlanVO[]; total: number }>({

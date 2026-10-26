@@ -4,18 +4,23 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/011-invoice-receipt-email/plan.md
+specs/012-enterprise-seat-licensing/plan.md
 
 Supporting artifacts for the active feature:
-- specs/011-invoice-receipt-email/spec.md — 功能规格（Q61~Q64：收据 / 邮箱 / 抬头顺序）
-- specs/011-invoice-receipt-email/plan.md — 两列 + 一个枚举值 + 选择器顺序
-- specs/011-invoice-receipt-email/data-model.md — 两个 `email` 列 + 票种 3「收据」
-- specs/011-invoice-receipt-email/contracts/app-api.md — C 端：申请 / 抬头簿加 `email`、收据
-- specs/011-invoice-receipt-email/contracts/admin-api.md — 管理端：列表 / 开具弹层展示票种与邮箱
-- specs/011-invoice-receipt-email/quickstart.md — 手工验证清单与显式不验证项
-  ⚠️ **上线顺序**：先执行 `sql/mysql/020-invoice-receipt-email.sql`，再发后端，最后发两个前端
+- specs/012-enterprise-seat-licensing/spec.md — 功能规格（Q65~Q74：企业 / 席位 / 有效期 / 可见性）
+- specs/012-enterprise-seat-licensing/plan.md — 4 表 + 3 列 + 权益解析 + 企业中心
+- specs/012-enterprise-seat-licensing/data-model.md — 企业 / 企业成员 / 授权批次 / 席位
+- specs/012-enterprise-seat-licensing/contracts/app-api.md — C 端企业中心 / 企业商品 / 下单与发票
+- specs/012-enterprise-seat-licensing/contracts/admin-api.md — 管理端企业 / 成员 / 席位 / 批次
+- specs/012-enterprise-seat-licensing/quickstart.md — 手工验证清单与显式不验证项
+  ⚠️ **上线顺序**：先执行 `sql/mysql/021-enterprise-seat-licensing.sql`，再发后端，最后发管理端/门面站/桌面端
 
-上一个特性（快递100 物流轨迹与地图）：
+上一个特性（发票收据、邮箱与抬头顺序）：
+- specs/011-invoice-receipt-email/{spec,plan,data-model,quickstart,tasks}.md
+- specs/011-invoice-receipt-email/contracts/{app-api,admin-api}.md
+  ⚠️ 上线顺序：先执行 `sql/mysql/020-invoice-receipt-email.sql`，再发后端，最后发两个前端
+
+更早的特性（快递100 物流轨迹与地图）：
 - specs/010-express-track/{spec,plan,research,data-model,quickstart,tasks}.md
 - specs/010-express-track/contracts/{app-api,admin-api}.md
   ⚠️ `trade_delivery_express.code` **同时供微信小程序物流同步使用**，快递100 用新增的 `kd100_code`（R48）

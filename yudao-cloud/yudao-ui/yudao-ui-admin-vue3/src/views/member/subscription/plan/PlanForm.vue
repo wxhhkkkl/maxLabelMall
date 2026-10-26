@@ -44,6 +44,15 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="类别" prop="scope">
+        <el-select v-model="formData.scope" class="!w-240px">
+          <el-option label="个人" :value="1" />
+          <el-option label="企业" :value="2" />
+        </el-select>
+        <span class="ml-10px text-12px text-gray-500">
+          企业类别必须绑定勾选「企业专享」的商品
+        </span>
+      </el-form-item>
       <el-form-item label="授予周期（月）" prop="periodMonths">
         <el-input-number v-model="formData.periodMonths" :min="1" :max="120" class="!w-240px" />
       </el-form-item>
@@ -88,12 +97,14 @@ const formData = reactive<SubscriptionPlanSaveVO>({
   spuId: undefined as never,
   skuId: undefined as never,
   periodMonths: 12,
+  scope: 1,
   enabled: true,
   sort: 0
 })
 const formRules = reactive({
   spuId: [{ required: true, message: '请选择商品 SPU', trigger: 'change' }],
   skuId: [{ required: true, message: '请选择商品 SKU', trigger: 'change' }],
+  scope: [{ required: true, message: '请选择类别', trigger: 'change' }],
   periodMonths: [{ required: true, message: '授予周期不能为空', trigger: 'blur' }]
 })
 

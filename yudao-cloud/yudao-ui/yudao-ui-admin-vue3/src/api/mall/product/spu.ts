@@ -41,6 +41,7 @@ export interface Spu {
   introduction?: string // 商品简介
   deliveryTypes?: number[] // 配送方式
   deliveryTemplateId?: number | undefined // 运费模版
+  enterpriseOnly?: boolean // 是否企业专享（不在公开商城展示）
   brandId?: number // 商品品牌编号
   specType?: boolean // 商品规格
   subCommissionType?: boolean // 分销类型

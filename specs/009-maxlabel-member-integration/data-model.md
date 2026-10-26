@@ -61,7 +61,7 @@ CREATE TABLE `member_subscription` (
   `spu_id` bigint NOT NULL COMMENT '商品 SPU 快照',
   `sku_id` bigint NOT NULL COMMENT '商品 SKU 快照',
   `period_months` int NOT NULL COMMENT '本段授予月数（plan.period_months × 数量）',
-  `start_time` datetime NOT NULL COMMENT '本段开始自然日 00:00:00（=max(今天, 上段 end_time 的日期)）',
+  `start_time` datetime NOT NULL COMMENT '本段开始自然日 00:00:00（=max(今天, 上段 end_time 的前一天 = 原到期日)）',
   `end_time` datetime NOT NULL COMMENT '本段最后有效自然日的次日 00:00:00（不含当日）',
   `source_order_id` bigint NOT NULL COMMENT '来源订单编号',
   `source_order_item_id` bigint NOT NULL COMMENT '来源订单项编号（幂等键）',
@@ -87,8 +87,8 @@ grant(memberId, orderItem, plan):
   2. latestEndTime = SELECT MAX(end_time) FROM member_subscription
                     WHERE member_id = memberId   -- 排他边界，已是"最后有效日+1天 00:00"
   3. today     = 今天（Asia/Shanghai）
-     startDate = max(today, latestEndTime.toLocalDate())  -- 无订阅时 = today
-     -- ⚠️ 不要再 +1 天：MAX(end_time) 已经包含那 1 天
+     startDate = max(today, latestEndTime.toLocalDate().minusDays(1))  -- 原到期日；无订阅时 = today
+     -- ⚠️ end_time 是"最后有效日 + 1 天"；取前一天才是原到期日，否则每次续费多 1 天（SC-078）
      months    = plan.period_months × orderItem.count
      endDate   = startDate.plusMonths(months)           -- 月末按 plusMonths 钳制
                                                             （1/31 + 1 月 → 2/28 或 2/29）
@@ -100,7 +100,7 @@ grant(memberId, orderItem, plan):
 | 场景 | 结果 |
 |---|---|
 | 首次购买 1 个月，`today = 10-20` | `start=10-20 00:00:00`，`endDate=11-20`，`end_time=11-21 00:00:00` |
-| 未到期（上段 `endDate=11-20`，`end_time=11-21 00:00`）再买 1 年 | `start=11-21 00:00:00`，`endDate=次年 11-21`，`end_time=次年 11-22 00:00:00` |
+| 未到期（上段 `endDate=11-20`，`end_time=11-21 00:00`）再买 1 年 | `start=11-20 00:00:00`（原到期日，重叠当天），`endDate=次年 11-20`，`end_time=次年 11-21 00:00:00` |
 | 已过期（上段 `endDate=09-01`，`end_time=09-02 00:00`）再买 1 个月 | `start=today 00:00:00`，`endDate=today+1 月`，`end_time=次日 00:00:00` |
 | 同一订单项重复回调 | 唯一键冲突 → 不新增 |
 | `count=2` 买 1 年 SKU | 本段授予 24 个月 |

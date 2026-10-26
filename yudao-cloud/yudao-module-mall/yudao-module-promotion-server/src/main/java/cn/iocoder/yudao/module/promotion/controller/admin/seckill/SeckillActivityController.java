@@ -20,12 +20,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
 
 @Tag(name = "管理后台 - 秒杀活动")
 @RestController
@@ -42,6 +45,7 @@ public class SeckillActivityController {
     @Operation(summary = "创建秒杀活动")
     @PreAuthorize("@ss.hasPermission('promotion:seckill-activity:create')")
     public CommonResult<Long> createSeckillActivity(@Valid @RequestBody SeckillActivityCreateReqVO createReqVO) {
+        validateEnterpriseProducts(List.of(createReqVO.getSpuId()));
         return success(seckillActivityService.createSeckillActivity(createReqVO));
     }
 
@@ -49,6 +53,7 @@ public class SeckillActivityController {
     @Operation(summary = "更新秒杀活动")
     @PreAuthorize("@ss.hasPermission('promotion:seckill-activity:update')")
     public CommonResult<Boolean> updateSeckillActivity(@Valid @RequestBody SeckillActivityUpdateReqVO updateReqVO) {
+        validateEnterpriseProducts(List.of(updateReqVO.getSpuId()));
         seckillActivityService.updateSeckillActivity(updateReqVO);
         return success(true);
     }
@@ -114,6 +119,18 @@ public class SeckillActivityController {
                 convertList(activityList, SeckillActivityDO::getId));
         List<ProductSpuRespDTO> spuList = productSpuApi.getSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
         return success(SeckillActivityConvert.INSTANCE.convertList(activityList, productList, spuList));
+    }
+
+    /** 企业专享商品不得进入公开促销活动（012 / R66） */
+    private void validateEnterpriseProducts(Collection<Long> spuIds) {
+        if (CollUtil.isEmpty(spuIds)) {
+            return;
+        }
+        boolean enterprise = productSpuApi.getSpuList(spuIds).getCheckedData().stream()
+                .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
+        if (enterprise) {
+            throw exception(SPU_ENTERPRISE_ONLY);
+        }
     }
 
 }

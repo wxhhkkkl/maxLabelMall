@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import InvoiceTitlePicker from '@/components/InvoiceTitlePicker.vue'
 import MlField from '@/components/base/MlField.vue'
@@ -21,7 +21,29 @@ const model = defineModel<InvoiceApplyForm>({ required: true })
  * 是否展示「从已保存抬头里选一条」。
  * 开票申请（结算页 / 补开弹层）展示；抬头簿的编辑弹层不展示（它就是在编辑某一条）。
  */
-const props = withDefaults(defineProps<{ showPicker?: boolean }>(), { showPicker: true })
+const props = withDefaults(defineProps<{ showPicker?: boolean; enterpriseOnly?: boolean }>(), {
+  showPicker: true,
+  enterpriseOnly: false,
+})
+
+/**
+ * 企业授权订单只允许企业抬头（Q73）。
+ * 这里**直接不渲染个人选项**，而不是渲染后置灰 —— 客户不该看到一个永远选不了的按钮。
+ */
+const kindOptions = computed(() =>
+  props.enterpriseOnly
+    ? INVOICE_TITLE_KIND_OPTIONS.filter((option) => option.value === InvoiceTitleKind.COMPANY)
+    : INVOICE_TITLE_KIND_OPTIONS
+)
+watch(
+  () => props.enterpriseOnly,
+  (enterpriseOnly) => {
+    if (enterpriseOnly && model.value.titleKind !== InvoiceTitleKind.COMPANY) {
+      model.value.titleKind = InvoiceTitleKind.COMPANY
+    }
+  },
+  { immediate: true }
+)
 
 /**
  * 专票才**显示**地址 / 电话 / 开户行三栏（**选填**，见 `invoiceFieldError`）。
@@ -65,7 +87,7 @@ function fillFrom(title: InvoiceTitle) {
       aria-label="抬头类型"
     >
       <button
-        v-for="option in INVOICE_TITLE_KIND_OPTIONS"
+        v-for="option in kindOptions"
         :key="option.value"
         type="button"
         class="invoice-kind"

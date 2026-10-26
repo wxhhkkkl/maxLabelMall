@@ -14,6 +14,9 @@ vi.mock('@/api/cart', () => ({
   deleteCartItems: vi.fn(),
 }))
 
+const getMyOrg = vi.fn()
+vi.mock('@/api/org', () => ({ getMyOrg: (...a: unknown[]) => getMyOrg(...a) }))
+
 const getMemberUser = vi.fn()
 vi.mock('@/api/member', () => ({
   getMemberUser: (...a: unknown[]) => getMemberUser(...a),
@@ -53,6 +56,8 @@ beforeEach(() => {
   getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '13800008888' })
   getCartCount.mockReset()
   getCartCount.mockResolvedValue(0)
+  getMyOrg.mockReset()
+  getMyOrg.mockResolvedValue({ orgId: null })
 })
 
 function mountHeader() {
@@ -164,6 +169,16 @@ describe('SiteHeader —— 静态结构', () => {
     expect(mLogin.attributes('href')).toBe('/account')
     // 顶栏按**脱敏手机号**展示（所有者 2026-10-16 指定；脱敏是 FR-016 的 MUST）
     expect(mLogin.text()).toContain('138****8888')
+  })
+
+  it('只有企业 OWNER/ADMIN 显示企业中心入口', async () => {
+    getMyOrg.mockResolvedValue({ orgId: 88, orgName: '测试企业', role: 1, status: 0 })
+    const admin = await mountLoggedIn()
+    expect(admin.find('a[href="/enterprise/center"]').exists()).toBe(true)
+
+    getMyOrg.mockResolvedValue({ orgId: 88, orgName: '测试企业', role: 3, status: 0 })
+    const member = await mountLoggedIn()
+    expect(member.find('a[href="/enterprise/center"]').exists()).toBe(false)
   })
 
   it('渲染汉堡按钮，点击切换 body 的 nav-open（沿用设计稿机制）', async () => {

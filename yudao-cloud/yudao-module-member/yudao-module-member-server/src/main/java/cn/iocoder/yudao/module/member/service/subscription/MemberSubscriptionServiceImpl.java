@@ -137,7 +137,7 @@ public class MemberSubscriptionServiceImpl implements MemberSubscriptionService 
         MaxLabelOrgDO org = seat == null ? null : orgMapper.selectById(seat.getOrgId());
         List<MaxLabelOrgLicenseDO> orgLicenses = org != null
                 && MaxLabelOrgStatusEnum.ENABLE.getStatus().equals(org.getStatus())
-                ? orgLicenseMapper.selectUnexpiredListByOrgId(org.getId(), LocalDateTime.now())
+                ? orgLicenseMapper.selectUnexpiredNonRefundedListByOrgId(org.getId(), LocalDateTime.now())
                 : Collections.emptyList();
         LocalDateTime orgEnd = orgLicenses.stream()
                 .map(MaxLabelOrgLicenseDO::getEndTime)

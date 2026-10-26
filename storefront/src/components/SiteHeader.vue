@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCartStore } from '@/store/cart'
 import { useUserStore } from '@/store/user'
 import { buildCategoryTree, listCategories } from '@/api/category'
+import { getMyOrg } from '@/api/org'
 import { industrySolutions } from '@/data/industrySolutions'
 import type { CategoryNode } from '@/types'
 import '@/styles/navigation.css'
@@ -55,6 +56,23 @@ const cartStore = useCartStore()
 const loginOpen = ref(false)
 const loggingOut = ref(false)
 const memberLevel = computed(() => userStore.member?.level?.name || '暂无等级')
+
+// 只有企业 OWNER/ADMIN 才显示「企业中心」入口；普通会员/未加入企业的用户不显示
+const enterpriseAdmin = ref(false)
+watch(
+  () => userStore.isLogin,
+  async (isLogin) => {
+    enterpriseAdmin.value = false
+    if (!isLogin) return
+    try {
+      const org = await getMyOrg()
+      enterpriseAdmin.value = org?.role === 1 || org?.role === 2
+    } catch {
+      enterpriseAdmin.value = false
+    }
+  },
+  { immediate: true }
+)
 async function onHeaderLogout() {
   if (loggingOut.value) return
   loggingOut.value = true
@@ -257,6 +275,14 @@ function isActive(name: string): boolean {
         >
           {{ memberLevel }}
         </RouterLink>
+        <RouterLink
+          v-if="enterpriseAdmin"
+          class="header-member-level"
+          to="/enterprise/center"
+          title="企业中心"
+        >
+          企业中心
+        </RouterLink>
         <button
           class="header-logout"
           type="button"
@@ -309,6 +335,13 @@ function isActive(name: string): boolean {
           to="/account/points"
         >
           {{ memberLevel }}
+        </RouterLink>
+        <RouterLink
+          v-if="enterpriseAdmin"
+          class="header-member-level"
+          to="/enterprise/center"
+        >
+          企业中心
         </RouterLink>
         <button
           class="header-logout"

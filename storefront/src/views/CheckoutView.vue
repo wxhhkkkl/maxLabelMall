@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { listAddress } from '@/api/address'
 import { listCart } from '@/api/cart'
@@ -49,7 +49,10 @@ const props = withDefaults(
   { source: 'product', count: 1 },
 )
 
+const route = useRoute()
 const router = useRouter()
+// 企业商品从企业中心进入结算时带 `enterprise=1`，发票卡片只展示企业抬头
+const enterpriseOrder = computed(() => route.query.enterprise === '1')
 const cartStore = useCartStore()
 const userStore = useUserStore()
 const toast = useToasts()
@@ -424,6 +427,7 @@ watch(
           v-if="(price?.payPrice ?? 0) > 0"
           v-model:enabled="invoiceEnabled"
           v-model:form="invoiceForm"
+          :enterprise-only="enterpriseOrder"
         />
 
         <!-- 券选择入口 -->

@@ -85,5 +85,6 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_ORG_SEAT_FULL = new ErrorCode(1_004_015_009, "企业席位已用完");
     ErrorCode MEMBER_ORG_SEAT_ALREADY = new ErrorCode(1_004_015_010, "该会员已有有效席位");
     ErrorCode MEMBER_ORG_SEAT_NOT_EXISTS = new ErrorCode(1_004_015_011, "该会员没有有效席位");
+    ErrorCode MEMBER_ORG_RENEWAL_SEATS_TOO_FEW = new ErrorCode(1_004_015_012, "续费席位数不能少于当前席位数（当前 {} 个）");
 
 }

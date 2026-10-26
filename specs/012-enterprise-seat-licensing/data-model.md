@@ -85,9 +85,9 @@ CREATE TABLE IF NOT EXISTS `maxlabel_org_member` (
 
 ## 3. `maxlabel_org_license` —— 企业授权批次（新增）
 
-> 一行 = 一次支付授予的**一段周期 × 一批席位**。续费插新行，不改旧行。
-> `seats_total = 订单项数量`（一个购买单位 = 一个席位）；
-> **周期取 `plan.period_months`，不乘数量** —— 数量是席位数，不是购买周期数。
+> 一行 = 一次支付授予的**一段周期 × 一批席位**。每次购买插新行，不改旧行。
+> `seats_total = 订单项数量` = **购买后的总席位数**（Q75）；
+> **购买周期取 `plan.period_months`，不乘数量**；实际起止时间会被折算拉长（Q78）。
 > 有效期语义与 `member_subscription` 完全一致：`end_time` 是最后有效自然日的次日 00:00。
 
 ```sql
@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS `maxlabel_org_license` (
   `source_order_item_id` bigint NOT NULL COMMENT '来源订单项编号（幂等键）',
   `source_order_no` varchar(64) NOT NULL COMMENT '来源订单号快照（后台展示）',
   `refunded` bit(1) NOT NULL DEFAULT b'0' COMMENT '来源订单或订单项是否已全额退款（仅标记，不回收）',
+  `folded_time` datetime NULL DEFAULT NULL COMMENT '折算时间（已并入后续批次；非空 = 不再参与容量/到期/续费起点）',
   `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
@@ -126,26 +127,33 @@ CREATE TABLE IF NOT EXISTS `maxlabel_org_license` (
 grantOrgLicense(orgId, orderItem, plan):
   1. SELECT id FROM maxlabel_org WHERE id = orgId AND status = 0 FOR UPDATE  -- 并发锚点
   2. 已存在同 source_order_item_id 的批次 → 直接返回（幂等）
-  3. latestEnd = SELECT MAX(end_time) FROM maxlabel_org_license WHERE org_id = orgId
+  3. currentSeats = MAX(seats_total) WHERE org_id AND refunded = 0
+                                AND folded_time IS NULL AND end_time > NOW()
+     currentSeats > 0 且 orderItem.count < currentSeats → 拒绝（Q75）
   4. today = 今天（Asia/Shanghai）
-     startDate = max(today, latestEnd.toLocalDate().minusDays(1))  -- 原到期日；无批次时 = today
-     months    = plan.period_months              -- 数量是席位数，不乘周期
-     endDate   = startDate.plusMonths(months)
+     剩余时长 = 未过期、未退款、未折算批次的最大 end_time − 今天（拆成「月 + 天」）
+     months = (currentSeats × 剩余月 + orderItem.count × plan.period_months) / orderItem.count
+     days   = (currentSeats × 剩余天 + 摊不平的整月折 30 天) / orderItem.count
   5. INSERT maxlabel_org_license(
        seats_total = orderItem.count,
-       start_time = startDate 00:00:00,
-       end_time   = endDate.plusDays(1) 00:00:00,
+       start_time = today 00:00:00,
+       end_time   = today.plusMonths(months).plusDays(days) + 1 天 00:00,
+       folded_time = NULL,
        source_order_item_id = orderItem.id)
      重复键 uk_source_item → 返回已有行
+  6. UPDATE maxlabel_org_license SET folded_time = NOW()
+       WHERE org_id AND refunded = 0 AND folded_time IS NULL
+         AND end_time > NOW() AND id <> 刚插入的 id
 ```
 
 | 场景 | 结果 |
 |---|---|
 | 首次购买 2 席位 × 1 年，today=10-26 | `start=10-26`，`endDate=次年 10-26`，`end_time=次年 10-27 00:00`，`seats_total=2` |
-| 未到期再买 5 席位 × 1 年 | 新行 `start=原 endDate`（重叠到期日），`seats_total=5` |
-| 已过期再买 | 新行 `start=today` |
+| 纯续费（席位数不变）2 席位 × 1 年 | 新行 `seats_total=2`，到期日 = 原到期日 + 1 年；旧批次 `folded_time` 非空 |
+| 1 席位剩 10 个月，再买 2 席位 × 1 年 | 新行 `seats_total=2`，`(1×10 + 2×12) / 2 = 17` 个月后到期（Q78） |
+| 已过期再买 | 剩余时长 = 0，新行 `start=today`、时长 = 购买周期 |
 | 同一订单项重复回调 | 唯一键冲突 → 不新增 |
-| 订单退款 | 只打 `refunded=1`，不缩短 `end_time`、不回收席位 |
+| 订单退款（仅运营后台） | 只打 `refunded=1`；该批次不再参与权益、容量、续费起点；已分配席位不自动撤销 |
 
 **0 元订单**：沿用 009 —— `payPrice <= 0` 不触发 `updateOrderPaid`；企业计划页同样校验 SKU 价格 > 0。
 
@@ -181,7 +189,11 @@ CREATE TABLE IF NOT EXISTS `maxlabel_org_seat` (
 ### 容量与并发
 
 ```text
-可用容量 = max(0, Σ seats_total(企业未过期批次) − COUNT(席位 status=0))
+可用容量 = max(0, 当前席位 − COUNT(席位 status=0))
+-- 当前席位 = 未过期且**未退款**批次中的**最大 seats_total**。
+-- · 续费会新增批次，旧批次是历史周期，不能累加；
+-- · 退款批次不能继续提供可分配容量；
+-- · 取 max 兜住历史脏数据（例如续费 1 席 < 原 2 席）。
 ```
 
 - 分配/撤销/转交 OWNER **同一个事务内**锁 `maxlabel_org` 行；
@@ -246,7 +258,8 @@ getCurrent(memberId):
       org = SELECT * FROM maxlabel_org WHERE id = seat.org_id AND status = 0
       if org != null:
           orgEnd = MAX(maxlabel_org_license.end_time
-                       WHERE org_id = org.id AND end_time > NOW())
+                       WHERE org_id = org.id AND end_time > NOW() AND refunded = 0
+                         AND folded_time IS NULL)
           if orgEnd != null:
               orgId = org.id; orgName = org.name
 
@@ -291,7 +304,8 @@ getCurrent(memberId):
       退出时同事务释放席位；OWNER 不能直接退出（须先转交）
 
 批次：未过期 ──时间─> 已过期        （派生，不改状态列）
-      退款 → refunded=1（不改变周期与席位）
+      退款 → refunded=1（不改变周期与席位；仅运营后台可触发）
+      复购 → folded_time=NOW()（剩余时长已折算进新批次，只留痕）
 
 席位：有效(0) ──撤销──> 已撤销(1) ──重新分配──> 有效(0)
       企业停用 / 全部批次过期 → 解析时视为无效，但 status 仍为 0

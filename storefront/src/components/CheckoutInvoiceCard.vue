@@ -18,6 +18,8 @@ import { invoiceFieldError } from '@/utils/invoice'
 const enabled = defineModel<boolean>('enabled', { required: true })
 const form = defineModel<InvoiceApplyForm>('form', { required: true })
 
+const props = withDefaults(defineProps<{ enterpriseOnly?: boolean }>(), { enterpriseOnly: false })
+
 /**
  * 实时校验提示：**只有勾了开票才提示**（没开票时不打扰客户）。
  *
@@ -40,7 +42,7 @@ const error = computed(() => (enabled.value ? invoiceFieldError(form.value) : nu
 
     <template v-if="enabled">
       <!-- 抬头选择器已移入 InvoiceFieldsForm：企业/个人 → 票种 → 抬头（Q64） -->
-      <InvoiceFieldsForm v-model="form" />
+      <InvoiceFieldsForm v-model="form" :enterprise-only="props.enterpriseOnly" />
       <p
         v-if="error"
         class="ml-error invoice-error"

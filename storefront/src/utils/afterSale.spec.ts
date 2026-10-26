@@ -62,6 +62,12 @@ describe('canApplyRefund —— 订单项上该不该出现「申请退款」', 
   it('未知的售后状态按「已申请过」保守处理 —— 不发请求', () => {
     expect(canApplyRefund(item({ afterSaleStatus: 99 }), OrderStatus.UNDELIVERED)).toBe(false)
   })
+
+  it('**企业授权订单一律不给入口**（012 / Q79，后端售后接口同样会拒）', () => {
+    for (const status of [OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.COMPLETED]) {
+      expect(canApplyRefund(item(), status, true)).toBe(false)
+    }
+  })
 })
 
 describe('allowsReturnRefund —— 「退货退款」只在已发货之后可选', () => {

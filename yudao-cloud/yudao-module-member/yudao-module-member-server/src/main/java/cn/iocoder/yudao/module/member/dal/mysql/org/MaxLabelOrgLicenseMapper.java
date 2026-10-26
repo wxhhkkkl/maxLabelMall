@@ -30,6 +30,37 @@ public interface MaxLabelOrgLicenseMapper extends BaseMapperX<MaxLabelOrgLicense
                 .orderByAsc(MaxLabelOrgLicenseDO::getEndTime));
     }
 
+    /**
+     * 未过期、**未退款且未折算**的批次。
+     *
+     * 退款批次与折算批次的剩余时长都已经被别的批次取代，只保留在列表里做留痕，
+     * 不再参与权益解析、席位容量、企业到期日与下次续费起点。
+     */
+    default List<MaxLabelOrgLicenseDO> selectUnexpiredNonRefundedListByOrgId(Long orgId, LocalDateTime now) {
+        return selectList(new LambdaQueryWrapperX<MaxLabelOrgLicenseDO>()
+                .eq(MaxLabelOrgLicenseDO::getOrgId, orgId)
+                .gt(MaxLabelOrgLicenseDO::getEndTime, now)
+                .eq(MaxLabelOrgLicenseDO::getRefunded, false)
+                .isNull(MaxLabelOrgLicenseDO::getFoldedTime)
+                .orderByAsc(MaxLabelOrgLicenseDO::getEndTime));
+    }
+
+    /**
+     * 把企业当前仍在生效的批次全部标记为「已折算」。
+     *
+     * 只动「未过期 + 未退款 + 未折算」的行：前两种本来就不参与计算，
+     * 重复折算会把折算时间刷新一遍，没有意义。
+     */
+    default int updateFoldedByOrgId(Long orgId, Long excludeId, LocalDateTime now) {
+        return update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MaxLabelOrgLicenseDO>()
+                .eq(MaxLabelOrgLicenseDO::getOrgId, orgId)
+                .ne(MaxLabelOrgLicenseDO::getId, excludeId)
+                .gt(MaxLabelOrgLicenseDO::getEndTime, now)
+                .eq(MaxLabelOrgLicenseDO::getRefunded, false)
+                .isNull(MaxLabelOrgLicenseDO::getFoldedTime)
+                .set(MaxLabelOrgLicenseDO::getFoldedTime, now));
+    }
+
     default PageResult<MaxLabelOrgLicenseDO> selectPageByOrgId(Long orgId, PageParam pageParam) {
         return selectPage(pageParam, new LambdaQueryWrapperX<MaxLabelOrgLicenseDO>()
                 .eq(MaxLabelOrgLicenseDO::getOrgId, orgId)

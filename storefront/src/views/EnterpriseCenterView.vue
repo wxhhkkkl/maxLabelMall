@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { listEnterprisePlans, type EnterprisePlan } from '@/api/enterprisePlan'
 import {
   addOrgMember,
   assignOrgSeat,
@@ -26,6 +27,8 @@ const loading = ref(true)
 const error = ref('')
 const actionError = ref('')
 const mobile = ref('')
+const plans = ref<EnterprisePlan[]>([])
+const planError = ref('')
 
 const canManage = computed(() => org.value.role === 1 || org.value.role === 2)
 const isOwner = computed(() => org.value.role === 1)
@@ -39,6 +42,10 @@ function roleLabel(role: number): string {
 function periodLabel(months: number): string {
   if (months % 12 === 0) return `${months / 12} 年`
   return `${months} 个月`
+}
+
+function priceLabel(price: number): string {
+  return `¥${(price / 100).toFixed(2)}`
 }
 
 async function loadOrg(): Promise<void> {
@@ -73,6 +80,16 @@ async function loadLicenses(): Promise<void> {
   }
 }
 
+async function loadPlans(): Promise<void> {
+  if (!canManage.value) return
+  planError.value = ''
+  try {
+    plans.value = await listEnterprisePlans()
+  } catch (reason) {
+    planError.value = reason instanceof Error ? reason.message : '企业授权商品加载失败'
+  }
+}
+
 async function switchTab(next: 'members' | 'licenses'): Promise<void> {
   tab.value = next
   actionError.value = ''
@@ -82,6 +99,7 @@ async function switchTab(next: 'members' | 'licenses'): Promise<void> {
 
 async function refresh(): Promise<void> {
   await loadOrg()
+  await loadPlans()
   if (tab.value === 'members') await loadMembers()
   else await loadLicenses()
 }
@@ -153,6 +171,7 @@ async function onLeave(): Promise<void> {
   if (!window.confirm('确定退出企业吗？席位会立即释放。')) return
   try {
     await leaveOrg()
+    plans.value = []
     await loadOrg()
   } catch (reason) {
     actionError.value = reason instanceof Error ? reason.message : '退出企业失败'
@@ -161,7 +180,10 @@ async function onLeave(): Promise<void> {
 
 onMounted(async () => {
   await loadOrg()
-  if (org.value.orgId) await loadMembers()
+  if (org.value.orgId) {
+    await loadPlans()
+    await loadMembers()
+  }
 })
 </script>
 
@@ -214,6 +236,29 @@ onMounted(async () => {
             </p>
           </article>
         </div>
+
+        <section v-if="canManage" class="ent-purchase">
+          <div class="ent-purchase-head">
+            <h2>购买企业授权</h2>
+            <p>按席位购买，支付成功后自动生成授权批次。</p>
+          </div>
+          <p v-if="planError" class="ent-state ent-error">
+            {{ planError }}
+          </p>
+          <p v-else-if="plans.length === 0" class="ent-state ent-muted">
+            暂无可购买的企业授权，请联系客服。
+          </p>
+          <div v-else class="ent-plan-grid">
+            <article v-for="plan in plans" :key="plan.skuId" class="ent-plan-card">
+              <p class="ent-plan-period">{{ periodLabel(plan.periodMonths) }}</p>
+              <h3>{{ plan.name }}</h3>
+              <p class="ent-plan-price">{{ priceLabel(plan.price) }} <small>/ 席位</small></p>
+              <button type="button" @click="router.push(`/enterprise/plan/${plan.skuId}`)">
+                购买
+              </button>
+            </article>
+          </div>
+        </section>
 
         <p v-if="actionError" class="ent-state ent-error">
           {{ actionError }}
@@ -307,7 +352,9 @@ onMounted(async () => {
                 <td>{{ license.seatsTotal }}</td>
                 <td>
                   {{ license.startDate }} ~ {{ license.endDate }}
-                  <small v-if="license.active">{{ license.remainingDays }} 天</small>
+                  <small v-if="license.refunded">已退款</small>
+                  <small v-else-if="license.folded">已折算</small>
+                  <small v-else-if="license.active">{{ license.remainingDays }} 天</small>
                   <small v-else>已过期</small>
                 </td>
                 <td>
@@ -315,7 +362,11 @@ onMounted(async () => {
                   <small v-if="license.refunded" class="ent-warn">来源已退款</small>
                 </td>
                 <td class="ent-actions">
-                  <button type="button" @click="router.push(`/enterprise/plan/${license.skuId}`)">
+                  <button
+                    v-if="!license.folded"
+                    type="button"
+                    @click="router.push({ path: `/enterprise/plan/${license.skuId}`, query: { renew: '1' } })"
+                  >
                     续费
                   </button>
                 </td>
@@ -392,6 +443,63 @@ onMounted(async () => {
   color: #0c2148;
   font-size: 18px;
   font-weight: 600;
+}
+.ent-purchase {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e3e9f4;
+  border-radius: 12px;
+}
+.ent-purchase-head h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #0c2148;
+}
+.ent-purchase-head p {
+  margin: 0 0 16px;
+  color: #5b6c8f;
+}
+.ent-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.ent-plan-card {
+  padding: 18px;
+  background: #f5f8ff;
+  border: 1px solid #e3e9f4;
+  border-radius: 10px;
+}
+.ent-plan-period {
+  margin: 0;
+  color: #2e7cd6;
+  font-weight: 600;
+}
+.ent-plan-card h3 {
+  margin: 8px 0;
+  font-size: 18px;
+  color: #0c2148;
+}
+.ent-plan-price {
+  margin: 0 0 12px;
+  color: #0c2148;
+  font-size: 24px;
+  font-weight: 700;
+}
+.ent-plan-price small {
+  color: #8a97b5;
+  font-size: 13px;
+  font-weight: 400;
+}
+.ent-plan-card button {
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #2e7cd6;
+  color: #ffffff;
+  cursor: pointer;
 }
 .ent-tabs {
   display: flex;
@@ -487,10 +595,12 @@ onMounted(async () => {
 }
 @media (max-width: 1100px) {
   .ent-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ent-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 768px) {
   .ent-hero h1 { font-size: 30px; }
   .ent-cards { grid-template-columns: 1fr; }
+  .ent-plan-grid { grid-template-columns: 1fr; }
   .ent-table { display: block; overflow-x: auto; }
 }
 @media (max-width: 480px) {

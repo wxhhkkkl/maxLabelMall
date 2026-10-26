@@ -85,7 +85,8 @@
           <el-table-column label="有效期" min-width="220">
             <template #default="{ row }">
               {{ row.startDate }} ~ {{ row.endDate }}
-              <el-tag v-if="row.active" type="success" class="ml-5px">{{ row.remainingDays }} 天</el-tag>
+              <el-tag v-if="row.folded" type="info" class="ml-5px">已折算</el-tag>
+              <el-tag v-else-if="row.active" type="success" class="ml-5px">{{ row.remainingDays }} 天</el-tag>
               <el-tag v-else type="info" class="ml-5px">已过期</el-tag>
             </template>
           </el-table-column>

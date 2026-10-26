@@ -155,5 +155,7 @@ public interface ErrorCodeConstants {
     ErrorCode ENTERPRISE_ORDER_BUYER_NOT_ADMIN = new ErrorCode(1_011_010_000, "仅企业管理员可购买企业授权");
     ErrorCode ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED = new ErrorCode(1_011_010_001, "企业授权订单必须使用企业类型的发票抬头");
     ErrorCode ENTERPRISE_PRODUCT_NOT_AVAILABLE = new ErrorCode(1_011_010_002, "企业商品仅可由企业管理员在企业中心购买");
+    // 企业授权订单**用户端不允许退款**（Q79）：运营后台仍保留人工退款通道
+    ErrorCode ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_003, "企业授权订单不支持退款，如有特殊情况请联系平台处理");
 
 }

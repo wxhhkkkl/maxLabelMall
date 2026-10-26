@@ -8,7 +8,8 @@ import { OrderStatus } from '@/types'
  * 口径**全部来自后端**（`AfterSaleServiceImpl.validateOrderItemApplicable`），
  * 前端只做「明知会被拒就别给入口/别发请求」的减少，**不自己裁决业务规则**：
  *
- *   · 订单必须已支付且未取消 —— 待支付、已取消都会被后端拒；
+ *   · 订单必须已支付且未取消 —— 待支付、已取消都会被拒；
+ *   · 企业授权订单**用户端不支持退款**（012 / Q79）—— 运营后台的人工通道另算；
  *   · 该订单项必须未被申请过 —— `afterSaleStatus !== 0` 会被拒；
  *   · 「退货退款」要求已发货；
  *   · 退款金额不得超过该项实付 —— 所以实付为 0 的项没有可退金额。
@@ -35,10 +36,18 @@ const REFUNDABLE_ORDER_STATUS: number[] = [
 /**
  * 该订单项现在能不能申请退款。
  *
+ * `enterprise` 来自订单详情的 `enterprise` 字段（后端按 `maxlabel_org_id` 判定）：
+ * 企业授权订单**用户端一律不给退款入口**（012 / Q79），后端售后接口同样会拒。
+ *
  * 未知的 `afterSaleStatus`（后端将来新增状态）按**已申请过**保守处理 ——
  * 宁可少给一个入口，也不要发一枪注定被拒的请求。
  */
-export function canApplyRefund(item: RefundableItem, orderStatus: number): boolean {
+export function canApplyRefund(
+  item: RefundableItem,
+  orderStatus: number,
+  enterprise = false,
+): boolean {
+  if (enterprise) return false
   if (!REFUNDABLE_ORDER_STATUS.includes(orderStatus)) return false
   if ((item.afterSaleStatus ?? AfterSaleItemStatus.NONE) !== AfterSaleItemStatus.NONE) return false
   // 实付为 0 或字段缺失 → 没有可退金额（后端 refundPrice 要求 > 0）

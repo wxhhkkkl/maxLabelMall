@@ -260,6 +260,7 @@ CREATE TABLE IF NOT EXISTS "maxlabel_org_license"
     "source_order_item_id" bigint NOT NULL,
     "source_order_no"      varchar(64) NOT NULL,
     "refunded"             bit NOT NULL DEFAULT FALSE,
+    "folded_time"          datetime NULL DEFAULT NULL,
     "creator"              varchar DEFAULT '',
     "create_time"          datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updater"              varchar DEFAULT '',

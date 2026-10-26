@@ -235,6 +235,11 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
    * 「待收款」区块靠它决定渲不渲染，同时它也是"压过无需支付误判"的依据（R47）。
    */
   offlinePay?: OfflinePayInfo | null
+  /**
+   * 是否企业授权订单（012 / Q79）。为 `true` 时**用户端不出现「申请退款」入口** ——
+   * 后端售后创建接口也会拒绝，这里只是别给一个注定被拒的按钮。
+   */
+  enterprise?: boolean
 }
 
 /**

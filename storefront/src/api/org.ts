@@ -35,6 +35,8 @@ export interface OrgLicense {
   remainingDays: number
   sourceOrderNo: string
   refunded: boolean
+  /** 已折算：剩余时长并入后续批次，本行只留痕（不再提供席位与到期日） */
+  folded: boolean
   active: boolean
 }
 

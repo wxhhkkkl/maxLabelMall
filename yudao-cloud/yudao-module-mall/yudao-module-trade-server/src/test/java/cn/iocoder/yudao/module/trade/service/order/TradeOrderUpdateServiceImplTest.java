@@ -459,6 +459,57 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testCreateOrder_enterpriseAdminWithoutInvoice_succeeds() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockEnterprisePrice();
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            TradeOrderDO order = orderService.createOrder(88L, enterpriseCreateReq(null));
+            assertEquals(88L, order.getMaxlabelOrgId());
+        }
+    }
+
+    @Test
+    public void testUpdateOrderPaid_enterpriseVirtualOrder_completesDirectly() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1001L));
+        mockEnterprisePrice();
+
+        TradeOrderDO order;
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+            order = orderService.createOrder(88L, enterpriseCreateReq(1));
+        }
+
+        PayOrderRespDTO payOrder = new PayOrderRespDTO();
+        payOrder.setId(1001L);
+        payOrder.setStatus(PayOrderStatusEnum.SUCCESS.getStatus());
+        payOrder.setChannelCode("mock");
+        payOrder.setChannelOrderNo("MOCK-1");
+        payOrder.setMerchantOrderId(String.valueOf(order.getId()));
+        payOrder.setPrice(order.getPayPrice());
+        payOrder.setSuccessTime(LocalDateTime.now());
+        when(payOrderApi.getOrder(1001L)).thenReturn(CommonResult.success(payOrder));
+
+        orderService.updateOrderPaid(order.getId(), 1001L);
+
+        TradeOrderDO dbOrder = tradeOrderMapper.selectById(order.getId());
+        assertEquals(TradeOrderStatusEnum.COMPLETED.getStatus(), dbOrder.getStatus());
+        assertNotNull(dbOrder.getFinishTime());
+    }
+
+    @Test
     public void testCreateOrder_nonAdminBuyerRejected() {
         when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
         when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(null));

@@ -49,13 +49,14 @@ const emptyForm = (over: Partial<InvoiceApplyForm> = {}): InvoiceApplyForm => ({
  *    父组件（测试）看不到，测试会得到假的"什么都没发生"。
  *    CheckoutView 用的是 `v-model:form="invoiceForm"`，这里的桩必须等价。
  */
-function mountCard(enabled: boolean, over: Partial<InvoiceApplyForm> = {}) {
+function mountCard(enabled: boolean, over: Partial<InvoiceApplyForm> = {}, enterpriseOnly = false) {
   const model = reactive(emptyForm(over))
   let enabledState = enabled
   const w = mount(CheckoutInvoiceCard, {
     props: {
       enabled,
       form: model,
+      'enterprise-only': enterpriseOnly,
       'onUpdate:form': (next: InvoiceApplyForm) => Object.assign(model, next),
       'onUpdate:enabled': (next: boolean) => { enabledState = next },
     },
@@ -64,6 +65,13 @@ function mountCard(enabled: boolean, over: Partial<InvoiceApplyForm> = {}) {
 }
 
 describe('结算页发票卡片', () => {
+  it('企业订单不渲染个人抬头选项', () => {
+    const { w } = mountCard(true, {}, true)
+    const kinds = w.findAll('[data-invoice-kind]').map((node) => node.attributes('data-invoice-kind'))
+    expect(kinds).toEqual([String(InvoiceTitleKind.COMPANY)])
+    expect(w.find(`[data-invoice-kind="${InvoiceTitleKind.PERSONAL}"]`).exists()).toBe(false)
+  })
+
   it('默认不开票：不渲染票种与抬头字段，也不出校验提示', () => {
     const { w } = mountCard(false)
     expect(w.find('.invoice-fields').exists()).toBe(false)

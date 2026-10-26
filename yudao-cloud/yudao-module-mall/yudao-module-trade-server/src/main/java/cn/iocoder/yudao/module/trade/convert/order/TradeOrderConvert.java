@@ -184,6 +184,8 @@ public interface TradeOrderConvert {
                                                 DeliveryExpressDO express) {
         AppTradeOrderDetailRespVO orderVO = convert3(order, orderItems);
         orderVO.setPayExpireTime(order.getCreateTime().plus(tradeOrderProperties.getPayExpireTime()));
+        // 企业授权订单：前端据此隐藏「申请退款」入口（Q79）
+        orderVO.setEnterprise(order.getMaxlabelOrgId() != null);
         if (StrUtil.isNotEmpty(order.getPayChannelCode())) {
             orderVO.setPayChannelName(DictFrameworkUtils.parseDictDataLabel(DictTypeConstants.CHANNEL_CODE, order.getPayChannelCode()));
         }

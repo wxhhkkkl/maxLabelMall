@@ -46,7 +46,7 @@ description: "任务清单：企业客户与席位授权（012）"
 - [X] T008 [P] 写 `.../member-server/src/test/java/.../service/org/MaxLabelOrgServiceTest.java`：创建企业同时写 OWNER 行、`owner_member_id` 与 OWNER 行一致、停用/启用、名称/状态筛选、**任何会令企业失去 OWNER 的操作被拒**、会员已在其他企业时创建/加入被拒
 - [X] T009 [P] 写 `.../member-server/src/test/java/.../service/org/MaxLabelOrgMemberServiceTest.java`：按手机号加入（未注册/已在其他企业/已在本企业）、移出（不能移出 OWNER）、设/取消 ADMIN、OWNER 转交（原 OWNER 降 ADMIN、并发最多一次成功）、成员主动退出（OWNER 不能退出）、退出时释放席位
 - [X] T010 [P] 写 `.../member-server/src/test/java/.../service/org/MaxLabelOrgLicenseServiceTest.java`：首购、未到期续费顺延、过期后续费从今天、`seats_total = 订单项数量`、周期 = `plan.periodMonths`（不乘数量）、同 `source_order_item_id` 幂等、并发回调、退款只标记不回收、`end_time` 为最后有效日次日 00:00、月末 `plusMonths` 钳制
-- [X] T011 [P] 写 `.../member-server/src/test/java/.../service/org/MaxLabelOrgSeatServiceTest.java`：容量 = `max(0, 未过期批次席位和 − 有效席位数)`；分配/撤销/重新分配复用同一行；超容量拒绝；跨企业拒绝；**并发抢最后一个席位最多一个成功**；旧批次过期但仍有未过期批次时席位继续有效；全部过期后失效、续费后恢复
+- [X] T011 [P] 写 `.../member-server/src/test/java/.../service/org/MaxLabelOrgSeatServiceTest.java`：容量 = `max(0, 未过期且未退款批次中的最大席位数 − 有效席位数)`；分配/撤销/重新分配复用同一行；超容量拒绝；跨企业拒绝；**并发抢最后一个席位最多一个成功**；旧批次过期但仍有未过期批次时席位继续有效；全部过期后失效、续费后恢复
 - [X] T012 [P] 写 `.../member-server/src/test/java/.../service/subscription/MemberSubscriptionServiceImplTest.java` 的新用例：只有个人、只有企业、并存取较晚、并列取个人、个人过期落回企业、企业过期落回个人、企业停用、席位撤销；断言 `sourceType/orgId/orgName`；以及 FR-306：OWNER/ADMIN 未分配席位时 `active=false`（角色本身不产生权益），分配席位后才生效，把成员从 ADMIN 降为 MEMBER 不改变其席位与权益
 - [X] T013 [P] 写 `.../product-server/src/test/java/.../service/subscriptionplan/MaxLabelSubscriptionPlanServiceImplTest.java` 的新用例：`scope=2` 必须绑定 `enterpriseOnly=true` 的 SPU、`scope=1` 反之；同一租户同一 scope 至多一条启用计划；跨 scope 不互相冲突；价格/虚拟商品校验沿用
 - [X] T014 [P] 写 `.../product-server/src/test/java/.../dal/mysql/spu/ProductSpuVisibilityTest.java`：公开分页、搜索、筛选维度均不含 `enterprise_only=1`；`AppProductSpuController#getSpuDetail` 命中企业商品抛 `SPU_ENTERPRISE_ONLY`；`/product/subscription-plan/list` 默认只返回 `scope=1`；公开 `GET /product/spu/list-by-ids`：未登录/个人会员按企业商品 ID 枚举时结果不含该商品，企业 OWNER/ADMIN 仍能取到（购物车渲染），RPC `ProductSpuApi#getSpuList` 不受影响；在 `yudao-cloud/yudao-module-mall/yudao-module-promotion-server/src/test/java/.../service/` 对应活动测试中：秒杀/拼团/砍价/积分活动保存时选择企业商品 → 被拒绝；产品侧：`POST /product/favorite/create` 收藏企业商品被拒（企业管理员除外），`GET /product/favorite/page`、`GET /product/browse-history/page` 对非企业管理员不返回企业商品
@@ -246,8 +246,23 @@ description: "任务清单：企业客户与席位授权（012）"
 - [X] T082 [P] 前端回归：`storefront/`、`yudao-cloud/yudao-ui/yudao-ui-admin-vue3/`、`../maxlabel/app/` 的 vitest 全量通过；新增视图已登记进 `storefront/src/styles/design-consistency.spec.ts`
 - [ ] T083 [P] 按 `specs/012-enterprise-seat-licensing/quickstart.md` 逐步执行并记录结果；把执行记录（日期、环境、结果）补到 `yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` 头部
 - [X] T084 [P] 更新仓库根 `CLAUDE.md` 的 “Supporting artifacts” 段：加入 012 的 spec/plan/data-model/contracts/quickstart 与上线顺序
-- [ ] T085 [P] 上线顺序核对：`yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` → 后端（member → product → trade）→ 管理端/门面站 → 桌面端；准备回滚说明（见 `specs/012-enterprise-seat-licensing/research.md` R74）
+- [ ] T085 [P] 上线顺序核对：`yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` → `022-enterprise-license-folded.sql` → 后端（member → product → trade）→ 管理端/门面站 → 桌面端；准备回滚说明（见 `specs/012-enterprise-seat-licensing/research.md` R74）
 - [X] T086 [P] 全仓检索确认：没有把企业来源写进 `edition`/会员等级；企业席位与个人订阅在能力上完全等价（Q69）；检索范围 `yudao-cloud/yudao-module-member/`、`yudao-cloud/yudao-module-mall/`、`storefront/src/`、`../maxlabel/app/src/`
+
+---
+
+## Phase 11: 复购折算与用户端退款限制（2026-10-26 追加，Q78/Q79）
+
+**Purpose**: 修正「复购后新席位要等老批次到期才生效」的时长口径，并把企业授权订单的退款入口从用户端摘掉。
+
+- [X] T087 [P] 新增 `yudao-cloud/sql/mysql/022-enterprise-license-folded.sql`：`maxlabel_org_license` 加 `folded_time`（幂等）；同步 H2 `create_tables.sql`
+- [X] T088 [P] `MaxLabelOrgLicenseServiceImpl#grant` 改为「购买数量 = 总席位数 + 剩余时长折算」：新批次起点 = 今天，时长按月/天摊平；旧批次打 `folded_time`；纯续费仍精确等于「原到期日 + 一个周期」（单测覆盖首购/纯续费/扩席位/已过期/折算批次不计容量）
+- [X] T089 [P] 批次查询排除折算批次（`selectUnexpiredNonRefundedListByOrgId`），C 端与管理端 VO 增加 `folded`，列表显示「已折算」、不再显示剩余天数与续费入口
+- [X] T090 [P] 用户端售后拦截：新增 `ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED`，`AfterSaleServiceImpl.validateOrderItemApplicable` 对 `maxlabel_org_id` 非空的订单直接拒绝（单测覆盖）
+- [X] T091 [P] 订单详情返回 `enterprise`；`storefront` 的 `canApplyRefund` 增加企业参数并隐藏入口（单测覆盖）
+- [X] T092 [P] 文档同步：spec（Q78/Q79、FR-298/299/326/327、SC-124/125）、data-model、contracts、quickstart
+- [X] T093 上线（2026-10-26 16:01）：`022` 已执行 → 后端已发（jar 15:53，服务 active、无 ERROR）→ 管理端/门面站已发
+- [ ] T094 手工验收：按 quickstart §5.1（复购折算）、§5.9（用户端无退款入口 + 接口拒绝）走一遍，并回填执行记录
 
 ---
 

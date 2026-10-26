@@ -10,7 +10,7 @@
 
 | 项 | 要求 |
 |---|---|
-| 数据库 | MySQL；已执行 `yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` |
+| 数据库 | MySQL；已执行 `021-enterprise-seat-licensing.sql` 与 `022-enterprise-license-folded.sql` |
 | 后端 | `java -jar yudao-server/target/yudao-server.jar`（约 70 秒启动）；**不要加 `--spring.profiles.active=local`** |
 | 前端 | `storefront`（Vite）、`yudao-ui-admin-vue3`、桌面端 `../maxlabel` |
 | 租户 | 162；请求头 `tenant-id: 162` |
@@ -20,6 +20,7 @@
 
 ```bash
 python scripts/apply_003_filter_dimension.py --file yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql
+python scripts/apply_003_filter_dimension.py --file yudao-cloud/sql/mysql/022-enterprise-license-folded.sql
 ```
 
 回查：
@@ -32,10 +33,13 @@ SELECT table_name FROM information_schema.tables
 SELECT column_name FROM information_schema.columns
  WHERE table_schema = DATABASE()
    AND (table_name, column_name) IN
-       (('maxlabel_subscription_plan','scope'),('product_spu','enterprise_only'),('trade_order','maxlabel_org_id'));
+       (('maxlabel_subscription_plan','scope'),('product_spu','enterprise_only'),
+        ('trade_order','maxlabel_org_id'),('maxlabel_org_license','folded_time'));
+
+SELECT COUNT(*) FROM maxlabel_org_license WHERE folded_time IS NOT NULL;
 ```
 
-预期：4 张表、3 列全部存在；`021` 重复执行不报错、不重复插入菜单。
+预期：4 张表、4 列全部存在；`021`/`022` 重复执行不报错、不重复插入菜单。
 
 ### 0.2 准备测试账号
 
@@ -69,9 +73,11 @@ SELECT column_name FROM information_schema.columns
 | 2.1 | 会员 C（非企业）打开 `/enterprise/center` | 被引导登录或提示“未加入企业”；看不到企业商品 | Q72/FR-296 |
 | 2.2 | 会员 C 直接访问企业商品详情 URL | 被拒绝或引导至企业授权说明 | Q72 |
 | 2.3 | 会员 A 登录 → 企业中心 → 选择企业商品 → **数量填 2** → mock 支付成功 | 企业中心出现 1 条授权批次：2 席位、1 年、来源订单可见；可用席位 2 | SC-105/106 |
+| 2.3a | 支付成功后打开订单详情 | 订单状态**直接为「已完成」**，没有发货入口 | Q77/FR-325 |
 | 2.4 | 检查 `trade_order.maxlabel_org_id` | 该订单的企业 ID 已写入 | R62 |
-| 2.5 | 结算时选**个人**类型发票抬头提交 | 被拒绝，提示企业订单必须使用企业抬头 | Q73/SC-119 |
-| 2.6 | 选**企业**抬头、填税号后提交 | 下单成功；后台订单详情抬头为企业 | Q73 |
+| 2.5 | 结算页发票卡片 | **不出现个人抬头选项**；不勾选开票直接提交 → 下单成功 | Q73/SC-119 |
+| 2.6 | 勾选开票，填企业抬头与税号后提交 | 下单成功；后台订单详情抬头为企业 | Q73 |
+| 2.7 | 直接调接口传 `titleKind=2`（个人） | 被拒绝，`ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED` | Q73/SC-119 |
 | 2.7 | 会员 B（普通成员）尝试购买企业商品 | 被拒绝 | FR-296 |
 | 2.8 | 公开商城列表/搜索企业商品 | 不出现；个人商品与个人计划不受影响 | FR-294/回归 |
 
@@ -114,14 +120,20 @@ SELECT column_name FROM information_schema.columns
 
 | # | 操作 | 预期 | 覆盖 |
 |---|---|---|---|
-| 5.1 | 企业授权未到期时再买 1 个席位 × 1 年 | 新批次从原到期日接续；可用席位 +1 | FR-298/SC-107 |
-| 5.2 | 连续续费 3 次 | 总到期日 = 初始到期日 + 3 个周期，误差 0 天 | SC-107 |
+| 5.1 | 企业授权未到期、原有 1 席位还剩约 10 个月时，再买 2 席位 × 1 年 | 新批次**从今天起算**，2 席位、约 17 个月后到期（折算，不再等到明年才生效）；旧批次显示「已折算」 | Q78/FR-298/SC-124 |
+| 5.1a | 折算后核对企业中心「席位容量 / 有效至」 | 共 2 席、有效至新批次到期日；已折算批次不计入容量与到期日 | Q78/SC-124 |
+| 5.2 | 连续纯续费 3 次（每次数量 = 当前席位） | 总到期日 = 初始到期日 + 3 个周期，误差 0 天；数量默认/最小 = 当前席位；旧批次逐条变「已折算」 | SC-107/121 |
+| 5.2a | 当前 2 个席位时，把购买数量改成 1 并点购买 | 前端拦截提示「不能少于当前 2 个」；直接调接口也被后端拒绝 | Q75/SC-121 |
 | 5.3 | 手工把一条旧批次的 `end_time` 改到过去，保留另一条未过期 | 已分配席位**继续有效**，可用容量按剩余批次计算 | Q71/R64 |
 | 5.4 | 把所有批次的 `end_time` 改到过去 | 企业来源权益全部失效；席位记录仍在；模板/打印记录可查 | FR-307/SC-115 |
 | 5.5 | 再购买一个批次 | 之前分配的席位**自动恢复**，无需重新分配 | Q71 |
 | 5.6 | 运营停用企业 | 所有企业来源权益失效；成员账号/订单/模板/打印记录保留 | FR-317 |
 | 5.7 | 重新启用企业（批次未过期） | 席位恢复 | Assumptions |
-| 5.8 | 退款一笔企业订单 | 批次显示“来源已退款”；周期与席位不自动回收 | FR-299 |
+| 5.8 | **运营后台**退款一笔企业订单 | 批次显示「已退款」；**不再计入**到期日、席位容量与续费起点；已分配席位不自动撤销 | Q76/FR-299 |
+| 5.8a | 退款后再续费 | 续费起点是**未退款批次**的原到期日，不会跳到退款批次的到期日 | Q76/SC-123 |
+| 5.9 | C 端打开企业授权订单详情 | **没有**「申请退款」入口；订单详情响应 `enterprise=true` | Q79/FR-327/SC-125 |
+| 5.9a | 绕过前端直接 `POST /app-api/trade/after-sale/create`（带该订单的订单项） | 返回 `ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED`；不产生售后单 | Q79/SC-125 |
+| 5.9b | 运营后台仍可对该企业订单做售后退款 | 可正常退款；批次打「已退款」标记（人工通道保留） | Q79 |
 
 ---
 

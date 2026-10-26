@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.member.service.org;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgLicenseGrantReqDTO;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgLicenseDO;
@@ -14,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_ORG_RENEWAL_SEATS_TOO_FEW;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -69,16 +71,52 @@ public class MaxLabelOrgLicenseServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    void renewalStartsFromPreviousEndDate() {
+    void renewalExtendsFromPreviousEndDateAndFoldsTheOldBatch() {
         MaxLabelOrgLicenseDO first = licenseService.grant(request(12, 2, 9001L));
-        MaxLabelOrgLicenseDO second = licenseService.grant(request(12, 5, 9002L));
+        MaxLabelOrgLicenseDO second = licenseService.grant(request(12, 2, 9002L));
 
-        // 从原到期日（end_time 的前一天）接续，避免每次续费多 1 天
-        LocalDate originalEndDate = first.getEndTime().toLocalDate().minusDays(1);
-        assertEquals(originalEndDate, second.getStartTime().toLocalDate());
-        assertEquals(originalEndDate.plusMonths(12).plusDays(1).atStartOfDay(),
+        // 纯续费（席位数不变）：到期日 = 原到期日 + 一个周期，误差 0 天（SC-107）
+        assertEquals(LocalDate.now().atStartOfDay(), second.getStartTime());
+        assertEquals(first.getEndTime().plusMonths(12), second.getEndTime());
+        assertEquals(2, second.getSeatsTotal());
+        // 旧批次已折算：不再提供容量与到期日
+        assertNotNull(licenseMapper.selectById(first.getId()).getFoldedTime());
+        assertEquals(second.getEndTime(), licenseService.getMaxEndTime(orgId));
+        assertEquals(2, licenseService.getSeatTotal(orgId));
+    }
+
+    @Test
+    void expansionFoldsRemainingTimeIntoTheNewSeatCount() {
+        MaxLabelOrgLicenseDO first = licenseService.grant(request(12, 1, 9001L));
+        // 造出「原 1 席位还剩 10 个月」
+        licenseMapper.updateById(new MaxLabelOrgLicenseDO().setId(first.getId())
+                .setEndTime(LocalDate.now().plusMonths(10).plusDays(1).atStartOfDay()));
+
+        MaxLabelOrgLicenseDO second = licenseService.grant(request(12, 2, 9002L));
+
+        // (1 席 × 10 个月 + 2 席 × 12 个月) / 2 席 = 17 个月
+        assertEquals(LocalDate.now().atStartOfDay(), second.getStartTime());
+        assertEquals(LocalDate.now().plusMonths(17).plusDays(1).atStartOfDay(),
                 second.getEndTime());
-        assertEquals(5, second.getSeatsTotal());
+        assertEquals(2, second.getSeatsTotal());
+        assertEquals(2, licenseService.getSeatTotal(orgId));
+        assertNotNull(licenseMapper.selectById(first.getId()).getFoldedTime());
+    }
+
+    @Test
+    void foldedBatchProvidesNoSeatsOrEndTimeEvenIfItEndsLater() {
+        MaxLabelOrgLicenseDO active = licenseService.grant(request(12, 2, 9001L));
+        // 折算批次的 end_time 更晚时，也 MUST NOT 把容量/到期日顶上去
+        licenseMapper.insert(MaxLabelOrgLicenseDO.builder()
+                .orgId(orgId).planId(11L).spuId(500L).skuId(501L)
+                .periodMonths(12).seatsTotal(9)
+                .startTime(LocalDate.now().atStartOfDay())
+                .endTime(LocalDate.now().plusMonths(36).plusDays(1).atStartOfDay())
+                .sourceOrderId(8002L).sourceOrderItemId(9002L).sourceOrderNo("o9002")
+                .refunded(false).foldedTime(LocalDateTime.now()).build());
+
+        assertEquals(2, licenseService.getSeatTotal(orgId));
+        assertEquals(active.getEndTime(), licenseService.getMaxEndTime(orgId));
     }
 
     @Test
@@ -100,6 +138,37 @@ public class MaxLabelOrgLicenseServiceImplTest extends BaseDbUnitTest {
 
         assertEquals(LocalDate.now().plusMonths(36),
                 third.getEndTime().toLocalDate().minusDays(1));
+    }
+
+    @Test
+    void renewalCannotBuyFewerSeatsThanCurrent() {
+        licenseService.grant(request(12, 2, 9001L));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> licenseService.grant(request(12, 1, 9002L)));
+        assertEquals(MEMBER_ORG_RENEWAL_SEATS_TOO_FEW.getCode(), exception.getCode());
+    }
+
+    @Test
+    void smallerOrRefundedRenewalBatchDoesNotReduceCurrentSeats() {
+        MaxLabelOrgLicenseDO first = licenseService.grant(request(12, 2, 9001L));
+        // 模拟历史脏数据：续费只买了 1 席，且到期日更晚
+        MaxLabelOrgLicenseDO extra = MaxLabelOrgLicenseDO.builder()
+                .orgId(orgId).planId(11L).spuId(500L).skuId(501L)
+                .periodMonths(12).seatsTotal(1)
+                .startTime(LocalDate.now().plusMonths(12).atStartOfDay())
+                .endTime(LocalDate.now().plusMonths(24).plusDays(1).atStartOfDay())
+                .sourceOrderId(8002L).sourceOrderItemId(9002L).sourceOrderNo("o9002")
+                .refunded(false).build();
+        licenseMapper.insert(extra);
+
+        // 当前席位取未退款批次的最大值，不能被 1 席的晚期批次拉低
+        assertEquals(2, licenseService.getSeatTotal(orgId));
+
+        // 退款后该批次不再提供容量，仍是 2；到期日也回到未退款批次
+        licenseMapper.updateById(new MaxLabelOrgLicenseDO().setId(extra.getId()).setRefunded(true));
+        assertEquals(2, licenseService.getSeatTotal(orgId));
+        assertEquals(first.getEndTime(), licenseService.getMaxEndTime(orgId));
     }
 
     @Test

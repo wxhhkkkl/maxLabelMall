@@ -164,7 +164,10 @@ public class AdminMemberOrgManageController {
             vo.setSourceOrderId(row.getSourceOrderId());
             vo.setSourceOrderNo(row.getSourceOrderNo());
             vo.setRefunded(row.getRefunded());
-            vo.setActive(row.getEndTime().isAfter(LocalDateTime.now()));
+            vo.setFolded(row.getFoldedTime() != null);
+            vo.setActive(row.getEndTime().isAfter(LocalDateTime.now())
+                    && !Boolean.TRUE.equals(row.getRefunded())
+                    && row.getFoldedTime() == null);
             vo.setCreateTime(row.getCreateTime());
             return vo;
         }).toList();

@@ -189,6 +189,22 @@ public class MemberSubscriptionServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    void refundedEnterpriseLicenseDoesNotExtendEndDate() {
+        Long orgId = createEnterpriseSource(12, true, false);
+        // 已退款的更长批次：不能把成员权益延长到 24 个月
+        orgLicenseMapper.insert(MaxLabelOrgLicenseDO.builder()
+                .orgId(orgId).planId(1L).spuId(1L).skuId(1L)
+                .periodMonths(24).seatsTotal(1)
+                .startTime(LocalDate.now().atStartOfDay())
+                .endTime(LocalDate.now().plusMonths(24).plusDays(1).atStartOfDay())
+                .sourceOrderId(8002L).sourceOrderItemId(9002L).sourceOrderNo("o9002")
+                .refunded(true).build());
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertEquals(LocalDate.now().plusMonths(12), current.getEndDate());
+    }
+
+    @Test
     void enterpriseSeatIsEffectiveWithoutPersonal() {
         createEnterpriseSource(12, true, false);
         var current = subscriptionService.getCurrent(memberId);

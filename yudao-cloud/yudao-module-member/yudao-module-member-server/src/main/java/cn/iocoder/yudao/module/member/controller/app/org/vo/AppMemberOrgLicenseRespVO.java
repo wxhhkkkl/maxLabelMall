@@ -16,6 +16,8 @@ public class AppMemberOrgLicenseRespVO {
     private Long remainingDays;
     private String sourceOrderNo;
     private Boolean refunded;
+    /** 已折算：剩余时长并入后续批次，只留痕 */
+    private Boolean folded;
     private Boolean active;
 
 }

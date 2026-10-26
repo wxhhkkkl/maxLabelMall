@@ -107,7 +107,10 @@
 权限：`member:org:license:query`
 
 参数：`orgId`（必填）、`pageNo/pageSize`。
-返回字段同 C 端 2.8，外加 `sourceOrderId/skuId/spuId/createTime`。
+返回字段同 C 端 2.8（含 `folded`），外加 `sourceOrderId/skuId/spuId/createTime`。
+折算批次在「有效期」列显示「已折算」标签，不再显示剩余天数（Q78）。
+
+> 运营后台的人工退款通道保留（Q79）：退款后批次打「已退款」标记，列表显示「来源已退款」。
 
 ---
 

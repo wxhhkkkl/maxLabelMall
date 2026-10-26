@@ -49,7 +49,7 @@
 
 | 字段 | 说明 |
 |---|---|
-| `active` | `max(个人 end_time, 企业有效批次 end_time) > NOW()` |
+| `active` | `max(个人 end_time, 企业未过期且未退款批次 end_time) > NOW()` |
 | `endDate` | 较晚来源的最后有效自然日；到期日当天全天有效 |
 | `sourceType` | `1` 个人订阅 / `2` 企业席位；表示**决定 `endDate` 的来源** |
 | `orgId` / `orgName` | 会员有有效企业席位时返回；否则为 `null` |
@@ -76,7 +76,7 @@
 
 - 无企业：`data = { "orgId": null, "role": null, ... }`，不抛错（前端据此显示“未加入企业”）。
 - `seatAvailable` 由服务端计算（R64），前端不得自行相减。
-- `licenseEndDate` = 企业所有未过期批次的最大到期日（展示用）。
+- `licenseEndDate` = 企业所有**未过期且未退款**批次的最大到期日（展示用）。
 
 ### 2.2 `GET /member/org/member/page` —— 企业成员与席位
 
@@ -166,9 +166,18 @@ OWNER/ADMIN 可访问。
   "id": 1, "periodMonths": 12, "seatsTotal": 20,
   "startDate": "2026-10-26", "endDate": "2027-10-26",
   "remainingDays": 365, "sourceOrderNo": "o202610260001",
-  "refunded": false, "active": true
+  "refunded": false, "folded": false, "active": true
 }], "total": 2 }, "msg": "" }
 ```
+
+| 字段 | 规则 |
+|---|---|
+| `active` | `end_time > NOW()` **且** `refunded=false` **且** `folded=false`；退款批次显示「已退款」，折算批次显示「已折算」 |
+| `refunded` | 退款批次只留痕：不计入 `licenseEndDate`、席位容量与续费起点 |
+| `folded` | **折算批次**（Q78）：剩余时长已并入后续批次，只留痕，不计入 `licenseEndDate`、席位容量与续费起点；前端 MUST NOT 再给「续费」入口 |
+
+> 已分配席位不因批次退款或折算而自动撤销，由运营人工处理（Q76）。
+> 复购后的新批次 `startDate` 恒为购买日，`endDate` 体现折算后的时长（Q78）。
 
 ### 2.9 `POST /member/org/leave` —— 主动退出企业
 
@@ -240,18 +249,32 @@ OWNER/ADMIN 可访问。
 
 1. 买家 MUST 是启用企业的 OWNER/ADMIN；否则
    `ENTERPRISE_ORDER_BUYER_NOT_ADMIN`。
-2. 请求 MUST 带 `invoice`，且 `invoice.titleKind = 1`（企业）；否则
-   `ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED`。
+2. 请求 **MAY 不带 `invoice`**（不开发票）；若带，`invoice.titleKind` MUST 为 `1`（企业）；
+   传个人抬头时返回 `ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED`。
 3. 抬头字段仍由 `InvoiceValidator` 校验（企业抬头必须有税号）。
 4. 订单落库时写入 `trade_order.maxlabel_org_id`（企业快照）。
+5. 结算页对企业订单 MUST **直接隐藏个人抬头选项**；企业商品页进入结算时带 `enterprise=1`。
 
-> 混合订单（个人商品 + 企业商品）同样整单强制企业抬头；买家要给个人商品开个人票时应拆单。
+> 混合订单（个人商品 + 企业商品）若开票，同样整单企业抬头；买家要给个人商品开个人票时应拆单。
 > 纯个人订单的行为**逐字不变**。
 
 ### 4.3 支付成功
 
 - 无需客户端额外调用；服务端按 `plan.scope` 自动发放个人订阅或企业授权批次。
+- **纯虚拟的企业授权订单支付成功后直接为「已完成」**，不进入发货流程；
+  含实物商品的订单仍为「待发货」（Q77）。
 - 权益在下一次 `GET /member/subscription/get` 刷新时可见（SC-106）。
+
+### 4.4 企业授权订单不支持用户端退款（Q79）
+
+| 接口 | 行为 |
+|---|---|
+| `GET /trade/order/get-detail` | 响应新增 `enterprise: boolean`（`trade_order.maxlabel_org_id` 非空），前端据此隐藏「申请退款」入口 |
+| `POST /trade/after-sale/create` | 命中企业授权订单 → `ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED`（“企业授权订单不支持退款，如有特殊情况请联系平台处理”） |
+
+> **运营后台的人工退款通道保留**：后台售后退款不走 `createAfterSale`，仍可处理特殊情况，
+> 退款后按 Q76 给批次打「已退款」标记。
+> 未支付订单的取消不受影响（没有资金往来）。
 
 ---
 
@@ -282,8 +305,10 @@ OWNER/ADMIN 可访问。
 | member | `MEMBER_ORG_SEAT_FULL` | 席位已用完 |
 | member | `MEMBER_ORG_SEAT_ALREADY` | 已有有效席位 |
 | member | `MEMBER_ORG_SEAT_NOT_EXISTS` | 席位不存在 |
+| member | `MEMBER_ORG_RENEWAL_SEATS_TOO_FEW` | 购买席位数少于当前有效席位数 |
 | product | `ENTERPRISE_PLAN_FORBIDDEN` | 非企业管理员不能购买 |
 | product | `SPU_ENTERPRISE_ONLY` | 企业商品不在公开商城 |
 | trade | `ENTERPRISE_ORDER_BUYER_NOT_ADMIN` | 企业订单买家不是管理员 |
 | trade | `ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED` | 企业订单必须用企业抬头 |
 | trade | `ENTERPRISE_PRODUCT_NOT_AVAILABLE` | 企业商品只能由企业管理员在企业中心购买（购物车/结算拒绝） |
+| trade | `ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED` | 企业授权订单用户端不支持退款（Q79） |

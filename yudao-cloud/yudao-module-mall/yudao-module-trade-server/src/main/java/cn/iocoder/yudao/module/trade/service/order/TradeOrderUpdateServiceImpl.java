@@ -302,8 +302,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     /**
-     * 企业订单：买家必须是启用企业的 OWNER/ADMIN，必须使用企业抬头，并把企业快照进订单。
-     * 纯个人订单在这里直接返回，行为不变（FR-296 / Q73）。
+     * 企业订单：买家必须是启用企业的 OWNER/ADMIN，并把企业快照进订单。
+     * 发票**可以不开发票**；若开票，抬头类型必须是企业（FR-296 / Q73）。
+     * 纯个人订单在这里直接返回，行为不变。
      */
     private void validateEnterpriseOrder(Long userId, AppTradeOrderCreateReqVO createReqVO,
                                          List<TradeOrderItemDO> orderItems, TradeOrderDO order) {
@@ -311,8 +312,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             return;
         }
         MemberOrgRespDTO org = requireEnterpriseAdmin(userId);
-        if (createReqVO.getInvoice() == null
-                || !Integer.valueOf(1).equals(createReqVO.getInvoice().getTitleKind())) {
+        if (createReqVO.getInvoice() != null
+                && !Integer.valueOf(1).equals(createReqVO.getInvoice().getTitleKind())) {
             throw exception(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED);
         }
         order.setMaxlabelOrgId(org.getOrgId());
@@ -428,6 +429,17 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 4. 执行 TradeOrderHandler 的后置处理
         List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(id);
         tradeOrderHandlers.forEach(handler -> handler.afterPayOrder(order, orderItems));
+
+        // 4.1 企业授权订单是纯虚拟授权：没有发货动作，支付成功即完成。
+        //     混买实物时 deliveryType 不会是 VIRTUAL，仍走原发货流程。
+        if (order.getMaxlabelOrgId() != null
+                && Objects.equals(order.getDeliveryType(), DeliveryTypeEnum.VIRTUAL.getType())) {
+            tradeOrderMapper.updateById(new TradeOrderDO().setId(id)
+                    .setStatus(TradeOrderStatusEnum.COMPLETED.getStatus())
+                    .setFinishTime(LocalDateTime.now()));
+            TradeOrderLogUtils.setOrderInfo(id, TradeOrderStatusEnum.UNDELIVERED.getStatus(),
+                    TradeOrderStatusEnum.COMPLETED.getStatus());
+        }
 
         // 5. 记录订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), TradeOrderStatusEnum.UNDELIVERED.getStatus());

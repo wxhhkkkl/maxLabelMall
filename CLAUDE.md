@@ -13,7 +13,10 @@ Supporting artifacts for the active feature:
 - specs/012-enterprise-seat-licensing/contracts/app-api.md — C 端企业中心 / 企业商品 / 下单与发票
 - specs/012-enterprise-seat-licensing/contracts/admin-api.md — 管理端企业 / 成员 / 席位 / 批次
 - specs/012-enterprise-seat-licensing/quickstart.md — 手工验证清单与显式不验证项
-  ⚠️ **上线顺序**：先执行 `sql/mysql/021-enterprise-seat-licensing.sql`，再发后端，最后发管理端/门面站/桌面端
+  ⚠️ **上线顺序**：先执行 `sql/mysql/021-enterprise-seat-licensing.sql`、`022-enterprise-license-folded.sql`，
+  再发后端，最后发管理端/门面站/桌面端
+  📌 所有者追加口径（2026-10-26）：**复购数量 = 购买后的总席位数**，旧批次剩余时长折算进新批次（Q78）；
+  **企业授权订单用户端不允许退款**，运营后台保留人工通道（Q79）
 
 上一个特性（发票收据、邮箱与抬头顺序）：
 - specs/011-invoice-receipt-email/{spec,plan,data-model,quickstart,tasks}.md

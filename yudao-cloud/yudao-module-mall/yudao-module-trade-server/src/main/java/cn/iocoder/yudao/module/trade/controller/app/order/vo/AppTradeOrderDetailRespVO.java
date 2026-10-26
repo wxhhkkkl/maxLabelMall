@@ -89,6 +89,13 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "配送方式", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer deliveryType;
 
+    /**
+     * 是否企业授权订单（012 / Q79）。**用户端不允许申请退款** ——
+     * 前端据此隐藏「申请退款」入口，后端在售后创建时同样会拒绝。
+     */
+    @Schema(description = "是否企业授权订单（用户端不支持退款）", example = "false")
+    private Boolean enterprise;
+
     @Schema(description = "发货物流公司编号", example = "10")
     private Long logisticsId;
 

@@ -1,18 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getEnterprisePlan, type EnterprisePlan } from '@/api/enterprisePlan'
+import { getMyOrg } from '@/api/org'
+import { hasVisibleContent, sanitizeRichText } from '@/utils/sanitize'
 
 const props = defineProps<{ skuId: string }>()
+const route = useRoute()
 const router = useRouter()
 const plan = ref<EnterprisePlan | null>(null)
 const count = ref(1)
+const currentSeats = ref(0)
 const loading = ref(true)
 const error = ref('')
+const purchaseError = ref('')
 
 const skuId = computed(() => Number(props.skuId))
 const totalPrice = computed(() => (plan.value ? plan.value.price * count.value : 0))
 const maxCount = computed(() => (plan.value?.stock && plan.value.stock > 0 ? plan.value.stock : 9999))
+const minCount = computed(() => Math.max(1, currentSeats.value))
+const isRenew = computed(() => route.query.renew === '1')
+const safeDescription = computed(() => {
+  const raw = plan.value?.description ?? ''
+  if (!raw.trim()) return ''
+  const clean = sanitizeRichText(raw)
+  return hasVisibleContent(clean) ? clean : ''
+})
 
 function periodLabel(months: number): string {
   if (months % 12 === 0) return `${months / 12} 年`
@@ -35,15 +48,38 @@ async function load(): Promise<void> {
   }
 }
 
+async function loadCurrentSeats(): Promise<void> {
+  try {
+    const org = await getMyOrg()
+    currentSeats.value = org.seatTotal ?? 0
+    count.value = Math.max(1, currentSeats.value)
+  } catch {
+    currentSeats.value = 0
+  }
+}
+
 function buy(): void {
   if (!plan.value) return
+  if (count.value < minCount.value) {
+    purchaseError.value = `购买席位数不能少于当前 ${minCount.value} 个`
+    return
+  }
+  purchaseError.value = ''
   void router.push({
     path: '/checkout',
-    query: { source: 'product', skuId: String(plan.value.skuId), count: String(count.value) },
+    query: {
+      source: 'product',
+      skuId: String(plan.value.skuId),
+      count: String(count.value),
+      enterprise: '1',
+    },
   })
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  await loadCurrentSeats()
+})
 </script>
 
 <template>
@@ -77,21 +113,32 @@ onMounted(load)
           <p class="ent-plan-price">
             {{ priceLabel(plan.price) }} <small>/ 席位</small>
           </p>
-          <p v-if="plan.description" class="ent-plan-desc">
-            {{ plan.description }}
-          </p>
+          <div v-if="safeDescription" class="ent-plan-desc" v-html="safeDescription" />
           <label class="ent-plan-count">
             席位数量
-            <input v-model.number="count" type="number" min="1" :max="maxCount" />
+            <input
+              v-model.number="count"
+              type="number"
+              :min="minCount"
+              :max="maxCount"
+              @input="purchaseError = ''"
+            />
           </label>
+          <p v-if="purchaseError" class="ent-plan-purchase-error">
+            {{ purchaseError }}
+          </p>
           <p class="ent-plan-total">
             合计：{{ priceLabel(totalPrice) }}
           </p>
           <p class="ent-plan-hint">
-            企业授权订单必须使用企业类型发票抬头，税号由买家填写。
+            <span v-if="currentSeats > 0">
+              购买席位数不能少于当前 {{ currentSeats }} 个席位；再次购买时，当前未用尽的时间会按
+              新的席位数折算（例如当前 1 席还剩 10 个月，改买 2 席，有效期会按 2 席摊平）。
+            </span>
+            企业授权订单若开票，只能使用企业类型抬头，税号由买家填写；也可以不开发票。
           </p>
           <button type="button" class="ent-plan-buy" @click="buy">
-            立即购买
+            {{ isRenew ? '续费' : '立即购买' }}
           </button>
         </div>
       </div>
@@ -200,6 +247,11 @@ onMounted(load)
 }
 .ent-plan-hint {
   color: #8a97b5;
+  font-size: 13px;
+}
+.ent-plan-purchase-error {
+  margin: 0 0 12px;
+  color: #ff5c22;
   font-size: 13px;
 }
 .ent-plan-buy {

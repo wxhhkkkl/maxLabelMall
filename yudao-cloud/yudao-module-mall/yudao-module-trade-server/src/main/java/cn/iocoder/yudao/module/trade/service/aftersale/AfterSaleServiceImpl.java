@@ -143,6 +143,10 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (order == null) {
             throw exception(ORDER_NOT_FOUND);
         }
+        // 企业授权订单：用户端不允许退款（Q79）。运营后台的人工退款不经过本方法，仍然保留。
+        if (order.getMaxlabelOrgId() != null) {
+            throw exception(ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED);
+        }
         // TODO 芋艿：超过一定时间，不允许售后
         // 已取消，无法发起售后
         if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {

@@ -43,3 +43,6 @@ export const listSoftwareByCategory = (categoryId: number) =>
   get<Software[]>('/software/list', { categoryId })
 
 export const getSoftwareDetail = (id: number) => get<SoftwareDetail>('/software/get', { id })
+
+/** 服务支持页平铺：所有可展示软件 + 各自的当前发布版本 */
+export const listAllSoftware = () => get<SoftwareDetail[]>('/software/all')

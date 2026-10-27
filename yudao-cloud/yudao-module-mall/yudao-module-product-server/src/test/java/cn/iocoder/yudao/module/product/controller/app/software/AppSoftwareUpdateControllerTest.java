@@ -42,7 +42,7 @@ public class AppSoftwareUpdateControllerTest {
         when(updateService.renderLatestYml("windows", "x64")).thenReturn("version: 1.0.23\npath: https://x/a.exe\n");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        String body = controller.getLatestYml("windows", "x64", response);
+        String body = controller.getLatestYml(162L, "windows", "x64", response);
 
         assertEquals("no-cache", response.getHeader("Cache-Control"));
         assertEquals(200, response.getStatus());
@@ -55,7 +55,7 @@ public class AppSoftwareUpdateControllerTest {
         when(updateService.renderLatestYml("macos", "arm64")).thenReturn(null);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        String body = controller.getLatestYml("macos", "arm64", response);
+        String body = controller.getLatestYml(162L, "macos", "arm64", response);
 
         assertEquals(404, response.getStatus());
         assertEquals("", body);

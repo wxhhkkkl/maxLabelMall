@@ -392,3 +392,34 @@ async function filter(nextQuery = input.value, nextCategory = category.value) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.software-entry {
+  margin: 24px auto 0;
+}
+.software-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid var(--ml-border, #e5e7eb);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.software-entry-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.software-entry-desc {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+.software-entry-action {
+  color: var(--ml-primary, #2e6e93);
+  white-space: nowrap;
+}
+</style>

@@ -106,7 +106,11 @@ const queryParams = reactive<{
   type?: number
 }>({ pageNo: 1, pageSize: 10, title: '', categoryId: undefined, type: undefined })
 
-const categoryName = (id?: number) => categories.value.find((c) => c.id === id)?.name ?? '—'
+// 找不到名称时回落成「#id」而不是空白：便于区分「分类没加载」与「分类已删除」
+const categoryName = (id?: number) => {
+  if (id == null) return '—'
+  return categories.value.find((c) => c.id === id)?.name ?? `#${id}`
+}
 
 const getList = async () => {
   loading.value = true
@@ -120,7 +124,12 @@ const getList = async () => {
 }
 
 const loadCategories = async () => {
-  categories.value = await getSoftwareCategoryList()
+  try {
+    categories.value = await getSoftwareCategoryList()
+  } catch {
+    categories.value = []
+    message.error('分类加载失败：请确认当前角色有「软件分类」查询权限')
+  }
 }
 
 const handleQuery = () => {

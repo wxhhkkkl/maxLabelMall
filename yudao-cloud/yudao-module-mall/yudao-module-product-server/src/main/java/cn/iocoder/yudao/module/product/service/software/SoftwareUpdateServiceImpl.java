@@ -91,8 +91,11 @@ public class SoftwareUpdateServiceImpl implements SoftwareUpdateService {
     }
 
     private String buildFeedUrl(String platform, String arch) {
-        return StrUtil.format("{}/app-api/software/feed/{}/{}/",
-                StrUtil.removeSuffix(publicBaseUrl, "/"), platform, arch);
+        // 路径里带租户号：electron-updater 自己发请求时**不会**带 tenant-id 头，
+        // 只能把租户放进 URL（见 AppSoftwareUpdateController#getLatestYml 的 @TenantIgnore）
+        Object tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        return StrUtil.format("{}/app-api/software/feed/{}/{}/{}/",
+                StrUtil.removeSuffix(publicBaseUrl, "/"), tenantId, platform, arch);
     }
 
     /**
@@ -105,9 +108,12 @@ public class SoftwareUpdateServiceImpl implements SoftwareUpdateService {
         if (client == null || latest == null) {
             return false;
         }
-        for (int i = 0; i < 3; i++) {
-            if (client[i] != latest[i]) {
-                return client[i] < latest[i];
+        int length = Math.max(client.length, latest.length);
+        for (int i = 0; i < length; i++) {
+            int left = i < client.length ? client[i] : 0;
+            int right = i < latest.length ? latest[i] : 0;
+            if (left != right) {
+                return left < right;
             }
         }
         return false;
@@ -118,12 +124,12 @@ public class SoftwareUpdateServiceImpl implements SoftwareUpdateService {
             return null;
         }
         String[] parts = version.trim().split("\\.");
-        if (parts.length != 3) {
+        if (parts.length < 3 || parts.length > 4) {
             return null;
         }
-        int[] result = new int[3];
+        int[] result = new int[parts.length];
         try {
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < parts.length; i++) {
                 result[i] = Integer.parseInt(parts[i]);
                 if (result[i] < 0) {
                     return null;

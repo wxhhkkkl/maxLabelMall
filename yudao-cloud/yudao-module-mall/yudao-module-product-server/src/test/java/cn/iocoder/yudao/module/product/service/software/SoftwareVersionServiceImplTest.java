@@ -84,6 +84,12 @@ public class SoftwareVersionServiceImplTest extends BaseDbUnitTest {
         assertEquals(SOFTWARE_FILE_INVALID.getCode(), e.getCode());
     }
 
+    /** 4 段版本号允许登记（驱动常见 7.4.2.3） */
+    @Test
+    void fourSegmentVersionAccepted() {
+        assertDoesNotThrow(() -> versionService.registerVersion(version("7.4.2.3", "windows", "x64")));
+    }
+
     @Test
     void duplicateVersionRejected() {
         versionService.registerVersion(version("1.0.1", "windows", "x64"));

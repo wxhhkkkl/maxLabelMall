@@ -1,43 +1,29 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { listSoftwareByCategory, listSoftwareCategories, type Software, type SoftwareCategory } from '@/api/software'
+import { listAllSoftware, type SoftwareDetail } from '@/api/software'
 
-const router = useRouter()
-const categories = ref<SoftwareCategory[]>([])
-const activeCategory = ref<number | null>(null)
-const softwares = ref<Software[]>([])
+const items = ref<SoftwareDetail[]>([])
 const loading = ref(true)
 const error = ref('')
 
-const loadSoftwares = async (categoryId: number) => {
-  activeCategory.value = categoryId
-  softwares.value = await listSoftwareByCategory(categoryId)
+const formatSize = (size: number) => {
+  if (!size) return '—'
+  const mb = size / 1024 / 1024
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(size / 1024).toFixed(0)} KB`
 }
 
-const selectCategory = async (category: SoftwareCategory) => {
-  error.value = ''
-  try {
-    await loadSoftwares(category.id)
-  } catch {
-    error.value = '加载失败，请稍后重试'
-  }
-}
-
-onMounted(async () => {
-  try {
-    categories.value = await listSoftwareCategories()
-    if (categories.value.length > 0) {
-      await loadSoftwares(categories.value[0]!.id)
-    }
-  } catch {
-    error.value = '加载失败，请稍后重试'
-  } finally {
-    loading.value = false
-  }
+onMounted(() => {
+  listAllSoftware()
+    .then((data) => {
+      items.value = data ?? []
+    })
+    .catch(() => {
+      error.value = '加载失败，请稍后重试'
+    })
+    .finally(() => {
+      loading.value = false
+    })
 })
-
-const openDetail = (item: Software) => router.push(`/support/software/${item.id}`)
 </script>
 
 <template>
@@ -45,88 +31,74 @@ const openDetail = (item: Software) => router.push(`/support/software/${item.id}
     <section class="ml-card">
       <h1 class="ml-card-title">软件与驱动下载</h1>
       <p v-if="error" class="text-red-600">{{ error }}</p>
-      <p v-if="!loading && categories.length === 0">暂无可用下载</p>
+      <p v-if="!loading && items.length === 0">暂无可用下载</p>
 
-      <div v-if="categories.length > 0" class="category-tabs" data-testid="software-categories">
-        <button
-          v-for="category in categories"
-          :key="category.id"
-          type="button"
-          :class="['category-tab', { active: category.id === activeCategory }]"
-          @click="selectCategory(category)"
-        >
-          {{ category.name }}
-        </button>
+      <!-- 一屏平铺：每个软件一块，版本直接列在下面，点「下载」即走 OSS 直链 -->
+      <div v-for="item in items" :key="item.id" class="software-block" data-testid="software-block">
+        <div class="software-head">
+          <h2 class="software-title">{{ item.title }}</h2>
+          <p v-if="item.introduction" class="software-intro">{{ item.introduction }}</p>
+        </div>
+        <table v-if="item.versions?.length" class="version-table">
+          <thead>
+            <tr>
+              <th>版本</th>
+              <th>系统</th>
+              <th>架构</th>
+              <th>大小</th>
+              <th>下载</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="version in item.versions" :key="version.platform + version.arch">
+              <td>{{ version.version }}</td>
+              <td>{{ version.platform }}</td>
+              <td>{{ version.arch }}</td>
+              <td>{{ formatSize(version.fileSize) }}</td>
+              <td>
+                <a :href="version.downloadUrl" rel="noopener noreferrer" target="_blank" class="download">
+                  下载
+                </a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="software-intro">暂无可用版本</p>
       </div>
-
-      <ul v-if="softwares.length > 0" class="software-list" data-testid="software-list">
-        <li v-for="item in softwares" :key="item.id" class="software-item">
-          <div>
-            <button type="button" class="software-title" @click="openDetail(item)">
-              {{ item.title }}
-            </button>
-            <p v-if="item.introduction" class="software-intro">{{ item.introduction }}</p>
-            <p v-if="item.latestVersion" class="software-meta">
-              最新版本 {{ item.latestVersion }}
-              <span v-if="item.platforms?.length"> · {{ item.platforms.join(' / ') }}</span>
-            </p>
-          </div>
-          <button type="button" class="ml-btn" @click="openDetail(item)">查看版本</button>
-        </li>
-      </ul>
     </section>
   </div>
 </template>
 
 <style scoped>
-.category-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0;
+.software-block {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ml-border, #eee);
 }
-.category-tab {
-  padding: 6px 14px;
-  border: 1px solid var(--ml-border, #e5e7eb);
-  border-radius: 999px;
-  background: #fff;
-  cursor: pointer;
-}
-.category-tab.active {
-  border-color: var(--ml-primary, #2e6e93);
-  color: var(--ml-primary, #2e6e93);
-}
-.software-list {
-  display: grid;
-  gap: 12px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.software-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--ml-border, #eee);
-  border-radius: 8px;
+.software-block:last-child {
+  border-bottom: none;
 }
 .software-title {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 16px;
+  margin: 0;
+  font-size: 17px;
   font-weight: 600;
-  cursor: pointer;
 }
 .software-intro {
-  margin: 6px 0;
+  margin: 6px 0 10px;
   color: #6b7280;
+  font-size: 14px;
 }
-.software-meta {
-  margin: 0;
-  font-size: 13px;
-  color: #6b7280;
+.version-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.version-table th,
+.version-table td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid var(--ml-border, #f2f2f2);
+  font-size: 14px;
+}
+.download {
+  color: var(--ml-primary, #2e6e93);
 }
 </style>

@@ -109,7 +109,7 @@ INSERT INTO `system_menu`
    `component_name`, `status`, `visible`, `keep_alive`, `always_show`,
    `creator`, `create_time`, `updater`, `update_time`, `deleted`)
 SELECT '软件分发', 'software:category:query', 2, 90, @mall_id,
-       'software', 'ep:download', 'mall/software/index',
+       'software', 'ep:download', 'mall/software/info/index',
        'MallSoftware', 0, b'1', b'1', b'1',
        '', NOW(), '', NOW(), b'0'
 FROM DUAL
@@ -118,6 +118,20 @@ WHERE NOT EXISTS (
 );
 
 SET @software_page_id = (SELECT `id` FROM `system_menu` WHERE `permission` = 'software:category:query' LIMIT 1);
+
+-- 页面：软件分类（与「软件分发」同级，组件路径必须与前端文件一致）
+INSERT INTO `system_menu`
+  (`name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`,
+   `component_name`, `status`, `visible`, `keep_alive`, `always_show`,
+   `creator`, `create_time`, `updater`, `update_time`, `deleted`)
+SELECT '软件分类', 'software:category:query', 2, 91, @mall_id,
+       'software-category', 'ep:folder', 'mall/software/category/index',
+       'MallSoftwareCategory', 0, b'1', b'1', b'1',
+       '', NOW(), '', NOW(), b'0'
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM (SELECT `id` FROM `system_menu` WHERE `component` = 'mall/software/category/index') AS existed
+);
 
 -- 按钮：软件分发下的 11 个权限点
 INSERT INTO `system_menu`

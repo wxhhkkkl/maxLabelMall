@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -39,6 +40,7 @@ public class SoftwareUpdateServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(updateService, "publicBaseUrl", "https://new.yuwangchenfa.com");
+        TenantContextHolder.setTenantId(162L);
         software = SoftwareDO.builder().id(10L).title("MaxLabel").type(1).status(0).showInSupport(true).build();
         current = SoftwareVersionDO.builder()
                 .id(1L).softwareId(10L).version("1.0.23").platform("windows").arch("x64")
@@ -60,7 +62,7 @@ public class SoftwareUpdateServiceImplTest {
         assertTrue(vo.getHasUpdate());
         assertEquals("1.0.23", vo.getLatestVersion());
         assertEquals(100L, vo.getSize());
-        assertEquals("https://new.yuwangchenfa.com/app-api/software/feed/windows/x64/", vo.getFeedUrl());
+        assertEquals("https://new.yuwangchenfa.com/app-api/software/feed/162/windows/x64/", vo.getFeedUrl());
     }
 
     /** Q90：客户端版本等于当前发布 → 无更新 */
@@ -87,6 +89,15 @@ public class SoftwareUpdateServiceImplTest {
         // 1.0.9 < 1.0.10（字符串比较会判错）
         assertTrue(SoftwareUpdateServiceImpl.isNewer("1.0.9", "1.0.10"));
         assertFalse(SoftwareUpdateServiceImpl.isNewer("1.0.10", "1.0.9"));
+    }
+
+    /** 4 段版本（如驱动 7.4.2.3）也要能比 */
+    @Test
+    void fourSegmentVersionsCompared() {
+        assertTrue(SoftwareUpdateServiceImpl.isNewer("7.4.2", "7.4.2.3"));
+        assertTrue(SoftwareUpdateServiceImpl.isNewer("7.4.1.9", "7.4.2.0"));
+        assertFalse(SoftwareUpdateServiceImpl.isNewer("7.4.2.3", "7.4.2"));
+        assertFalse(SoftwareUpdateServiceImpl.isNewer("7.4.2.3", "7.4.2.3"));
     }
 
     @Test

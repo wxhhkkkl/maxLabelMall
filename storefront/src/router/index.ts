@@ -64,8 +64,7 @@ const router = createRouter({
         { path: 'support', name: 'support', component: () => import('@/views/SupportView.vue') },
         { path: 'support/contact', name: 'support-contact', component: () => import('@/views/SupportContactView.vue') },
         // 013：软件与驱动下载。**必须排在 `support/:slug` 之前**，否则会被文章路由吃掉
-        { path: 'support/software', name: 'support-software', component: () => import('@/views/SupportSoftwareView.vue') },
-        { path: 'support/software/:id(\d+)', name: 'support-software-detail', component: () => import('@/views/SoftwareDetailView.vue') },
+        { path: 'support/driver-install', name: 'support-driver-install', component: () => import('@/views/SupportSoftwareView.vue') },
         { path: 'support/:slug', name: 'support-article', component: () => import('@/views/SupportArticleView.vue') },
 
         // ── 功能页（11 条路由 / 10 个视图） ────────────────────────

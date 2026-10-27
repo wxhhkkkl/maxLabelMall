@@ -1,57 +1,78 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const push = vi.fn()
-vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
-vi.mock('@/api/software', () => ({
-  listSoftwareCategories: vi.fn(),
-  listSoftwareByCategory: vi.fn()
-}))
+vi.mock('@/api/software', () => ({ listAllSoftware: vi.fn() }))
 
-import { listSoftwareByCategory, listSoftwareCategories } from '@/api/software'
+import { listAllSoftware } from '@/api/software'
 import SupportSoftwareView from './SupportSoftwareView.vue'
 
-const categories = vi.mocked(listSoftwareCategories)
-const byCategory = vi.mocked(listSoftwareByCategory)
+const listAll = vi.mocked(listAllSoftware)
 
-beforeEach(() => {
-  categories.mockReset()
-  byCategory.mockReset()
-  push.mockReset()
-})
+beforeEach(() => listAll.mockReset())
 
-describe('服务支持 · 软件与驱动列表（013 / US49）', () => {
-  it('默认选中第一个分类并展示软件', async () => {
-    categories.mockResolvedValue([{ id: 1, name: '打印驱动', sort: 0 }])
-    byCategory.mockResolvedValue([
-      { id: 10, categoryId: 1, title: 'Zebra 驱动', introduction: '适用于 ZD 系列', type: 2, latestVersion: '1.0.1', platforms: ['windows'] }
+describe('服务支持 · 软件与驱动（013 / US49）', () => {
+  it('一屏平铺所有软件及其版本，不再需要二次点击', async () => {
+    listAll.mockResolvedValue([
+      {
+        id: 1,
+        categoryId: 1,
+        title: 'MaxLabel',
+        introduction: '标签打印软件',
+        type: 1,
+        versions: [
+          {
+            version: '1.0.22',
+            platform: 'windows',
+            arch: 'x64',
+            fileName: 'a.exe',
+            fileSize: 144699554,
+            downloadUrl: 'https://img.yuwangchenfa.com/software/windows-x64/1.0.22/a.exe'
+          }
+        ]
+      },
+      {
+        id: 2,
+        categoryId: 2,
+        title: 'zenpert4T530',
+        introduction: '打印机驱动',
+        type: 2,
+        versions: [
+          {
+            version: '7.4.2',
+            platform: 'windows',
+            arch: 'x64',
+            fileName: 'b.zip',
+            fileSize: 1048576,
+            downloadUrl: 'https://img.yuwangchenfa.com/software/windows-x64/7.4.2/b.zip'
+          }
+        ]
+      }
     ])
 
     const wrapper = mount(SupportSoftwareView)
     await flushPromises()
 
-    expect(byCategory).toHaveBeenCalledWith(1)
-    expect(wrapper.text()).toContain('Zebra 驱动')
-    expect(wrapper.text()).toContain('1.0.1')
+    expect(listAll).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('[data-testid="software-block"]')).toHaveLength(2)
+
+    const links = wrapper.findAll('a.download')
+    expect(links).toHaveLength(2)
+    expect(links[0]!.attributes('href')).toContain('1.0.22')
+    expect(links[1]!.attributes('href')).toContain('7.4.2')
+    expect(wrapper.text()).toContain('138.0 MB')
   })
 
-  it('切换分类时按新分类重新拉取', async () => {
-    categories.mockResolvedValue([
-      { id: 1, name: '打印驱动', sort: 0 },
-      { id: 2, name: '标签软件', sort: 1 }
-    ])
-    byCategory.mockResolvedValue([])
-
+  it('没有可下载项时给出空态', async () => {
+    listAll.mockResolvedValue([])
     const wrapper = mount(SupportSoftwareView)
     await flushPromises()
-    await wrapper.findAll('.category-tab')[1]!.trigger('click')
-    await flushPromises()
 
-    expect(byCategory).toHaveBeenLastCalledWith(2)
+    expect(wrapper.text()).toContain('暂无可用下载')
+    expect(wrapper.findAll('[data-testid="software-block"]')).toHaveLength(0)
   })
 
-  it('没有分类时给出空态', async () => {
-    categories.mockResolvedValue([])
+  it('加载失败时给出提示而不是白屏', async () => {
+    listAll.mockResolvedValue(null as never)
     const wrapper = mount(SupportSoftwareView)
     await flushPromises()
 
@@ -59,8 +80,7 @@ describe('服务支持 · 软件与驱动列表（013 / US49）', () => {
   })
 
   it('页面不提供搜索框（Q88）', async () => {
-    categories.mockResolvedValue([{ id: 1, name: '打印驱动', sort: 0 }])
-    byCategory.mockResolvedValue([])
+    listAll.mockResolvedValue([])
     const wrapper = mount(SupportSoftwareView)
     await flushPromises()
 

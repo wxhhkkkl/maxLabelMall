@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="dialogVisible" :title="dialogTitle">
+  <Dialog v-model="dialogVisible" :title="dialogTitle" scroll max-height="70vh">
     <el-form
       ref="formRef"
       v-loading="formLoading"

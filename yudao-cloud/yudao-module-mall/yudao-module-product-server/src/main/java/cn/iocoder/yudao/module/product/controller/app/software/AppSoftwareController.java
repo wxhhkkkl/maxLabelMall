@@ -84,6 +84,38 @@ public class AppSoftwareController {
         }).toList());
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "服务支持页：一次拿全（所有可展示软件 + 当前发布版本）")
+    @PermitAll
+    public CommonResult<List<AppSoftwareDetailRespVO>> getAllSoftware() {
+        List<Long> categoryIds = categoryService.getEnabledCategoryList().stream()
+                .map(SoftwareCategoryDO::getId).toList();
+        if (categoryIds.isEmpty()) {
+            return success(Collections.emptyList());
+        }
+        List<SoftwareDO> softwares = softwareService.getSupportSoftwareList(categoryIds);
+        if (softwares.isEmpty()) {
+            return success(Collections.emptyList());
+        }
+        Map<Long, List<SoftwareVersionDO>> versionMap = versionService
+                .getCurrentVersionList(softwares.stream().map(SoftwareDO::getId).toList())
+                .stream().collect(Collectors.groupingBy(SoftwareVersionDO::getSoftwareId));
+        return success(softwares.stream().map(s -> {
+            AppSoftwareDetailRespVO vo = BeanUtils.toBean(s, AppSoftwareDetailRespVO.class);
+            List<SoftwareVersionDO> versions = versionMap.getOrDefault(s.getId(), Collections.emptyList());
+            vo.setVersions(versions.stream().map(v -> {
+                AppSoftwareVersionRespVO versionVO = BeanUtils.toBean(v, AppSoftwareVersionRespVO.class);
+                versionVO.setDownloadUrl(v.getFileUrl());
+                return versionVO;
+            }).toList());
+            if (!versions.isEmpty()) {
+                vo.setLatestVersion(versions.get(0).getVersion());
+                vo.setPlatforms(versions.stream().map(SoftwareVersionDO::getPlatform).distinct().toList());
+            }
+            return vo;
+        }).toList());
+    }
+
     @GetMapping("/get")
     @Operation(summary = "服务支持页：软件详情（只含当前发布版本）")
     @Parameter(name = "id", description = "软件编号", required = true)

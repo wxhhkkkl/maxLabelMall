@@ -97,6 +97,29 @@ public class AppSoftwareControllerTest {
     }
 
     /** 不在服务支持页展示的软件，直接访问详情按"不存在"处理 */
+    /** 一屏平铺：一次拿到所有软件与各自的当前发布 */
+    @Test
+    void allReturnsEveryVisibleSoftwareWithVersions() {
+        when(categoryService.getEnabledCategoryList())
+                .thenReturn(List.of(category(1L, "打印驱动"), category(2L, "标签软件")));
+        when(softwareService.getSupportSoftwareList(any()))
+                .thenReturn(List.of(software(10L, 1L, true), software(11L, 2L, true)));
+        when(versionService.getCurrentVersionList(any()))
+                .thenReturn(List.of(version(10L, "1.0.1", "windows"), version(11L, "7.4.2", "windows")));
+
+        List<AppSoftwareDetailRespVO> all = controller.getAllSoftware().getData();
+
+        assertEquals(2, all.size());
+        assertEquals("1.0.1", all.get(0).getVersions().get(0).getVersion());
+        assertTrue(all.get(0).getVersions().get(0).getDownloadUrl().startsWith("https://img.yuwangchenfa.com/"));
+    }
+
+    @Test
+    void allReturnsEmptyWhenNoCategory() {
+        when(categoryService.getEnabledCategoryList()).thenReturn(List.of());
+        assertTrue(controller.getAllSoftware().getData().isEmpty());
+    }
+
     @Test
     void detailRejectedWhenNotShownInSupport() {
         when(softwareService.getSoftware(10L)).thenReturn(software(10L, 1L, false));

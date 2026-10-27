@@ -13,6 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 /**
@@ -43,13 +46,17 @@ public class AppSoftwareUpdateController {
         return success(updateService.checkUpdate(softwareId, currentVersion, platform, arch));
     }
 
-    @GetMapping(value = "/feed/{platform}/{arch}/latest.yml", produces = "text/yaml;charset=UTF-8")
+    @GetMapping(value = "/feed/{tenantId}/{platform}/{arch}/latest.yml", produces = "text/yaml;charset=UTF-8")
     @Operation(summary = "生成 electron-updater 的 latest.yml")
     @PermitAll
-    public String getLatestYml(@PathVariable("platform") String platform,
+    @TenantIgnore
+    public String getLatestYml(@PathVariable("tenantId") Long tenantId,
+                               @PathVariable("platform") String platform,
                                @PathVariable("arch") String arch,
                                HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
+        // electron-updater 不带 tenant-id 头，这里用路径里的租户号兜住查询
+        TenantContextHolder.setTenantId(tenantId);
         String yml = updateService.renderLatestYml(platform, arch);
         if (yml == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);

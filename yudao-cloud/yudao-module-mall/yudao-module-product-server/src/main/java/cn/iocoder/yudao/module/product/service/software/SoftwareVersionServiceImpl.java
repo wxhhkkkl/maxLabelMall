@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.product.enums.software.SoftwarePlatformEnum;
 import cn.iocoder.yudao.module.product.enums.software.SoftwareVersionStatusEnum;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +28,14 @@ import static cn.iocoder.yudao.module.product.enums.software.SoftwareLogRecordCo
 /**
  * 软件版本 Service 实现类（013）
  */
+@Slf4j
 @Service
 @Validated
 public class SoftwareVersionServiceImpl implements SoftwareVersionService {
 
     /** 语义化三段式（Assumptions） */
-    private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
+    // 允许 1~4 段：驱动常见 4 段（如 7.4.2.3）；桌面端软件仍建议三段（electron-updater 用 semver）
+    private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$");
     /** Base64(sha512) 固定 88 位 */
     private static final int SHA512_BASE64_LENGTH = 88;
 
@@ -132,22 +135,27 @@ public class SoftwareVersionServiceImpl implements SoftwareVersionService {
             throw exception(SOFTWARE_NOT_EXISTS);
         }
         if (StrUtil.isBlank(version.getVersion()) || !VERSION_PATTERN.matcher(version.getVersion()).matches()) {
+            log.warn("[registerVersion] 版本号格式非法: {}", version.getVersion());
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (SoftwarePlatformEnum.parse(version.getPlatform()) == null
                 || SoftwareArchEnum.parse(version.getArch()) == null) {
+            log.warn("[registerVersion] 平台/架构非法: {}/{}", version.getPlatform(), version.getArch());
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (StrUtil.isBlank(version.getFileName())) {
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (version.getFileSize() == null || version.getFileSize() <= 0) {
+            log.warn("[registerVersion] 文件大小非法: {}", version.getFileSize());
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (StrUtil.isBlank(version.getSha512()) || version.getSha512().length() != SHA512_BASE64_LENGTH) {
+            log.warn("[registerVersion] sha512 长度非法: {}", StrUtil.length(version.getSha512()));
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (StrUtil.isBlank(version.getFileUrl()) || !storageService.isAllowedUrl(version.getFileUrl())) {
+            log.warn("[registerVersion] 文件地址不在白名单: {}", version.getFileUrl());
             throw exception(SOFTWARE_FILE_INVALID);
         }
         // 版本号唯一（FR-333）
@@ -160,9 +168,11 @@ public class SoftwareVersionServiceImpl implements SoftwareVersionService {
         try {
             remoteSize = fileChecker.getContentLength(version.getFileUrl());
         } catch (Exception e) {
+            log.warn("[registerVersion] 回源 HEAD 失败: {} — {}", version.getFileUrl(), e.getMessage());
             throw exception(SOFTWARE_FILE_INVALID);
         }
         if (remoteSize != version.getFileSize()) {
+            log.warn("[registerVersion] 大小不一致: 登记 {} / 实际 {}", version.getFileSize(), remoteSize);
             throw exception(SOFTWARE_FILE_INVALID);
         }
     }

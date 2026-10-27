@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="dialogVisible" :title="`版本管理 · ${title}`" width="1000px">
+  <Dialog v-model="dialogVisible" :title="`版本管理 · ${title}`" width="1000px" scroll max-height="70vh">
     <el-form :inline="true" class="mb-10px">
       <el-form-item label="版本号">
         <el-input v-model="form.version" class="!w-130px" placeholder="1.0.23" />

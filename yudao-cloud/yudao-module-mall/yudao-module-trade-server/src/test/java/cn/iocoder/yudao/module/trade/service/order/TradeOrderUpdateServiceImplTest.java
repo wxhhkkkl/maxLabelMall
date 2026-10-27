@@ -23,6 +23,7 @@ import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreate
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
 import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
+import cn.iocoder.yudao.module.member.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -381,6 +382,56 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         assertEquals(ENTERPRISE_PRODUCT_NOT_AVAILABLE.getCode(), exception.getCode());
     }
 
+    @Test
+    public void testSettlementOrder_enterpriseItemSetsEnterpriseFlag() {
+        when(tradeConfigService.getTradeConfig()).thenReturn(null);
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setPrice(new TradePriceCalculateRespBO.Price());
+        TradePriceCalculateRespBO.OrderItem orderItem = new TradePriceCalculateRespBO.OrderItem();
+        orderItem.setSkuId(301L);
+        orderItem.setCount(1);
+        calculateRespBO.setItems(List.of(orderItem));
+        when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
+        when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+
+        AppTradeOrderSettlementReqVO reqVO = new AppTradeOrderSettlementReqVO();
+        AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
+        item.setSkuId(301L);
+        item.setCount(1);
+        reqVO.setItems(List.of(item));
+
+        AppTradeOrderSettlementRespVO respVO = orderService.settlementOrder(88L, reqVO);
+        // 结算页据此隐藏个人抬头 —— 不能只靠 URL 上的 enterprise=1（购物车/直接打开也要正确）
+        assertEquals(Boolean.TRUE, respVO.getEnterprise());
+    }
+
+    @Test
+    public void testSettlementOrder_personalItemHasNoEnterpriseFlag() {
+        when(tradeConfigService.getTradeConfig()).thenReturn(null);
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setPrice(new TradePriceCalculateRespBO.Price());
+        TradePriceCalculateRespBO.OrderItem orderItem = new TradePriceCalculateRespBO.OrderItem();
+        orderItem.setSkuId(201L);
+        orderItem.setCount(1);
+        calculateRespBO.setItems(List.of(orderItem));
+        when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
+        when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+        when(productSubscriptionPlanApi.getBySkuId(201L)).thenReturn(CommonResult.success(null));
+
+        AppTradeOrderSettlementReqVO reqVO = new AppTradeOrderSettlementReqVO();
+        AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
+        item.setSkuId(201L);
+        item.setCount(1);
+        reqVO.setItems(List.of(item));
+
+        AppTradeOrderSettlementRespVO respVO = orderService.settlementOrder(88L, reqVO);
+        assertEquals(Boolean.FALSE, respVO.getEnterprise());
+    }
+
     private ProductSubscriptionPlanRespDTO enterprisePlan() {
         ProductSubscriptionPlanRespDTO plan = new ProductSubscriptionPlanRespDTO();
         plan.setId(11L);
@@ -443,9 +494,13 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     }
 
     private AppTradeOrderCreateReqVO enterpriseCreateReq(Integer titleKind) {
+        return enterpriseCreateReq(titleKind, 2);
+    }
+
+    private AppTradeOrderCreateReqVO enterpriseCreateReq(Integer titleKind, Integer count) {
         AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
         item.setSkuId(301L);
-        item.setCount(2);
+        item.setCount(count);
         AppTradeOrderCreateReqVO reqVO = new AppTradeOrderCreateReqVO();
         reqVO.setItems(List.of(item));
         reqVO.setCouponId(0L);
@@ -485,6 +540,7 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     public void testCreateOrder_enterpriseAdminWithCompanyInvoice_snapshotsOrg() {
         when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
         when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(memberOrgApi.getSeatTotal(88L)).thenReturn(CommonResult.success(0));
         when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
         when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
         mockEnterprisePrice();
@@ -504,6 +560,7 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     public void testCreateOrder_enterpriseAdminWithoutInvoice_succeeds() {
         when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
         when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(memberOrgApi.getSeatTotal(88L)).thenReturn(CommonResult.success(0));
         when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
         when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
         mockEnterprisePrice();
@@ -518,10 +575,51 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         }
     }
 
+    // ==================== Q75：购买数量 = 购买后总席位数 ====================
+
+    @Test
+    public void testCreateOrder_enterpriseSeatsBelowCurrent_rejected() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(memberOrgApi.getSeatTotal(88L)).thenReturn(CommonResult.success(5));
+        mockEnterprisePrice();
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            // 当前 5 席，只买 2 席 → 下单即拒绝，不能等到支付回调（否则买家已被扣款）
+            ServiceException exception = assertThrows(ServiceException.class,
+                    () -> orderService.createOrder(88L, enterpriseCreateReq(null, 2)));
+            assertEquals(ErrorCodeConstants.MEMBER_ORG_RENEWAL_SEATS_TOO_FEW.getCode(), exception.getCode());
+        }
+    }
+
+    @Test
+    public void testCreateOrder_enterpriseSeatsEqualCurrent_succeeds() {
+        when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
+        when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(memberOrgApi.getSeatTotal(88L)).thenReturn(CommonResult.success(2));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockEnterprisePrice();
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            TradeOrderDO order = orderService.createOrder(88L, enterpriseCreateReq(null, 2));
+            assertEquals(88L, order.getMaxlabelOrgId());
+        }
+    }
+
     @Test
     public void testUpdateOrderPaid_enterpriseVirtualOrder_completesDirectly() {
         when(productSubscriptionPlanApi.getBySkuId(301L)).thenReturn(CommonResult.success(enterprisePlan()));
         when(memberOrgApi.getByMemberId(88L)).thenReturn(CommonResult.success(enterpriseOrg(1)));
+        when(memberOrgApi.getSeatTotal(88L)).thenReturn(CommonResult.success(0));
         when(tradeNoRedisDAO.generate(any())).thenReturn("NO-ENT");
         when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1001L));
         mockEnterprisePrice();

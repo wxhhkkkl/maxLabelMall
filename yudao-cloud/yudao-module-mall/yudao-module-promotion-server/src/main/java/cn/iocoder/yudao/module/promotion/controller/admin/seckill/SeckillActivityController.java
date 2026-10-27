@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.controller.admin.seckill.vo.activity.*;
 import cn.iocoder.yudao.module.promotion.convert.seckill.SeckillActivityConvert;
 import cn.iocoder.yudao.module.promotion.dal.dataobject.seckill.SeckillActivityDO;
@@ -29,6 +30,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_SUBSCRIPTION_ONLY;
 
 @Tag(name = "管理后台 - 秒杀活动")
 @RestController
@@ -40,6 +42,8 @@ public class SeckillActivityController {
     private SeckillActivityService seckillActivityService;
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建秒杀活动")
@@ -121,7 +125,10 @@ public class SeckillActivityController {
         return success(SeckillActivityConvert.INSTANCE.convertList(activityList, productList, spuList));
     }
 
-    /** 企业专享商品不得进入公开促销活动（012 / R66） */
+    /**
+     * 不在公开商城出售的商品不得进入公开促销活动（012 / R66 / FR-328）：
+     * ① 企业专享商品；② 被会员授权计划引用的商品（个人授权商品 enterprise_only=0，同样不在公开商城）。
+     */
     private void validateEnterpriseProducts(Collection<Long> spuIds) {
         if (CollUtil.isEmpty(spuIds)) {
             return;
@@ -130,6 +137,9 @@ public class SeckillActivityController {
                 .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
         if (enterprise) {
             throw exception(SPU_ENTERPRISE_ONLY);
+        }
+        if (CollUtil.isNotEmpty(subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData())) {
+            throw exception(SPU_SUBSCRIPTION_ONLY);
         }
     }
 

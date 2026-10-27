@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
+import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +41,8 @@ public class AppProductSpuVisibilityTest {
     private ProductBrowseHistoryService productBrowseHistoryService;
     @Mock
     private MemberOrgApi memberOrgApi;
+    @Mock
+    private MaxLabelSubscriptionPlanService subscriptionPlanService;
     @InjectMocks
     private AppProductSpuController controller;
 
@@ -65,6 +68,20 @@ public class AppProductSpuVisibilityTest {
         try (MockedStatic<SecurityFrameworkUtils> mocked = mockStatic(SecurityFrameworkUtils.class)) {
             mocked.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(null);
             var result = controller.getSpuList(Set.of(1L, 2L)).getData();
+            assertEquals(1, result.size());
+            assertEquals(1L, result.get(0).getId());
+        }
+    }
+
+    @Test
+    void anonymousListByIdsExcludesPlanReferencedSpu() {
+        // 会员授权商品（被 maxlabel_subscription_plan 引用）不在公开商城出现（FR-328 / Q81）
+        when(productSpuService.getSpuList(any()))
+                .thenReturn(List.of(spu(1L, "公开商品", false), spu(3L, "会员授权商品", false)));
+        when(subscriptionPlanService.getPlanSpuIds(any())).thenReturn(List.of(3L));
+        try (MockedStatic<SecurityFrameworkUtils> mocked = mockStatic(SecurityFrameworkUtils.class)) {
+            mocked.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(null);
+            var result = controller.getSpuList(Set.of(1L, 3L)).getData();
             assertEquals(1, result.size());
             assertEquals(1L, result.get(0).getId());
         }

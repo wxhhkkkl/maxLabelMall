@@ -7,7 +7,13 @@
             <el-input v-model="mobile" placeholder="输入已注册会员手机号" clearable />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="handleAddMember">加入成员</el-button>
+            <el-button
+              v-hasPermi="['member:org:member:add']"
+              type="primary"
+              @click="handleAddMember"
+            >
+              加入成员
+            </el-button>
             <el-button @click="loadMembers">刷新</el-button>
           </el-form-item>
         </el-form>
@@ -34,10 +40,24 @@
           </el-table-column>
           <el-table-column label="操作" min-width="300" fixed="right">
             <template #default="{ row }">
-              <el-button v-if="!row.seatActive" link type="primary" @click="handleAssign(row)">
+              <el-button
+                v-if="!row.seatActive"
+                v-hasPermi="['member:org:seat:assign']"
+                link
+                type="primary"
+                @click="handleAssign(row)"
+              >
                 分配席位
               </el-button>
-              <el-button v-else link type="danger" @click="handleRevoke(row)">撤销席位</el-button>
+              <el-button
+                v-else
+                v-hasPermi="['member:org:seat:revoke']"
+                link
+                type="danger"
+                @click="handleRevoke(row)"
+              >
+                撤销席位
+              </el-button>
               <el-button
                 v-if="row.role !== 1"
                 v-hasPermi="['member:org:member:update-role']"

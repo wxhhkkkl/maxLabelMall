@@ -31,4 +31,9 @@ public class MemberOrgApiImpl implements MemberOrgApi {
         return success(true);
     }
 
+    @Override
+    public CommonResult<Integer> getSeatTotal(Long orgId) {
+        return success(licenseService.getSeatTotal(orgId));
+    }
+
 }

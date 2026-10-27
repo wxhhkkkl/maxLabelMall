@@ -153,6 +153,8 @@ public class CartServiceImpl implements CartService {
         // 如果 SPU 被删除，则删除购物车对应的商品。延迟删除
         // 为什么不是 SKU 被删除呢？因为 SKU 被删除时，还可以通过 SPU 选择其它 SKU
         deleteCartIfSpuDeleted(carts, spus);
+        // 非企业 OWNER/ADMIN 不展示企业专享商品（处理历史购物车残留；012 / R75）
+        deleteEnterpriseCartIfNotAdmin(userId, carts, spus);
 
         // 拼接数据
         return TradeCartConvert.INSTANCE.convertList(carts, spus, skus);
@@ -164,6 +166,24 @@ public class CartServiceImpl implements CartService {
             return Collections.emptyList();
         }
         return cartMapper.selectListByUserId(userId, ids);
+    }
+
+    /**
+     * 非企业 OWNER/ADMIN 的购物车里，企业专享商品不上屏。
+     * 只影响展示，不删除购物车行 —— 管理员被降级后再恢复时还能看到自己加过的商品。
+     */
+    private void deleteEnterpriseCartIfNotAdmin(Long userId, List<CartDO> carts,
+                                                List<ProductSpuRespDTO> spus) {
+        if (isEnterpriseAdmin(userId) || CollUtil.isEmpty(spus)) {
+            return;
+        }
+        Set<Long> enterpriseSpuIds = convertSet(
+                spus.stream().filter(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList(),
+                ProductSpuRespDTO::getId);
+        if (CollUtil.isEmpty(enterpriseSpuIds)) {
+            return;
+        }
+        carts.removeIf(cart -> enterpriseSpuIds.contains(cart.getSpuId()));
     }
 
     private void deleteCartIfSpuDeleted(List<CartDO> carts, List<ProductSpuRespDTO> spus) {

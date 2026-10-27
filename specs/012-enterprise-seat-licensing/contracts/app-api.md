@@ -222,6 +222,7 @@ OWNER/ADMIN 可访问。
 | `GET /product/favorite/page` | 非企业 OWNER、ADMIN → 过滤企业商品（处理历史收藏残留） |
 | `GET /product/browse-history/page` | 非企业 OWNER、ADMIN → 过滤企业商品（处理历史浏览残留） |
 | `GET /product/subscription-plan/list` | **只返回个人计划**（`scope=1`），保持桌面端/门面站现有行为；每项新增 `edition`（Q80） |
+| 促销活动保存（秒杀 / 拼团 / 砍价 / 积分） | 拒绝 `enterprise_only=1` 的 SPU（`SPU_ENTERPRISE_ONLY`），**也**拒绝被 `maxlabel_subscription_plan` 引用的 SPU（`SPU_SUBSCRIPTION_ONLY`）—— 后者含 `enterprise_only=0` 的个人授权商品，同样不在公开商城出售（FR-328） |
 
 > `ProductSpuApi#getSpuList`（RPC）**不**加过滤：trade 校验订单项、促销活动内部读取都走它，
 > 过滤会连带影响企业订单。过滤只做在 C 端公开控制器（`AppProductSpuController#getSpuList`、
@@ -249,7 +250,22 @@ OWNER/ADMIN 可访问。
 > 企业管理员在这些入口中保留企业商品（购物车/结算需要），但公开价格展示接口
 > `settlement-product` 对所有人都不返回企业商品。
 
-### 4.2 `POST /trade/order/create` —— 行为变化，无新字段
+### 4.2 `GET /trade/order/settlement` / `settlement-by-cart` —— 响应新增 `enterprise`
+
+```jsonc
+{ "code": 0, "data": { "type": 0, "deliveryType": 3, "items": [ … ],
+  "enterprise": true, "price": { … }, "offlinePayEnabled": false }, "msg": "" }
+```
+
+| 字段 | 规则 |
+|---|---|
+| `enterprise` | 本单是否含企业授权商品（按订单项 SKU 是否命中 `scope=2` 的启用计划判定），由**服务端**给出 |
+
+> 结算页据此**直接隐藏个人抬头选项**（FR-296 / Q73）。前端 MUST 用本字段判定，
+> MUST NOT 只看 URL 上的 `enterprise=1` —— 从购物车进入或直接打开结算页时 URL 上没有该参数。
+> 非企业单为 `false`，既有行为不变。
+
+### 4.3 `POST /trade/order/create` —— 行为变化，无新字段
 
 订单项中**任一**命中 `scope=2` 的计划时：
 
@@ -264,14 +280,14 @@ OWNER/ADMIN 可访问。
 > 混合订单（个人商品 + 企业商品）若开票，同样整单企业抬头；买家要给个人商品开个人票时应拆单。
 > 纯个人订单的行为**逐字不变**。
 
-### 4.3 支付成功
+### 4.4 支付成功
 
 - 无需客户端额外调用；服务端按 `plan.scope` 自动发放个人订阅或企业授权批次。
 - **纯虚拟的企业授权订单支付成功后直接为「已完成」**，不进入发货流程；
   含实物商品的订单仍为「待发货」（Q77）。
 - 权益在下一次 `GET /member/subscription/get` 刷新时可见（SC-106）。
 
-### 4.4 企业授权订单不支持用户端退款（Q79）
+### 4.5 企业授权订单不支持用户端退款（Q79）
 
 | 接口 | 行为 |
 |---|---|
@@ -314,6 +330,7 @@ OWNER/ADMIN 可访问。
 | member | `MEMBER_ORG_RENEWAL_SEATS_TOO_FEW` | 购买席位数少于当前有效席位数 |
 | product | `ENTERPRISE_PLAN_FORBIDDEN` | 非企业管理员不能购买 |
 | product | `SPU_ENTERPRISE_ONLY` | 企业商品不在公开商城 |
+| product | `SPU_SUBSCRIPTION_ONLY` | 会员授权商品（被授权计划引用）不进公开商城，也不得挂促销活动 |
 | trade | `ENTERPRISE_ORDER_BUYER_NOT_ADMIN` | 企业订单买家不是管理员 |
 | trade | `ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED` | 企业订单必须用企业抬头 |
 | trade | `ENTERPRISE_PRODUCT_NOT_AVAILABLE` | 企业商品只能由企业管理员在企业中心购买（购物车/结算拒绝） |

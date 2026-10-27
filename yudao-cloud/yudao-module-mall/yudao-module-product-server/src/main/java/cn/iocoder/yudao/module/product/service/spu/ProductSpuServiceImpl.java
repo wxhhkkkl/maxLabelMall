@@ -14,7 +14,10 @@ import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuUpdateS
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.subscriptionplan.MaxLabelSubscriptionPlanDO;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
+import cn.iocoder.yudao.module.product.dal.mysql.subscriptionplan.MaxLabelSubscriptionPlanMapper;
+import cn.iocoder.yudao.module.product.enums.subscriptionplan.MaxLabelSubscriptionScopeEnum;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
@@ -61,6 +64,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
      */
     @Resource
     private ProductSpuFilterTagService spuFilterTagService;
+    @Resource
+    private MaxLabelSubscriptionPlanMapper subscriptionPlanMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -97,6 +102,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = updateReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, updateReqVO.getSpecType());
+        // 改成企业专享前，先确认没有个人授权计划还指向它（契约 admin-api §4.1）
+        validateEnterpriseOnlySwitch(spu.getId(), spu.getEnterpriseOnly(), updateReqVO.getEnterpriseOnly());
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
@@ -109,6 +116,22 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 标签，因为这次替换没再带上它们而自然消失，不会留下"看不见却还挂着"的孤儿关联。
         spuFilterTagService.saveSpuFilterValues(updateObj.getId(), updateReqVO.getCategoryId(),
                 updateReqVO.getFilterValueIds());
+    }
+
+    /**
+     * 把商品改成「企业专享」时，个人授权计划不能再指向它 —— 否则个人续费页会指向一个
+     * 已被公开商城排除的商品（契约 admin-api §4.1）。
+     */
+    private void validateEnterpriseOnlySwitch(Long spuId, Boolean oldEnterpriseOnly, Boolean newEnterpriseOnly) {
+        if (Boolean.TRUE.equals(oldEnterpriseOnly) || !Boolean.TRUE.equals(newEnterpriseOnly)) {
+            return;
+        }
+        List<MaxLabelSubscriptionPlanDO> plans = subscriptionPlanMapper.selectListBySpuId(spuId);
+        boolean hasPersonalPlan = plans.stream()
+                .anyMatch(plan -> MaxLabelSubscriptionScopeEnum.PERSONAL.getScope().equals(plan.getScope()));
+        if (hasPersonalPlan) {
+            throw exception(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH);
+        }
     }
 
     /**

@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
+import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,6 +53,8 @@ public class AppProductSpuController {
     private ProductBrowseHistoryService productBrowseHistoryService;
     @Resource
     private MemberOrgApi memberOrgApi;
+    @Resource
+    private MaxLabelSubscriptionPlanService subscriptionPlanService;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -63,8 +66,16 @@ public class AppProductSpuController {
             return success(Collections.emptyList());
         }
         // 企业专享商品：只对企业 OWNER/ADMIN 返回（购物车/订单渲染需要；012 / Q72）
-        List<ProductSpuDO> visibleList = isEnterpriseAdmin() ? list
+        boolean enterpriseAdmin = isEnterpriseAdmin();
+        List<ProductSpuDO> visibleList = enterpriseAdmin ? list
                 : list.stream().filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList();
+        // 会员授权商品（被订阅计划引用）不进入公开商城，首页货架走的就是这个接口（FR-328 / Q81）
+        if (!enterpriseAdmin) {
+            List<Long> planSpuIds = subscriptionPlanService.getPlanSpuIds(ids);
+            if (CollUtil.isNotEmpty(planSpuIds)) {
+                visibleList = visibleList.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+            }
+        }
 
         // 拼接返回
         visibleList.forEach(spu -> spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount()));

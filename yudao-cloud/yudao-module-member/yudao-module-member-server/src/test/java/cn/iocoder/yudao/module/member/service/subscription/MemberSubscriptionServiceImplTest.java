@@ -188,6 +188,36 @@ public class MemberSubscriptionServiceImplTest extends BaseDbUnitTest {
         return org.getId();
     }
 
+    /** FR-306：角色本身不附带权益 —— 企业有效、批次未过期，但没分配席位就没有权益 */
+    @Test
+    void roleWithoutSeatHasNoEntitlement() {
+        MaxLabelOrgDO org = MaxLabelOrgDO.builder()
+                .name("无席位企业").ownerMemberId(memberId).status(0).remark("").build();
+        orgMapper.insert(org);
+        orgLicenseMapper.insert(MaxLabelOrgLicenseDO.builder()
+                .orgId(org.getId()).planId(1L).edition("enterprise").spuId(1L).skuId(1L)
+                .periodMonths(12).seatsTotal(5)
+                .startTime(LocalDate.now().atStartOfDay())
+                .endTime(LocalDate.now().plusMonths(12).plusDays(1).atStartOfDay())
+                .sourceOrderId(8101L).sourceOrderItemId(9101L).sourceOrderNo("o8101")
+                .refunded(false).build());
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertFalse(current.getActive());
+    }
+
+    /** FR-317：企业停用后，本已生效的企业席位立即失效（数据保留） */
+    @Test
+    void disabledOrgMakesSeatInactive() {
+        Long orgId = createEnterpriseSource(12, true, false);
+        assertTrue(subscriptionService.getCurrent(memberId).getActive());
+
+        orgMapper.updateById(MaxLabelOrgDO.builder().id(orgId).status(1).build());
+
+        var current = subscriptionService.getCurrent(memberId);
+        assertFalse(current.getActive());
+    }
+
     @Test
     void refundedEnterpriseLicenseDoesNotExtendEndDate() {
         Long orgId = createEnterpriseSource(12, true, false);

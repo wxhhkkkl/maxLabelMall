@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.controller.app.seckill.vo.activity.AppSeckillActivityDetailRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.seckill.vo.activity.AppSeckillActivityNowRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.seckill.vo.activity.AppSeckillActivityPageReqVO;
@@ -36,6 +37,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -72,6 +74,8 @@ public class AppSeckillActivityController {
 
     @Resource
     private ProductSpuApi spuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @GetMapping("/get-now")
     @Operation(summary = "获得当前秒杀活动", description = "获取当前正在进行的活动，提供给首页使用")
@@ -92,7 +96,7 @@ public class AppSeckillActivityController {
         List<SeckillProductDO> productList = activityService.getSeckillProductListByActivityIds(
                 convertList(activityList, SeckillActivityDO::getId));
         // 2.2 获取 spu 信息
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(activityList, SeckillActivityDO::getSpuId));
         return SeckillActivityConvert.INSTANCE.convert(config, activityList, productList, spuList);
     }
 
@@ -109,7 +113,7 @@ public class AppSeckillActivityController {
                 convertList(pageResult.getList(), SeckillActivityDO::getId));
 
         // 2. 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(pageResult.getList(), SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(pageResult.getList(), SeckillActivityDO::getSpuId));
         return success(SeckillActivityConvert.INSTANCE.convertPage02(pageResult, productList, spuList));
     }
 
@@ -168,8 +172,24 @@ public class AppSeckillActivityController {
         // 2. 拼接返回
         List<SeckillProductDO> productList = activityService.getSeckillProductListByActivityIds(
                 convertList(activityList, SeckillActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, SeckillActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(activityList, SeckillActivityDO::getSpuId));
         return success(SeckillActivityConvert.INSTANCE.convertAppList(activityList, productList, spuList));
     }
 
+
+    /**
+     * 不在公开商城出售的商品不下发名称/头图/市场价（FR-328）：
+     * 保存入口已拦过一遍，但「历史活动」与「先建活动后建计划」两种顺序仍会漏，渲染前再过滤一次。
+     */
+    private List<ProductSpuRespDTO> getPublicSpuList(Collection<Long> spuIds) {
+        List<ProductSpuRespDTO> spus = spuApi.getSpuList(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(spus)) {
+            return spus;
+        }
+        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(planSpuIds)) {
+            return spus;
+        }
+        return spus.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+    }
 }

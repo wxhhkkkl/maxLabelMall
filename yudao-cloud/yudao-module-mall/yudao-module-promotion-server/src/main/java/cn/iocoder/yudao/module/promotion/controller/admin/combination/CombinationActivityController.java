@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.promotion.controller.admin.combination.vo.activity.*;
 import cn.iocoder.yudao.module.promotion.convert.combination.CombinationActivityConvert;
@@ -35,6 +36,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_SUBSCRIPTION_ONLY;
 
 @Tag(name = "管理后台 - 拼团活动")
 @RestController
@@ -49,6 +51,8 @@ public class CombinationActivityController {
 
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建拼团活动")
@@ -149,6 +153,9 @@ public class CombinationActivityController {
                 .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
         if (enterprise) {
             throw exception(SPU_ENTERPRISE_ONLY);
+        }
+        if (CollUtil.isNotEmpty(subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData())) {
+            throw exception(SPU_SUBSCRIPTION_ONLY);
         }
     }
 

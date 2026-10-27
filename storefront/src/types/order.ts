@@ -52,6 +52,13 @@ export interface SettlementResp {
    * 后台关掉（`trade_config.offline_pay_enabled = false`）时这里就是 `false`（FR-210）。
    */
   offlinePayEnabled: boolean
+  /**
+   * 本单是否含企业授权商品（012 / FR-296）。
+   *
+   * 结算页据此**直接隐藏个人抬头选项**。权威来源是服务端（按订单项是否命中企业计划算出来），
+   * 前端 MUST NOT 只看 URL 上的 `enterprise=1` —— 从购物车进入时 URL 上没有这个参数。
+   */
+  enterprise?: boolean
   /** 对公转账的提示语（如「请在转账附言里写订单号」）—— 后台可配，可为空 */
   offlinePayTip?: string
   usePoint: number

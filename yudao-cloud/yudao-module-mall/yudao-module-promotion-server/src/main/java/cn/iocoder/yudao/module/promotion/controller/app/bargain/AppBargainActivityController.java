@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.controller.app.bargain.vo.activity.AppBargainActivityDetailRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.bargain.vo.activity.AppBargainActivityRespVO;
 import cn.iocoder.yudao.module.promotion.convert.bargain.BargainActivityConvert;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -60,6 +62,8 @@ public class AppBargainActivityController {
 
     @Resource
     private ProductSpuApi spuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @GetMapping("/list")
     @Operation(summary = "获得砍价活动列表", description = "用于小程序首页")
@@ -76,7 +80,7 @@ public class AppBargainActivityController {
             return Collections.emptyList();
         }
         // 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(list, BargainActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(list, BargainActivityDO::getSpuId));
         return BargainActivityConvert.INSTANCE.convertAppList(list, spuList);
     }
 
@@ -89,7 +93,7 @@ public class AppBargainActivityController {
             return success(PageResult.empty(result.getTotal()));
         }
         // 拼接数据
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(result.getList(), BargainActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(result.getList(), BargainActivityDO::getSpuId));
         return success(BargainActivityConvert.INSTANCE.convertAppPage(result, spuList));
     }
 
@@ -108,4 +112,20 @@ public class AppBargainActivityController {
         return success(BargainActivityConvert.INSTANCE.convert(activity, successUserCount, spu));
     }
 
+
+    /**
+     * 不在公开商城出售的商品不下发名称/头图/市场价（FR-328）：
+     * 保存入口已拦过一遍，但「历史活动」与「先建活动后建计划」两种顺序仍会漏，渲染前再过滤一次。
+     */
+    private List<ProductSpuRespDTO> getPublicSpuList(Collection<Long> spuIds) {
+        List<ProductSpuRespDTO> spus = spuApi.getSpuList(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(spus)) {
+            return spus;
+        }
+        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(planSpuIds)) {
+            return spus;
+        }
+        return spus.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+    }
 }

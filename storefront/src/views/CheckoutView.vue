@@ -51,8 +51,10 @@ const props = withDefaults(
 
 const route = useRoute()
 const router = useRouter()
-// 企业商品从企业中心进入结算时带 `enterprise=1`，发票卡片只展示企业抬头
-const enterpriseOrder = computed(() => route.query.enterprise === '1')
+// 企业授权订单只展示企业抬头（Q73）。权威来源是结算接口返回的 `enterprise`
+// （按订单项是否命中企业计划算出来的）；URL 上的 `enterprise=1` 只作为企业中心入口的兜底 ——
+// 从购物车或直接打开结算页时 URL 上没有这个参数，不能只靠它判断。
+const enterpriseOrder = computed(() => data.value?.enterprise === true || route.query.enterprise === '1')
 const cartStore = useCartStore()
 const userStore = useUserStore()
 const toast = useToasts()

@@ -54,7 +54,7 @@
 | R70 | H2 DDL 同步；Maven 测试带 `-am`，清掉 IDE 脏 class |
 | R71 | `/enterprise` 保留公开获客页；交易放登录后的 `/enterprise/center`，现有 FR-049 断言继续成立 |
 | R72 | 退款标记扩展现有方法，同时更新个人订阅与企业批次 |
-| R73 | 桌面端只加 `subscriptionSource/orgName` 展示，不改权益判定 |
+| R73 | 桌面端只加 `subscriptionSource/orgName` 展示，不改权益判定；**离线兜底仍用本机时间判过期**（2026-10-27 所有者确认，见 quickstart §10.4） |
 | R74 | 上线顺序：SQL 021 → 后端 → 管理端/门面站 → 桌面端 |
 | R75 | 企业商品的结算/购物车/收藏/浏览记录旁路：trade 统一 `validateEnterpriseSku`；`settlement-product` 一律排除；列表按角色过滤 |
 

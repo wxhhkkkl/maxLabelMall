@@ -189,3 +189,65 @@ SELECT COUNT(*) FROM maxlabel_org_license WHERE folded_time IS NOT NULL;
 | 企业商品仍出现在公开商城 | SPU `enterprise_only` 是否为 1；列表接口是否加了过滤；缓存是否未刷新 |
 | 后台按钮不显示 | 权限串是否登记成 `system_menu` 行；角色是否勾选（超管也需要菜单行存在） |
 | 企业订单下单被拒 | 买家是否 OWNER/ADMIN；`invoice.titleKind` 是否为 1；税号是否合法 |
+
+---
+
+## 10. 上线顺序与回滚（T085）
+
+### 10.1 顺序（不可乱）
+
+| # | 步骤 | 通过判据 |
+|---|---|---|
+| 1 | `021-enterprise-seat-licensing.sql` | 4 张 `maxlabel_org*` 表存在；3 列存在；10 个 `member:org:*` 权限串存在 |
+| 2 | `022-enterprise-license-folded.sql` | `maxlabel_org_license.folded_time` 存在 |
+| 3 | `023-plan-edition.sql`（**依赖 021** 的批次表） | `maxlabel_subscription_plan.edition`、`member_subscription.edition`、`maxlabel_org_license.edition` 存在 |
+| 4 | `024-personal-subscription-order.sql` | `trade_order.maxlabel_subscription` 存在 |
+| 5 | 后端（member → product → trade 同一批发布） | `systemctl is-active maxlabel` = active；启动日志无 ERROR |
+| 6 | 管理端 + 门面站 | 「会员中心 → 企业管理」可打开；`/enterprise/center` 可打开 |
+| 7 | 桌面端 | 账户弹层能显示「企业授权（企业名）」 |
+
+四份 SQL 都幂等，可重复执行；但**顺序 021 先于 022/023**（023 给批次表加列，表由 021 创建）。
+
+回滚顺序相反：桌面端 → 门面站/管理端 → 后端 → 按依赖 `DROP` 4 张表。
+`trade_order.maxlabel_org_id`、`product_spu.enterprise_only`、
+`maxlabel_subscription_plan.scope`、三处 `edition`、`trade_order.maxlabel_subscription`
+**可以保留**（旧代码忽略未知列），有企业数据时不要删列。详见 [research.md](./research.md) R74。
+
+### 10.2 2026-10-27 核对结果
+
+只读核对（经应用机 `8.146.233.197` 的内网隧道查库 + SSH 看产物时间）：
+
+| 项 | 实测 |
+|---|---|
+| 4 张表 | `maxlabel_org`、`maxlabel_org_member`、`maxlabel_org_license`、`maxlabel_org_seat` 全部存在 |
+| 8 列 | 上述 8 列全部存在（含 `folded_time`、三处 `edition`、`maxlabel_subscription`） |
+| 权限串 | 10 个 `member:org:*` 全部登记在 `system_menu.permission` |
+| 数据 | `maxlabel_org` 已有 1 行 |
+| 后端 jar | `/opt/maxlabel/app/yudao-server.jar` · 2026-10-27 12:17 |
+| 服务 | `maxlabel` active，`ActiveEnterTimestamp=2026-10-27 12:17:07 CST` |
+| 门面站 | `/var/www/maxlabel/index.html` · 2026-10-27 12:08 |
+| 管理端 | `/var/www/maxlabel/admin/index.html` · 2026-10-27 10:53 |
+
+**结论**：SQL 全部先于两端前端与后端生效，顺序满足 R74 的硬约束（SQL → 前端/后端）。
+当天两次前端发布（10:53、12:08）早于 12:17 的后端发布 —— 因为企业域接口在
+2026-10-26 的后端里已经存在，前端先发只是暂时拿不到当天新增的 `edition` 字段，
+不构成报错。**后续发布仍按 10.1 的表执行，不要反过来。**
+
+### 10.3 已确认的例外：桌面端本地判定权益（FR-322）
+
+**所有者决定（2026-10-27）**：保留桌面端的本地过期判定，作为**离线兜底**；不为此改
+`entitlement.ts`，也不视为违反 FR-322。
+
+口径：
+
+- **来源与到期日**一律以后端 `GET /member/subscription/get` 的返回为准（`sourceType/orgName/endDate`）；
+- **「今天是否已过期」**这一层允许本地用本机时间与 `subscriptionEndTime` 比对 ——
+  断网或后端不可达时，桌面端仍要能判断本地编辑/打印是否放行（009 既有设计，plan R73）；
+- 拿到后端结论时，后端说了算；本地判定只在拿不到时兜底。
+
+代价（已知并接受）：终端本机时间被改错时，离线期间可能误判过期/未过期；恢复联网后自动纠正。
+
+### 10.4 未验证（需要人工在界面上走）
+
+`§1 ~ §7` 的界面与支付步骤（建企业、下单、mock 支付、席位分配、退改与过期）
+必须在已部署环境上由人工执行；本文档只完成到**结构、产物与顺序**层面的核对。

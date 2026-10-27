@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.member.service.org;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgDO;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.member.enums.LogRecordConstants.*;
 
 /**
  * MaxLabel 企业 Service 实现类
@@ -38,6 +40,8 @@ public class MaxLabelOrgServiceImpl implements MaxLabelOrgService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_CREATE_SUB_TYPE, bizNo = "{{#name}}",
+            success = MEMBER_ORG_CREATE_SUCCESS)
     public Long createOrg(String name, Long ownerMemberId, String remark) {
         if (StrUtil.isBlank(name) || ownerMemberId == null) {
             throw exception(MEMBER_ORG_NOT_EXISTS);
@@ -77,6 +81,8 @@ public class MaxLabelOrgServiceImpl implements MaxLabelOrgService {
     }
 
     @Override
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_UPDATE_STATUS_SUB_TYPE, bizNo = "{{#id}}",
+            success = MEMBER_ORG_UPDATE_STATUS_SUCCESS)
     public void updateStatus(Long id, Integer status) {
         validateOrgExists(id);
         if (MaxLabelOrgStatusEnum.valueOf(status) == null) {

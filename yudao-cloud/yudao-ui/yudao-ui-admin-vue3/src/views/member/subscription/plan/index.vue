@@ -158,6 +158,16 @@ const editionLabel = (edition?: string) => EDITION_LABELS[edition ?? ''] ?? '标
 const coverageWarning = computed(() => {
   const enabled = list.value.filter((plan) => plan.enabled)
   if (enabled.length === 0) return '当前没有启用的会员授权计划，商城将无法购买会员。'
+  // 同一类别同一时刻只能有一条启用的「商品映射」（契约 admin-api §3.1）。
+  // 月卡/年卡挂同一个 SPU 是允许的，所以看的是不同的 spuId 个数。
+  for (const scope of [1, 2]) {
+    const spuIds = new Set(
+      enabled.filter((plan) => (plan.scope ?? 1) === scope).map((plan) => plan.spuId)
+    )
+    if (spuIds.size > 1) {
+      return `「${scope === 2 ? '企业' : '个人'}」类别启用了 ${spuIds.size} 个商品；同一类别同一时刻只能启用一条商品映射。`
+    }
+  }
   const months = new Set(enabled.map((plan) => plan.periodMonths))
   if (!months.has(1) || !months.has(12)) {
     return '启用的会员计划缺少 1 个月或 12 个月周期；上架前建议同时提供月卡与年卡。'

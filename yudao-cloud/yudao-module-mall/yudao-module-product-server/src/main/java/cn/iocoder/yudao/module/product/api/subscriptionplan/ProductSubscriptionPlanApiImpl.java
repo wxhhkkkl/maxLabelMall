@@ -9,6 +9,9 @@ import jakarta.annotation.Resource;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collection;
+import java.util.List;
+
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 /**
@@ -28,6 +31,11 @@ public class ProductSubscriptionPlanApiImpl implements ProductSubscriptionPlanAp
             return success(null);
         }
         return success(BeanUtils.toBean(plan, ProductSubscriptionPlanRespDTO.class));
+    }
+
+    @Override
+    public CommonResult<List<Long>> getPlanSpuIds(Collection<Long> spuIds) {
+        return success(planService.getPlanSpuIds(spuIds));
     }
 
 }

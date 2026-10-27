@@ -62,7 +62,10 @@ public class AppProductBrowseHistoryController {
         ProductBrowseHistoryPageReqVO pageReqVO = BeanUtils.toBean(reqVO, ProductBrowseHistoryPageReqVO.class)
                 .setUserId(getLoginUserId())
                 .setUserDeleted(false); // 排除用户已删除的（隐藏的）
-        PageResult<ProductBrowseHistoryDO> pageResult = productBrowseHistoryService.getBrowseHistoryPage(pageReqVO);
+        // 非企业管理员：在 SQL 分页前排除企业专享商品，total 与列表保持一致（012 / R75）
+        PageResult<ProductBrowseHistoryDO> pageResult = isEnterpriseAdmin()
+                ? productBrowseHistoryService.getBrowseHistoryPage(pageReqVO)
+                : productBrowseHistoryService.getBrowseHistoryPageExcludingEnterprise(pageReqVO);
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(PageResult.empty());
         }

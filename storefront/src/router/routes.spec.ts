@@ -60,6 +60,8 @@ const ALL_PATHS = [
   '/agreement/user',
   '/agreement/privacy',
   '/enterprise',
+  '/enterprise/center',
+  '/enterprise/plan/601',
   '/templates',
   '/changelog',
   '/about',
@@ -180,7 +182,18 @@ describe('静态链接守卫 —— 站内链接不得指向不存在的路由�
 })
 
 describe('需登录守卫（T074 / FR-015）', () => {
-  const PROTECTED = ['/cart', '/checkout', '/order', '/order/1', '/account', '/account/address', '/coupon/mine']
+  const PROTECTED = [
+    '/cart',
+    '/checkout',
+    '/order',
+    '/order/1',
+    '/account',
+    '/account/address',
+    '/coupon/mine',
+    // 012：企业中心与企业商品页都要登录（企业身份从登录态判断）
+    '/enterprise/center',
+    '/enterprise/plan/601'
+  ]
 
   it.each(PROTECTED)('%s 未登录时挂上 ?login=1 并记住 redirect', async (path) => {
     window.localStorage.clear()

@@ -28,4 +28,9 @@ public interface MemberOrgApi {
     @Operation(summary = "发放企业授权批次（幂等）")
     CommonResult<Boolean> grantLicense(@RequestBody MemberOrgLicenseGrantReqDTO reqDTO);
 
+    @GetMapping(PREFIX + "/get-seat-total")
+    @Operation(summary = "获得企业当前有效席位数")
+    @Parameter(name = "orgId", description = "企业编号", required = true)
+    CommonResult<Integer> getSeatTotal(@RequestParam("orgId") Long orgId);
+
 }

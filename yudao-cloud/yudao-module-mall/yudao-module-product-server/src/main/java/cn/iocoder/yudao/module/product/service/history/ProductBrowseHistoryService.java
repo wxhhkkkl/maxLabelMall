@@ -39,4 +39,9 @@ public interface ProductBrowseHistoryService {
      */
     PageResult<ProductBrowseHistoryDO> getBrowseHistoryPage(ProductBrowseHistoryPageReqVO pageReqVO);
 
+    /**
+     * 同上，但在 SQL 分页前就排除企业专享商品（非企业管理员用，保证 total 一致）。
+     */
+    PageResult<ProductBrowseHistoryDO> getBrowseHistoryPageExcludingEnterprise(ProductBrowseHistoryPageReqVO pageReqVO);
+
 }

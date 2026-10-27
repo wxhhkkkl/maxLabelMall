@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.promotion.controller.admin.point.vo.activity.PointActivityPageReqVO;
 import cn.iocoder.yudao.module.promotion.controller.admin.point.vo.activity.PointActivityRespVO;
@@ -33,6 +34,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.framework.common.util.collection.MapUtils.findAndThen;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_SUBSCRIPTION_ONLY;
 
 @Tag(name = "管理后台 - 积分商城活动")
 @RestController
@@ -44,6 +46,8 @@ public class PointActivityController {
     private PointActivityService pointActivityService;
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建积分商城活动")
@@ -152,6 +156,9 @@ public class PointActivityController {
                 .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
         if (enterprise) {
             throw exception(SPU_ENTERPRISE_ONLY);
+        }
+        if (CollUtil.isNotEmpty(subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData())) {
+            throw exception(SPU_SUBSCRIPTION_ONLY);
         }
     }
 

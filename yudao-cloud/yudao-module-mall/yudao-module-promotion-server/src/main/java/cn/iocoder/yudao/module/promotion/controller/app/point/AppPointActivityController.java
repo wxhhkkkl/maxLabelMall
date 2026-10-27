@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.controller.admin.point.vo.activity.PointActivityPageReqVO;
 import cn.iocoder.yudao.module.promotion.controller.app.point.vo.AppPointActivityDetailRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.point.vo.AppPointActivityPageReqVO;
@@ -45,6 +46,8 @@ public class AppPointActivityController {
 
     @Resource
     private ProductSpuApi productSpuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @GetMapping("/page")
     @Operation(summary = "获得积分商城活动分页")
@@ -106,6 +109,11 @@ public class AppPointActivityController {
         Map<Long, List<PointProductDO>> productsMap = convertMultiMap(products, PointProductDO::getActivityId);
         Map<Long, ProductSpuRespDTO> spuMap = productSpuApi.getSpuMap(
                 convertSet(activityList, PointActivityDO::getSpuId));
+        // 不在公开商城出售的商品不下发名称/头图/市场价（FR-328 / T112）
+        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuMap.keySet()).getCheckedData();
+        if (CollUtil.isNotEmpty(planSpuIds)) {
+            planSpuIds.forEach(spuMap::remove);
+        }
         List<AppPointActivityRespVO> result = BeanUtils.toBean(activityList, AppPointActivityRespVO.class);
         result.forEach(activity -> {
             // 设置 product 信息

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.member.service.org;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgMemberDO;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_ORG_MEMBER_IN_OTHER;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -111,6 +113,20 @@ public class MaxLabelOrgMemberServiceImplTest extends BaseDbUnitTest {
 
         // 另起一个企业，仍由 owner 建（owner 已在原企业，应该被拒）
         assertThrows(Exception.class, () -> orgService.createOrg("另一个企业", ownerId, ""));
+    }
+
+    @Test
+    void joinSecondOrgIsRejectedWithBusinessError() {
+        addUser("13800138016");
+        memberService.addMember(orgId, "13800138016", OPERATOR_MEMBER, ownerId);
+
+        Long otherOwnerId = addUser("13800138017");
+        Long otherOrgId = orgService.createOrg("第二家企业", otherOwnerId, "");
+
+        // 已在其他企业 → 必须是业务错误，而不是数据库唯一键异常（FR-290）
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> memberService.addMember(otherOrgId, "13800138016", OPERATOR_MEMBER, otherOwnerId));
+        assertEquals(MEMBER_ORG_MEMBER_IN_OTHER.getCode(), exception.getCode());
     }
 
 }

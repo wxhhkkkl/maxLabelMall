@@ -93,6 +93,7 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.minusTime;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
 import static cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils.getTerminal;
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_ORG_RENEWAL_SEATS_TOO_FEW;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.trade.enums.MessageTemplateConstants.WXA_ORDER_DELIVERY;
 
@@ -178,6 +179,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         TradeConfigDO tradeConfig = ObjUtil.defaultIfNull(tradeConfigService.getTradeConfig(), new TradeConfigDO());
         respVO.setOfflinePayEnabled(Boolean.TRUE.equals(tradeConfig.getOfflinePayEnabled()));
         respVO.setOfflinePayTip(tradeConfig.getOfflinePayTip());
+        // 3.2 本单是否含企业授权商品：结算页据此隐藏个人抬头（FR-296 / Q73）
+        respVO.setEnterprise(calculateRespBO.getItems() != null
+                && calculateRespBO.getItems().stream().anyMatch(item -> isEnterprisePlan(item.getSkuId())));
         return respVO;
     }
 
@@ -328,6 +332,19 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (createReqVO.getInvoice() != null
                 && !Integer.valueOf(1).equals(createReqVO.getInvoice().getTitleKind())) {
             throw exception(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED);
+        }
+        // Q75：购买数量表示「购买后的总席位数」，不能少于当前有效席位数。
+        // 必须在下单时就拒绝 —— 放到支付回调里拒绝等于「先扣款、再失败」。
+        Integer currentSeats = memberOrgApi.getSeatTotal(org.getOrgId()).getCheckedData();
+        if (currentSeats != null && currentSeats > 0) {
+            for (TradeOrderItemDO item : orderItems) {
+                if (!isEnterprisePlan(item.getSkuId())) {
+                    continue;
+                }
+                if (item.getCount() == null || item.getCount() < currentSeats) {
+                    throw exception(MEMBER_ORG_RENEWAL_SEATS_TOO_FEW);
+                }
+            }
         }
         order.setMaxlabelOrgId(org.getOrgId());
     }

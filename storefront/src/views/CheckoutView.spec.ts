@@ -483,6 +483,23 @@ describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR
     expect(lastInput().invoice).toBeUndefined()
   })
 
+  it('结算响应 enterprise=true 时只给企业抬头（购物车进入、URL 上没有 enterprise=1）', async () => {
+    // 权威来源是结算接口的 enterprise 字段，不能只认 URL（FR-296 / Q73）
+    const w = await mountCheckout(settlementResp({ enterprise: true }), { source: 'cart', cartIds: [5] })
+    await invoiceBox(w).setValue(true)
+
+    const kinds = w.findAll('.invoice-kind')
+    expect(kinds).toHaveLength(1)
+    expect(kinds[0]!.text()).toContain('企业')
+  })
+
+  it('结算响应未标记企业时，个人抬头照常可选', async () => {
+    const w = await mountCheckout(settlementResp({ enterprise: false }), { source: 'cart', cartIds: [5] })
+    await invoiceBox(w).setValue(true)
+
+    expect(w.findAll('.invoice-kind')).toHaveLength(2)
+  })
+
   it('勾选并填好抬头后，invoice **逐字段**进请求体', async () => {
     // 本项目吃过"表单填了但没提交出去"的亏（只断言 UI、不断言请求体）——这条专门钉它
     const w = await mountCheckout()

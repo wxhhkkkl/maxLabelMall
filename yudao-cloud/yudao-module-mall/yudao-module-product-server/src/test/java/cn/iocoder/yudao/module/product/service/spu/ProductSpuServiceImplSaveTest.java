@@ -1,12 +1,15 @@
 package cn.iocoder.yudao.module.product.service.spu;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.category.ProductCategoryMapper;
+import cn.iocoder.yudao.module.product.dal.dataobject.subscriptionplan.MaxLabelSubscriptionPlanDO;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
+import cn.iocoder.yudao.module.product.dal.mysql.subscriptionplan.MaxLabelSubscriptionPlanMapper;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryServiceImpl;
@@ -20,8 +23,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * 商品保存链路（特性 003 / US14）—— **本次上线出问题后补的**。
@@ -44,6 +50,8 @@ public class ProductSpuServiceImplSaveTest extends BaseDbUnitTest {
     private ProductSpuMapper spuMapper;
     @Resource
     private ProductCategoryMapper categoryMapper;
+    @Resource
+    private MaxLabelSubscriptionPlanMapper planMapper;
 
     @MockitoBean
     private ProductSkuService productSkuService;
@@ -104,6 +112,21 @@ public class ProductSpuServiceImplSaveTest extends BaseDbUnitTest {
         Long spuId = insertSpu("碳带 A", CATEGORY_WAX);
 
         assertDoesNotThrow(() -> spuService.updateSpu(reqVO(spuId, CATEGORY_WAX, List.of(99999L))));
+    }
+
+    /** 改商品：已有个人授权计划映射时，不允许改成企业专享（契约 admin-api §4.1） */
+    @Test
+    public void testUpdateSpu_toEnterpriseOnlyRejectedWhenPersonalPlanExists() {
+        Long spuId = insertSpu("会员授权商品", CATEGORY_WAX);
+        planMapper.insert(MaxLabelSubscriptionPlanDO.builder()
+                .spuId(spuId).skuId(9001L).periodMonths(12).scope(1)
+                .enabled(true).sort(0).build());
+
+        ProductSpuSaveReqVO reqVO = reqVO(spuId, CATEGORY_WAX, null);
+        reqVO.setEnterpriseOnly(true);
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> spuService.updateSpu(reqVO));
+        assertEquals(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH.getCode(), exception.getCode());
     }
 
     /** 新建商品：同样不该炸 */

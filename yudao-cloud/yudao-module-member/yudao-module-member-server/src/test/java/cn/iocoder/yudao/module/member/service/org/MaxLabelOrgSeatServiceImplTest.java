@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.member.service.org;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgLicenseGrantReqDTO;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgLicenseDO;
@@ -13,6 +14,8 @@ import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
 
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_ORG_NOT_MEMBER;
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_ORG_SEAT_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -68,6 +71,42 @@ public class MaxLabelOrgSeatServiceImplTest extends BaseDbUnitTest {
         req.setOrderItemId(itemId);
         req.setOrderNo("o8001");
         licenseService.grant(req);
+    }
+
+    /** FR-305：不能把席位分配给别的企业的成员，也不能撤销别的企业的席位 */
+    @Test
+    void crossOrgAssignAndRevokeRejected() {
+        grant(2, 9101L);
+
+        // 另建一家企业，成员不是本企业的人
+        MemberUserDO otherOwner = MemberUserDO.builder()
+                .mobile("13800138009").nickname("另一家企业主").status(0).registerIp("127.0.0.1").build();
+        userMapper.insert(otherOwner);
+        Long otherOrgId = orgService.createOrg("第二家企业", otherOwner.getId(), "");
+
+        ServiceException assignError = assertThrows(ServiceException.class,
+                () -> seatService.assign(otherOrgId, memberId, OPERATOR_MEMBER, otherOwner.getId()));
+        assertEquals(MEMBER_ORG_NOT_MEMBER.getCode(), assignError.getCode());
+
+        // 本企业正常分配后，别的企业不能撤销它
+        seatService.assign(orgId, memberId, OPERATOR_MEMBER, ownerId);
+        ServiceException revokeError = assertThrows(ServiceException.class,
+                () -> seatService.revoke(otherOrgId, memberId, OPERATOR_MEMBER, otherOwner.getId()));
+        assertEquals(MEMBER_ORG_SEAT_NOT_EXISTS.getCode(), revokeError.getCode());
+        assertNotNull(seatService.getActiveByMemberId(memberId));
+    }
+
+    /** FR-293/308：成员主动退出时，席位同事务释放，容量还回来 */
+    @Test
+    void leaveReleasesSeat() {
+        grant(2, 9201L);
+        seatService.assign(orgId, memberId, OPERATOR_MEMBER, ownerId);
+        assertEquals(1, seatService.getAvailableSeats(orgId));
+
+        memberService.leave(memberId);
+
+        assertNull(seatService.getActiveByMemberId(memberId));
+        assertEquals(2, seatService.getAvailableSeats(orgId));
     }
 
     @Test

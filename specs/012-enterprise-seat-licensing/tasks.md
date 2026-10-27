@@ -136,7 +136,8 @@ description: "任务清单：企业客户与席位授权（012）"
 - [X] T048 [P] [US42] 写 `.../member-server/src/test/java/.../controller/app/subscription/AppMemberSubscriptionControllerTest.java` 的新用例：企业来源 `sourceType=2/orgName`、并存取较晚、并列取个人、无订阅 `sourceType=1`
 - [X] T049 [P] [US42] 写 `.../member-server/src/test/java/.../service/template/{LabelTemplateServiceImplTest,SharedTemplateServiceImplTest}.java` 的新用例：企业席位有效时上传/提交共享成功；撤销后 403；企业批次过期后 403；个人订阅仍有效时不受影响
 - [X] T050 [P] [US42] 写 `../maxlabel/app/tests/integration/main/mall-repository.test.ts` 的新用例：解析 `sourceType/orgName`；写 `../maxlabel/app/tests/unit/main/mall-auth.test.ts` 的新用例：会话中保留来源字段
-- [ ] T051 [P] [US42] 写 `../maxlabel/app/tests/unit/renderer/mall-account-dialog.test.tsx`（或既有账户弹层测试）：企业来源显示“企业授权（公司名）”，个人来源显示原文案
+- [X] T051 [P] [US42] 写 `../maxlabel/app/tests/unit/renderer/mall-account-dialog.test.ts`：企业来源显示“企业授权（公司名）”，个人来源显示原文案
+  （桌面端 vitest 只收 `tests/unit/**/*.test.ts`，故用 `.ts` 而非 `.tsx`；为此把 `MallAccountDialog.tsx` 里已有的 `statusText` 导出，未改判定逻辑）
 
 ### Implementation for US42
 
@@ -180,7 +181,8 @@ description: "任务清单：企业客户与席位授权（012）"
 
 - [X] T061 [P] [US44] 写 `.../member-server/src/test/java/.../controller/admin/org/AdminMemberOrgControllerTest.java`：企业分页/详情/创建/修改/停用；权限串缺失时 403；创建时 OWNER 行一致；创建/停用写入操作日志
 - [X] T062 [P] [US44] 写 `.../member-server/src/test/java/.../controller/admin/org/AdminMemberOrgManageControllerTest.java`：成员/席位/批次分页与代操作；不能移出 OWNER；退款标记展示；权限校验；代操作留痕
-- [ ] T063 [P] [US44] 写 `yudao-cloud/yudao-ui/yudao-ui-admin-vue3/src/views/member/org/{index,OrgForm}.spec.ts` 与 `.../org/detail/{OrgMemberList,OrgSeatList,OrgLicenseList}.spec.ts`：列表、表单、页签、分页、空态
+- [X] T063 [P] [US44] 写 `yudao-cloud/yudao-ui/yudao-ui-admin-vue3/src/views/member/org/{index,OrgDetail}.spec.ts`：列表、表单、页签、分页、空态
+  （T067 实际把详情页合并成 `OrgDetail.vue`，未拆 `detail/` 子目录，测试按实际文件落点）
 - [X] T064 [P] [US44] 写 `.../views/member/user/detail/UserBasicInfo.spec.ts`（或既有会员详情 spec）：只读“所属企业”；无企业显示“未加入”
 
 ### Implementation for US44
@@ -246,7 +248,8 @@ description: "任务清单：企业客户与席位授权（012）"
 - [X] T082 [P] 前端回归：`storefront/`、`yudao-cloud/yudao-ui/yudao-ui-admin-vue3/`、`../maxlabel/app/` 的 vitest 全量通过；新增视图已登记进 `storefront/src/styles/design-consistency.spec.ts`
 - [ ] T083 [P] 按 `specs/012-enterprise-seat-licensing/quickstart.md` 逐步执行并记录结果；把执行记录（日期、环境、结果）补到 `yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` 头部
 - [X] T084 [P] 更新仓库根 `CLAUDE.md` 的 “Supporting artifacts” 段：加入 012 的 spec/plan/data-model/contracts/quickstart 与上线顺序
-- [ ] T085 [P] 上线顺序核对：`yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` → `022-enterprise-license-folded.sql` → 后端（member → product → trade）→ 管理端/门面站 → 桌面端；准备回滚说明（见 `specs/012-enterprise-seat-licensing/research.md` R74）
+- [X] T085 [P] 上线顺序核对：`yudao-cloud/sql/mysql/021-enterprise-seat-licensing.sql` → `022-enterprise-license-folded.sql` → `023-plan-edition.sql` → `024-personal-subscription-order.sql` → 后端（member → product → trade）→ 管理端/门面站 → 桌面端；回滚说明见 `specs/012-enterprise-seat-licensing/research.md` R74 与 quickstart §10
+  （2026-10-27 只读核对：4 表 / 8 列 / 10 权限串全部就位，jar 12:17 且服务 active，门面站 12:08、管理端 10:53）
 - [X] T086 [P] 全仓检索确认：没有把企业来源写进 `edition`/会员等级；企业席位与个人订阅在能力上完全等价（Q69）；检索范围 `yudao-cloud/yudao-module-member/`、`yudao-cloud/yudao-module-mall/`、`storefront/src/`、`../maxlabel/app/src/`
 
 ---
@@ -351,3 +354,45 @@ Task: "新增 EnterpriseCenterView.vue / EnterpriseLicensePanel.vue / Enterprise
 - [X] T088 `AdminMemberOrgController#get` 在 `orgService.getOrg(id)` 返回 null 时抛 `MEMBER_ORG_NOT_EXISTS`，避免 `toRespVO(null)` 的 NPE/500 per FR-314 / contracts/admin-api.md §1.2 (partial)
 - [X] T089 收藏分页在过滤企业专享 SPU 后同步收窄 `favorites` 与 `total`（或跳过 null SPU），不返回空白行 per FR-294 / R75 / SC-118 (partial)
 - [X] T090 补充 `GET /product/spu/list-by-ids`、`/product/favorite/page`、`/product/browse-history/page` 的企业商品过滤测试 per SC-118 / T014 (partial)
+
+---
+
+## Phase 12: Convergence
+
+> 2026-10-27 复核（代码 vs spec / plan / contracts / 宪法）。下列任务按严重度排序，ID 续 T094。
+
+- [X] T095 **CRITICAL**（宪法原则 I「测试先行」/ 实现门禁）核对并补齐四处「任务已标记完成、但声称的断言并不存在」的测试：① `CartServiceImpl#getCartList` 的企业商品过滤（T015 声称有）；② 计划页「跨 scope 单启用」提示（T031 声称有）；③ 桌面端 `tests/unit/main/mall-auth.test.ts` 的会话来源字段（T050 声称有，实际 0 处 `subscriptionSource`）；④ 企业创建/停用的操作日志（T061 声称有）。补齐断言或按实际状态修正任务描述，不得让任务标记继续失真 per Constitution I / 实现门禁 (contradicts)
+- [X] T096 [US41/US44] `GET /trade/cart/list` 对非企业 OWNER/ADMIN 过滤 `enterprise_only=1` 的商品：现在 `CartServiceImpl#getCartList` 只删下架 SPU，原样返回名称/价格/SKU，与契约「过滤企业商品」不符。按收藏页的做法在 SQL 前置过滤并同步收窄 `total` per FR-294 / contracts/app-api §4.1 / SC-118 (missing)
+- [X] T097 [US44] 实现 FR-318 的操作留痕：`yudao-module-member` 目前 **0 处** `@LogRecord`/`@OperateLog`，企业创建、停用、角色变更、OWNER 转交只有可变的 `BaseDO.creator/updater`，无操作类型、无前后值、无历史（仅席位分配/撤销有 `operator_type/operator_id/assigned_time/revoked_time`）。按 CRM 模块既有写法给六类操作加 `@LogRecord`，并补断言 per FR-318 / US44/AC2 (missing)
+- [X] T098 [US40] 把「购买席位数 MUST NOT 少于当前有效席位数」的校验前移到下单入口：现在只有支付回调里的 `MaxLabelOrgLicenseServiceImpl#grantLicense` 会抛 `MEMBER_ORG_RENEWAL_SEATS_TOO_FEW`，买家可能已被扣款却拿不到批次。在 `TradeOrderUpdateServiceImpl#validateEnterpriseOrder` 内按 `count` 与当前席位数比较并抛出同一错误 per FR-298 / Q75 / SC-121 (partial)
+- [X] T099 [US40] 结算页企业订单判定改为权威来源：`storefront/src/views/CheckoutView.vue` 目前只看 `route.query.enterprise === '1'`，从购物车（FR-294 允许企业管理员保留企业商品）或直接打开结算 URL 时个人抬头选项会重新出现。改为按结算项是否命中企业计划（或由服务端返回标记）判定 `enterpriseOnly` per FR-296 / Q73 / SC-119 (partial)
+- [X] T100 [US42/US46] `AppProductBrowseHistoryController#getBrowseHistoryPage` 在内存过滤企业商品后没有收窄 `pageResult.total`（`list` 已过滤），会出现 total>list、翻到空页；收藏页已按 SQL 前置过滤，浏览记录照此办理 per FR-294 / SC-118 / T089 同类 (partial)
+- [X] T101 [US40] `/product/spu/list-by-ids` 只排除 `enterprise_only`，没有排除「被 `maxlabel_subscription_plan` 引用」的会员授权商品（`ProductSpuMapper#selectPage` 已排除两者）；首页货架/DIY 组件走的就是这个接口，故 FR-328 的「首页不出现」在这条路径上不成立。同时核对促销活动 H5 读取路径是否同样漏出 per FR-328 / Q81 (partial)
+- [X] T102 [US44] 商品保存时校验「企业专享」与既有计划的一致性：`ProductSpuServiceImpl` 完全不看 `enterpriseOnly`，把已有个人计划的 SPU 改成企业专享后，个人续费页仍指向一个已被公开商城排除的商品。按契约「已有个人授权计划映射时拒绝并提示先调整计划」实现 per contracts/admin-api §4.1 / FR-294 (missing)
+- [X] T103 [US43] 按手机号加入成员时改成锁 `member_user` 行（T018 原文如此，实际锁的是目标企业行），并把唯一键冲突 `DuplicateKeyException` 转成 `MEMBER_ORG_MEMBER_IN_OTHER`；现在并发加入两个不同企业时，后到的请求报数据库异常而不是业务提示 per FR-290 / US43/AC3 (partial)
+- [X] T104 [US44] 管理端补两处提示：① 计划页「跨 scope 只能有一条启用计划」（`plan/index.vue` 的 `coverageWarning` 只检查月卡/年卡周期）；② 商品「企业专享」开关与计划 `scope` 冲突提示（`OtherForm.vue` 只有开关，`PlanForm.vue` 选 SPU 时不读 `enterpriseOnly`） per T031 / T040 / contracts/admin-api §3.1 §4.1 (partial)
+- [X] T105 [US44] 企业详情页 `OrgDetail.vue` 的「加入成员」「分配席位」「撤销席位」三个按钮没有 `v-hasPermi`（其余动作都有），权限串已登记但按钮对无权限角色仍然可见；补指令并与后端 `@PreAuthorize` 对齐 per contracts/admin-api §5 (missing)
+- [ ] T106 [Constitution I] 补后端负向/并发测试：跨企业分配与撤销席位（FR-305）、OWNER/ADMIN 未分配席位时无权益（FR-306）、企业停用后席位失效（FR-317 分支）、退出/移出时释放席位（FR-293/308）、并发加入两个企业（FR-290）、并发抢最后一个席位（FR-302）、促销活动保存拒绝企业商品与收藏创建拒绝（FR-294 g/h）、RPC `ProductSpuApi#getSpuList` 不被过滤 (partial)
+  - 2026-10-27 已完成：跨企业分配与撤销（`MaxLabelOrgSeatServiceImplTest#crossOrgAssignAndRevokeRejected`）、角色无席位无权益（`MemberSubscriptionServiceImplTest#roleWithoutSeatHasNoEntitlement`）、企业停用失效（`#disabledOrgMakesSeatInactive`）、退出释放席位（`MaxLabelOrgSeatServiceImplTest#leaveReleasesSeat`）、收藏创建拒绝（`ProductFavoriteServiceImplTest`）
+  - 2026-10-27（第二轮）：促销活动保存拒绝已由 T109 覆盖（`SeckillActivityControllerTest` 三类用例；另三个活动控制器同一套校验）
+  - **仍未覆盖**：并发类的两条（需多线程 + 独立事务，`BaseDbUnitTest` 单事务回滚模型下做不到；quickstart §8 已声明「压测不在本期」）、RPC `getSpuList` 不过滤的回归断言
+- [X] T107 [Constitution I] 补前端测试：`storefront/src/router/routes.spec.ts` 的 `ALL_PATHS`/`PROTECTED` 未包含 `/enterprise/center` 与 `/enterprise/plan/:skuId`（路由已带 `requiresAuth`）；管理端缺「企业详情页不出现模板/打印字段」的断言（目前只有 C 端用例） per FR-293 / FR-319 (partial)
+- [X] T108 [US42] 澄清桌面端「MUST NOT 自行判断权益是否有效」（FR-322）与 009 离线设计的边界：`maxlabel/app/src/shared/domain/entitlement.ts` 仍用本机时间与 `subscriptionEndTime` 比较判过期，plan R73 又明确「不改权益判定」。请所有者确认口径并在 quickstart/spec 记录例外，或据此调整桌面端判定 per FR-322 / plan R73 (contradicts)
+
+---
+
+## Phase 13: Convergence
+
+> 2026-10-27 第二轮复核（Phase 12 落地后）。以下按严重度排序，ID 续 T108。
+
+- [X] T109 [US40] 促销活动（秒杀 / 拼团 / 砍价 / 积分）仍可挂「被 `maxlabel_subscription_plan` 引用」的会员授权商品并公开渲染：四个 Admin 控制器的 `validateEnterpriseProducts` 只校验 `enterpriseOnly`，而个人授权商品是 `enterprise_only=0`；App 端 `getNow`/`page` 又走未过滤的 `productSpuApi.getSpuList`。需要在保存时拒绝「被计划引用」的 SPU（`product-api` 需提供按 SPU 查计划归属的 RPC），或在 App 端渲染前过滤 per FR-328 / FR-294 / T101 (partial)
+- [X] T110 [US40] 同步契约：`AppTradeOrderSettlementRespVO` 新增的 `enterprise` 字段（结算页据此隐藏个人抬头，FR-296/Q73）没有写进 `contracts/app-api.md` 的 §4；契约里「含企业商品 → 拒绝」的描述也要补上「响应带 `enterprise` 标记」 per contracts/app-api.md §4 / FR-296 (partial)
+- [X] T111 [US46] `GET /product/comment/page` 是 `@PermitAll`，按 `spuId` 直接返回 `spuName`，不校验该 SPU 是否为 `enterprise_only` 或会员授权商品；对非企业管理员过滤，避免成为 FR-294「其他入口不得泄露名称」的旁路 per FR-294 (partial)
+
+---
+
+## Phase 14: Convergence
+
+> 2026-10-27 第三轮复核（Phase 13 落地后）。ID 续 T111。
+
+- [X] T112 [US40] 促销的**渲染侧**仍会展示被授权计划引用的 SPU：T109 只拦住了保存入口，所以「修复前已建的活动」与「先建活动、后建计划」两种顺序仍会漏。在 `AppSeckillActivityController`、`AppCombinationActivityController`、`AppBargainActivityController`、`AppPointActivityController` 取到 `spuList` 后、交给 Convert 前过滤掉 `getPlanSpuIds` 命中的 SPU（名称/图片/市场价格都由它填充），并补对应的 App 端用例 per FR-328 / FR-294 / T109 同类 (partial)

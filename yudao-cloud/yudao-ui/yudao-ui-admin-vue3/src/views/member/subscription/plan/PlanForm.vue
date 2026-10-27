@@ -52,6 +52,9 @@
         <span class="ml-10px text-12px text-gray-500">
           企业类别必须绑定勾选「企业专享」的商品
         </span>
+        <span v-if="scopeConflictHint" class="ml-10px text-12px text-red-500">
+          {{ scopeConflictHint }}
+        </span>
       </el-form-item>
       <el-form-item label="桌面端版本" prop="edition">
         <el-select v-model="formData.edition" class="!w-240px">
@@ -127,6 +130,8 @@ interface SpuOption {
 }
 const spuOptions = ref<SpuOption[]>([])
 const skuOptions = ref<Sku[]>([])
+// 当前选中的 SPU：用于校验「类别」与商品的「企业专享」标记是否一致
+const selectedSpu = ref<{ enterpriseOnly?: boolean; skus?: Sku[] } | null>(null)
 const spuLoading = ref(false)
 const skuLoading = ref(false)
 const spuOptionLabel = (spu: SpuOption) => `${spu.name}（ID ${spu.id}）`
@@ -147,6 +152,7 @@ const loadSpuOptions = async () => {
 }
 
 const loadSkuOptions = async (spuId?: number) => {
+  selectedSpu.value = null
   if (!spuId) {
     skuOptions.value = []
     return
@@ -154,11 +160,28 @@ const loadSkuOptions = async (spuId?: number) => {
   skuLoading.value = true
   try {
     const spu = await getSpu(spuId)
+    selectedSpu.value = spu ?? null
     skuOptions.value = spu?.skus ?? []
   } finally {
     skuLoading.value = false
   }
 }
+
+/**
+ * 类别与商品的「企业专享」标记必须一致（契约 admin-api §3.1）。
+ * 不拦在这里的话，保存时会被服务端拒绝，但运营看不出是哪一项对不上。
+ */
+const scopeConflictHint = computed(() => {
+  if (!selectedSpu.value) return ''
+  const enterpriseOnly = selectedSpu.value.enterpriseOnly === true
+  if (formData.scope === 2 && !enterpriseOnly) {
+    return '企业类别必须选择勾选了「企业专享」的商品'
+  }
+  if (formData.scope === 1 && enterpriseOnly) {
+    return '个人类别不能选择勾选了「企业专享」的商品'
+  }
+  return ''
+})
 
 /** 类别切换时给出版位默认值：企业 → 企业版，个人 → 专业版；仍可手动改。 */
 const handleScopeChange = (scope?: number) => {

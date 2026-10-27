@@ -27,6 +27,16 @@ public interface MemberUserMapper extends BaseMapperX<MemberUserDO> {
         return selectOne(MemberUserDO::getMobile, mobile);
     }
 
+    /**
+     * 锁定会员行（SELECT ... FOR UPDATE）。
+     * 用于「同一会员同一时刻只能属于一个启用中的企业」——并发加入两个不同企业时串行化（FR-290）。
+     */
+    default MemberUserDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<MemberUserDO>()
+                .eq(MemberUserDO::getId, id)
+                .last("FOR UPDATE"));
+    }
+
     default MemberUserDO selectByEmail(String email) {
         return selectOne(MemberUserDO::getEmail, email);
     }

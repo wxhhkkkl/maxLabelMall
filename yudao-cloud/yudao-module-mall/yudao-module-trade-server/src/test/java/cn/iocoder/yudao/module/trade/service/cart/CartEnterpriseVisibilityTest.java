@@ -7,7 +7,9 @@ import cn.iocoder.yudao.module.product.api.sku.ProductSkuApi;
 import cn.iocoder.yudao.module.product.api.sku.dto.ProductSkuRespDTO;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.trade.controller.app.cart.vo.AppCartAddReqVO;
+import cn.iocoder.yudao.module.trade.controller.app.cart.vo.AppCartListRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.cart.CartDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.cart.CartMapper;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_PRODUCT_NOT_AVAILABLE;
@@ -105,6 +110,68 @@ public class CartEnterpriseVisibilityTest {
         });
 
         assertEquals(9L, cartService.addCart(1001L, request()));
+    }
+
+    // ==================== 购物车列表 / R75 ====================
+
+    private CartDO cart(Long id, Long spuId, Long skuId) {
+        CartDO cart = new CartDO();
+        cart.setId(id);
+        cart.setSpuId(spuId);
+        cart.setSkuId(skuId);
+        cart.setCount(1);
+        cart.setSelected(true);
+        return cart;
+    }
+
+    private ProductSpuRespDTO normalSpu() {
+        ProductSpuRespDTO spu = new ProductSpuRespDTO();
+        spu.setId(200L);
+        spu.setStatus(ProductSpuStatusEnum.ENABLE.getStatus());
+        spu.setStock(10);
+        return spu;
+    }
+
+    private ProductSpuRespDTO enabledEnterpriseSpu() {
+        ProductSpuRespDTO spu = enterpriseSpu();
+        spu.setStatus(ProductSpuStatusEnum.ENABLE.getStatus());
+        spu.setStock(10);
+        return spu;
+    }
+
+    private ProductSkuRespDTO sku(Long id, Long spuId) {
+        ProductSkuRespDTO sku = sku();
+        sku.setId(id);
+        sku.setSpuId(spuId);
+        return sku;
+    }
+
+    @Test
+    void nonAdminCartListExcludesEnterpriseSpu() {
+        when(cartMapper.selectListByUserId(1001L)).thenReturn(new ArrayList<>(List.of(
+                cart(1L, 300L, 301L), cart(2L, 200L, 201L))));
+        when(productSpuApi.getSpuList(any())).thenReturn(success(List.of(enabledEnterpriseSpu(), normalSpu())));
+        when(productSkuApi.getSkuList(any())).thenReturn(success(List.of(sku(301L, 300L), sku(201L, 200L))));
+        when(memberOrgApi.getByMemberId(1001L)).thenReturn(success(null));
+
+        AppCartListRespVO result = cartService.getCartList(1001L);
+
+        assertEquals(1, result.getValidList().size());
+        assertEquals(200L, result.getValidList().get(0).getSpu().getId());
+        assertEquals(0, result.getInvalidList().size());
+    }
+
+    @Test
+    void enterpriseAdminCartListKeepsEnterpriseSpu() {
+        when(cartMapper.selectListByUserId(1001L)).thenReturn(new ArrayList<>(List.of(
+                cart(1L, 300L, 301L), cart(2L, 200L, 201L))));
+        when(productSpuApi.getSpuList(any())).thenReturn(success(List.of(enabledEnterpriseSpu(), normalSpu())));
+        when(productSkuApi.getSkuList(any())).thenReturn(success(List.of(sku(301L, 300L), sku(201L, 200L))));
+        when(memberOrgApi.getByMemberId(1001L)).thenReturn(success(org(1, 0)));
+
+        AppCartListRespVO result = cartService.getCartList(1001L);
+
+        assertEquals(2, result.getValidList().size());
     }
 
 }

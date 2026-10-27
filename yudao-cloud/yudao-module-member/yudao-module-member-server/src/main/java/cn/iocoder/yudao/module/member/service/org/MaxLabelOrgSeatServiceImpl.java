@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgSeatDO;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMemberMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgSeatMapper;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.member.enums.LogRecordConstants.*;
 
 /**
  * MaxLabel 企业席位 Service 实现类
@@ -37,6 +39,8 @@ public class MaxLabelOrgSeatServiceImpl implements MaxLabelOrgSeatService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_SEAT_ASSIGN_SUB_TYPE, bizNo = "{{#orgId}}",
+            success = MEMBER_ORG_SEAT_ASSIGN_SUCCESS)
     public void assign(Long orgId, Long memberId, Integer operatorType, Long operatorId) {
         // 企业行锁：容量校验与写入串行化
         orgService.lockOrg(orgId);
@@ -70,6 +74,8 @@ public class MaxLabelOrgSeatServiceImpl implements MaxLabelOrgSeatService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_SEAT_REVOKE_SUB_TYPE, bizNo = "{{#orgId}}",
+            success = MEMBER_ORG_SEAT_REVOKE_SUCCESS)
     public void revoke(Long orgId, Long memberId, Integer operatorType, Long operatorId) {
         orgService.lockOrg(orgId);
         orgMemberService.validateOperator(orgId, operatorType, operatorId, false);

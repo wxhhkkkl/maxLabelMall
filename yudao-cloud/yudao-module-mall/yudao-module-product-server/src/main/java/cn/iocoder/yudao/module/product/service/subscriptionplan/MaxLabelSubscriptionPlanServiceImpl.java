@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.service.subscriptionplan;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.subscriptionplan.vo.MaxLabelSubscriptionPlanCreateReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.subscriptionplan.vo.MaxLabelSubscriptionPlanPageReqVO;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -107,6 +109,14 @@ public class MaxLabelSubscriptionPlanServiceImpl implements MaxLabelSubscription
     @Override
     public List<MaxLabelSubscriptionPlanDO> getEnabledPlanList() {
         return planMapper.selectEnabledList();
+    }
+
+    @Override
+    public List<Long> getPlanSpuIds(Collection<Long> spuIds) {
+        if (CollUtil.isEmpty(spuIds)) {
+            return List.of();
+        }
+        return planMapper.selectSpuIdsBySpuIds(spuIds);
     }
 
     @Override

@@ -56,6 +56,15 @@ public class AppTradeOrderSettlementRespVO {
     @Schema(description = "对公转账提示语", example = "[[提示语占位]]")
     private String offlinePayTip;
 
+    /**
+     * 本单是否含企业授权商品（012 / FR-296）
+     *
+     * 结算页据此**直接隐藏个人抬头选项**。前端 MUST 用本字段，不能只看 URL 上的
+     * `enterprise=1` —— 从购物车或直接打开结算页时 URL 上没有这个参数。
+     */
+    @Schema(description = "本单是否含企业授权商品", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
+    private Boolean enterprise;
+
     @Schema(description = "已使用的积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer usePoint;
 

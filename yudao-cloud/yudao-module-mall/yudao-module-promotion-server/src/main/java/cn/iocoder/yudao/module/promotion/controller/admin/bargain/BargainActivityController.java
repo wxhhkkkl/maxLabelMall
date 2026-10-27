@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
 import cn.iocoder.yudao.module.promotion.controller.admin.bargain.vo.activity.*;
 import cn.iocoder.yudao.module.promotion.convert.bargain.BargainActivityConvert;
@@ -29,6 +30,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTERPRISE_ONLY;
+import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_SUBSCRIPTION_ONLY;
 
 @Tag(name = "管理后台 - 砍价活动")
 @RestController
@@ -45,6 +47,8 @@ public class BargainActivityController {
 
     @Resource
     private ProductSpuApi spuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建砍价活动")
@@ -121,6 +125,9 @@ public class BargainActivityController {
                 .anyMatch(spu -> Boolean.TRUE.equals(spu.getEnterpriseOnly()));
         if (enterprise) {
             throw exception(SPU_ENTERPRISE_ONLY);
+        }
+        if (CollUtil.isNotEmpty(subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData())) {
+            throw exception(SPU_SUBSCRIPTION_ONLY);
         }
     }
 

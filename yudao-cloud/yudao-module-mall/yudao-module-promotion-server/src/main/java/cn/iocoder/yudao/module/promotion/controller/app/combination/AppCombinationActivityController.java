@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.api.spu.ProductSpuApi;
 import cn.iocoder.yudao.module.product.api.spu.dto.ProductSpuRespDTO;
+import cn.iocoder.yudao.module.product.api.subscriptionplan.ProductSubscriptionPlanApi;
 import cn.iocoder.yudao.module.promotion.controller.app.combination.vo.activity.AppCombinationActivityDetailRespVO;
 import cn.iocoder.yudao.module.promotion.controller.app.combination.vo.activity.AppCombinationActivityRespVO;
 import cn.iocoder.yudao.module.promotion.convert.combination.CombinationActivityConvert;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -42,6 +44,8 @@ public class AppCombinationActivityController {
 
     @Resource
     private ProductSpuApi spuApi;
+    @Resource
+    private ProductSubscriptionPlanApi subscriptionPlanApi;
 
     @GetMapping("/page")
     @Operation(summary = "获得拼团活动分页")
@@ -54,7 +58,7 @@ public class AppCombinationActivityController {
         // 拼接返回
         List<CombinationProductDO> productList = activityService.getCombinationProductListByActivityIds(
                 convertList(pageResult.getList(), CombinationActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(pageResult.getList(), CombinationActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(pageResult.getList(), CombinationActivityDO::getSpuId));
         return success(CombinationActivityConvert.INSTANCE.convertAppPage(pageResult, productList, spuList));
     }
 
@@ -72,7 +76,7 @@ public class AppCombinationActivityController {
         // 2. 拼接返回
         List<CombinationProductDO> productList = activityService.getCombinationProductListByActivityIds(
                 convertList(activityList, CombinationActivityDO::getId));
-        List<ProductSpuRespDTO> spuList = spuApi.getSpuList(convertList(activityList, CombinationActivityDO::getSpuId)).getCheckedData();
+        List<ProductSpuRespDTO> spuList = getPublicSpuList(convertList(activityList, CombinationActivityDO::getSpuId));
         return success(CombinationActivityConvert.INSTANCE.convertAppList(activityList, productList, spuList));
     }
 
@@ -93,4 +97,20 @@ public class AppCombinationActivityController {
         return success(CombinationActivityConvert.INSTANCE.convert3(activity, products));
     }
 
+
+    /**
+     * 不在公开商城出售的商品不下发名称/头图/市场价（FR-328）：
+     * 保存入口已拦过一遍，但「历史活动」与「先建活动后建计划」两种顺序仍会漏，渲染前再过滤一次。
+     */
+    private List<ProductSpuRespDTO> getPublicSpuList(Collection<Long> spuIds) {
+        List<ProductSpuRespDTO> spus = spuApi.getSpuList(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(spus)) {
+            return spus;
+        }
+        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData();
+        if (CollUtil.isEmpty(planSpuIds)) {
+            return spus;
+        }
+        return spus.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+    }
 }

@@ -63,4 +63,9 @@ public class ProductBrowseHistoryServiceImpl implements ProductBrowseHistoryServ
         return browseHistoryMapper.selectPage(pageReqVO);
     }
 
+    @Override
+    public PageResult<ProductBrowseHistoryDO> getBrowseHistoryPageExcludingEnterprise(ProductBrowseHistoryPageReqVO pageReqVO) {
+        return browseHistoryMapper.selectPageExcludingEnterprise(pageReqVO);
+    }
+
 }

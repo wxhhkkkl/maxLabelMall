@@ -12,7 +12,9 @@ import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMemberMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgSeatMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
 import cn.iocoder.yudao.module.member.enums.org.MaxLabelOrgRoleEnum;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import jakarta.annotation.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -25,6 +27,7 @@ import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.member.enums.LogRecordConstants.*;
 
 /**
  * MaxLabel 企业成员 Service 实现类
@@ -61,6 +64,8 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
         if (member == null) {
             throw exception(MEMBER_ORG_MOBILE_NOT_REGISTERED);
         }
+        // 锁会员行：并发加入两个不同企业时串行化，避免后到的请求报数据库异常（FR-290）
+        memberUserMapper.selectByIdForUpdate(member.getId());
         MaxLabelOrgMemberDO exists = orgMemberMapper.selectByMemberId(member.getId());
         if (exists != null) {
             if (Objects.equals(exists.getOrgId(), orgId)) {
@@ -68,12 +73,17 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
             }
             throw exception(MEMBER_ORG_MEMBER_IN_OTHER);
         }
-        orgMemberMapper.insert(MaxLabelOrgMemberDO.builder()
-                .orgId(orgId)
-                .memberId(member.getId())
-                .role(MaxLabelOrgRoleEnum.MEMBER.getRole())
-                .joinedTime(LocalDateTime.now())
-                .build());
+        try {
+            orgMemberMapper.insert(MaxLabelOrgMemberDO.builder()
+                    .orgId(orgId)
+                    .memberId(member.getId())
+                    .role(MaxLabelOrgRoleEnum.MEMBER.getRole())
+                    .joinedTime(LocalDateTime.now())
+                    .build());
+        } catch (DuplicateKeyException e) {
+            // 唯一键 uk_member(tenant_id, member_id) 兜底：不把数据库异常抛给前台
+            throw exception(MEMBER_ORG_MEMBER_IN_OTHER);
+        }
     }
 
     @Override
@@ -94,6 +104,8 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_UPDATE_ROLE_SUB_TYPE, bizNo = "{{#orgId}}",
+            success = MEMBER_ORG_UPDATE_ROLE_SUCCESS)
     public void updateRole(Long orgId, Long memberId, Integer role, Integer operatorType, Long operatorId) {
         orgService.lockOrg(orgId);
         validateOperator(orgId, operatorType, operatorId, true);
@@ -113,6 +125,8 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = MEMBER_ORG_TYPE, subType = MEMBER_ORG_TRANSFER_OWNER_SUB_TYPE, bizNo = "{{#orgId}}",
+            success = MEMBER_ORG_TRANSFER_OWNER_SUCCESS)
     public void transferOwner(Long orgId, Long targetMemberId, Integer operatorType, Long operatorId) {
         MaxLabelOrgDO org = orgService.lockOrg(orgId);
         validateOperator(orgId, operatorType, operatorId, true);

@@ -86,5 +86,6 @@ public interface ErrorCodeConstants {
     ErrorCode ENTERPRISE_PLAN_FORBIDDEN = new ErrorCode(1_008_011_001, "仅企业管理员可购买企业授权");
     ErrorCode MEMBER_SUBSCRIPTION_PLAN_SCOPE_INVALID = new ErrorCode(1_008_011_002, "会员授权商品类别不合法");
     ErrorCode MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH = new ErrorCode(1_008_011_003, "计划类别与商品企业专享标记不一致");
+    ErrorCode SPU_SUBSCRIPTION_ONLY = new ErrorCode(1_008_011_004, "该商品是会员授权商品，只能从会员授权页或企业采购页进入");
 
 }

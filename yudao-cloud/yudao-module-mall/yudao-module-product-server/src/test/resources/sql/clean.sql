@@ -10,3 +10,7 @@ DELETE FROM "product_filter_value";
 DELETE FROM "product_filter_dimension";
 
 DELETE FROM "maxlabel_subscription_plan";
+
+DELETE FROM "maxlabel_software_version";
+DELETE FROM "maxlabel_software";
+DELETE FROM "maxlabel_software_category";

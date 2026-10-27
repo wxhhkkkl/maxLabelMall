@@ -88,4 +88,14 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH = new ErrorCode(1_008_011_003, "计划类别与商品企业专享标记不一致");
     ErrorCode SPU_SUBSCRIPTION_ONLY = new ErrorCode(1_008_011_004, "该商品是会员授权商品，只能从会员授权页或企业采购页进入");
 
+    //========== MaxLabel 软件与驱动分发 1-008-012-000 ==========
+    ErrorCode SOFTWARE_CATEGORY_NOT_EXISTS = new ErrorCode(1_008_012_000, "软件分类不存在");
+    ErrorCode SOFTWARE_NOT_EXISTS = new ErrorCode(1_008_012_001, "软件不存在");
+    ErrorCode SOFTWARE_VERSION_NOT_EXISTS = new ErrorCode(1_008_012_002, "软件版本不存在");
+    ErrorCode SOFTWARE_VERSION_DUPLICATE = new ErrorCode(1_008_012_003, "该平台与架构下已存在相同版本号");
+    ErrorCode SOFTWARE_VERSION_NOT_PUBLISHED = new ErrorCode(1_008_012_004, "未发布的版本不能设为当前发布");
+    ErrorCode SOFTWARE_VERSION_CONFLICT = new ErrorCode(1_008_012_005, "该平台与架构已有当前发布版本，请刷新后重试");
+    ErrorCode SOFTWARE_FILE_INVALID = new ErrorCode(1_008_012_006, "文件地址、大小或校验和不合法");
+    ErrorCode SOFTWARE_CATEGORY_NOT_EMPTY = new ErrorCode(1_008_012_008, "分类下仍有软件，无法删除");
+
 }

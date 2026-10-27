@@ -157,5 +157,7 @@ public interface ErrorCodeConstants {
     ErrorCode ENTERPRISE_PRODUCT_NOT_AVAILABLE = new ErrorCode(1_011_010_002, "企业商品仅可由企业管理员在企业中心购买");
     // 企业授权订单**用户端不允许退款**（Q79）：运营后台仍保留人工退款通道
     ErrorCode ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_003, "企业授权订单不支持退款，如有特殊情况请联系平台处理");
+    // 个人会员订阅订单**用户端同样不允许退款**（2026-10-27）：后台人工通道保留
+    ErrorCode SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_004, "会员订阅订单不支持退款，如有特殊情况请联系平台处理");
 
 }

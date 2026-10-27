@@ -12,6 +12,8 @@ export interface LabelTemplateVO {
   createTime: string
   updateTime: string
   content?: string
+  /** 示意图（SVG data URL，由后端从正文生成）。 */
+  thumb?: string
 }
 
 export interface SharedTemplateVO {
@@ -33,6 +35,8 @@ export interface SharedTemplateVO {
   publishedTime?: string
   createTime: string
   content?: string
+  /** 示意图（SVG data URL，由后端从正文生成）。 */
+  thumb?: string
 }
 
 export const getTemplatePage = async (params: {

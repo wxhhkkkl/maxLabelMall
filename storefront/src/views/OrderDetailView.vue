@@ -556,7 +556,9 @@ function afterSaleText(it: OrderDetail['items'][number]): string {
 
 /** 该项现在能不能申请退款（判定与口径说明见 `utils/afterSale.ts`） */
 function canRefund(it: OrderDetail['items'][number]): boolean {
-  return order.value ? canApplyRefund(it, order.value.status, order.value.enterprise) : false
+  return order.value
+    ? canApplyRefund(it, order.value.status, order.value.enterprise || order.value.subscription)
+    : false
 }
 
 function openRefund(it: OrderDetail['items'][number]) {

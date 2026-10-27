@@ -111,7 +111,8 @@ Query：`userId`（必填）、`pageNo`、`pageSize`、`keyword?`。
   { "id": 9001, "memberId": 1001, "name": "顺丰面单 100×150",
     "sizeBytes": 48211, "widthMm": 100.0, "heightMm": 150.0,
     "category": "物流", "keywords": "顺丰,面单",
-    "shareStatus": 1, "createTime": "…", "updateTime": "…" }
+    "shareStatus": 1, "thumb": "data:image/svg+xml;base64,PHN2Zy…",
+    "createTime": "…", "updateTime": "…" }
 ] }, "msg": "" }
 ```
 
@@ -126,6 +127,7 @@ Query：`userId`（必填）、`pageNo`、`pageSize`、`keyword?`。
   "id": 9001, "memberId": 1001, "name": "顺丰面单 100×150",
   "content": "{…私有 msdx 原文…}", "sizeBytes": 48211,
   "widthMm": 100.0, "heightMm": 150.0, "category": "物流", "keywords": "顺丰,面单",
+  "thumb": "data:image/svg+xml;base64,PHN2Zy…",
   "createTime": "…", "updateTime": "…"
 }, "msg": "" }
 ```
@@ -151,11 +153,13 @@ Query：`auditStatus?`（0/1/2/3）、`keyword?`、`pageNo`、`pageSize`。
     "category": "物流", "keywords": "面单,快递",
     "auditStatus": 0, "rejectReason": null,
     "auditUserId": null, "auditTime": null, "publishedTime": null,
+    "thumb": "data:image/svg+xml;base64,PHN2Zy…",
     "createTime": "2026-10-20T12:00:00+08:00" }
 ] }, "msg": "" }
 ```
 
 - 默认按 `create_time DESC`；可选按状态筛选；
+- `thumb`：后端从正文即时生成的 SVG data URL 示意图（2026-10-27 新增）；
 - 权限：`member:shared-template:query`。
 
 ### 4.2 `GET /admin-api/member/shared-template/get?id=`

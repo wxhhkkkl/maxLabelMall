@@ -392,6 +392,48 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         return plan;
     }
 
+    private ProductSubscriptionPlanRespDTO personalPlan() {
+        ProductSubscriptionPlanRespDTO plan = new ProductSubscriptionPlanRespDTO();
+        plan.setId(12L);
+        plan.setSpuId(501L);
+        plan.setSkuId(302L);
+        plan.setPeriodMonths(12);
+        plan.setScope(1);
+        plan.setEnabled(true);
+        return plan;
+    }
+
+    private AppTradeOrderCreateReqVO personalCreateReq() {
+        AppTradeOrderSettlementReqVO.Item item = new AppTradeOrderSettlementReqVO.Item();
+        item.setSkuId(302L);
+        item.setCount(1);
+        AppTradeOrderCreateReqVO reqVO = new AppTradeOrderCreateReqVO();
+        reqVO.setItems(List.of(item));
+        reqVO.setCouponId(0L);
+        return reqVO;
+    }
+
+    private void mockPersonalPrice() {
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setDeliveryType(3); // 纯虚拟商品
+        TradePriceCalculateRespBO.Price price = new TradePriceCalculateRespBO.Price();
+        price.setTotalPrice(2900);
+        price.setDiscountPrice(0);
+        price.setDeliveryPrice(0);
+        price.setCouponPrice(0);
+        price.setPointPrice(0);
+        price.setVipPrice(0);
+        price.setPayPrice(2900);
+        calculateRespBO.setPrice(price);
+        TradePriceCalculateRespBO.OrderItem item = new TradePriceCalculateRespBO.OrderItem();
+        item.setSpuId(501L).setSkuId(302L).setCount(1)
+                .setPrice(2900).setDiscountPrice(0).setPayPrice(2900).setSpuName("个人订阅");
+        calculateRespBO.setItems(List.of(item));
+        when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
+        when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+    }
+
     private MemberOrgRespDTO enterpriseOrg(int role) {
         MemberOrgRespDTO org = new MemberOrgRespDTO();
         org.setOrgId(88L);
@@ -503,6 +545,39 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         when(payOrderApi.getOrder(1001L)).thenReturn(CommonResult.success(payOrder));
 
         orderService.updateOrderPaid(order.getId(), 1001L);
+
+        TradeOrderDO dbOrder = tradeOrderMapper.selectById(order.getId());
+        assertEquals(TradeOrderStatusEnum.COMPLETED.getStatus(), dbOrder.getStatus());
+        assertNotNull(dbOrder.getFinishTime());
+    }
+
+    @Test
+    public void testUpdateOrderPaid_personalSubscriptionVirtualOrder_completesDirectly() {
+        when(productSubscriptionPlanApi.getBySkuId(302L)).thenReturn(CommonResult.success(personalPlan()));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-SUB");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1002L));
+        mockPersonalPrice();
+
+        TradeOrderDO order;
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+            order = orderService.createOrder(88L, personalCreateReq());
+        }
+        assertEquals(Boolean.TRUE, order.getMaxlabelSubscription());
+
+        PayOrderRespDTO payOrder = new PayOrderRespDTO();
+        payOrder.setId(1002L);
+        payOrder.setStatus(PayOrderStatusEnum.SUCCESS.getStatus());
+        payOrder.setChannelCode("mock");
+        payOrder.setChannelOrderNo("MOCK-SUB-1");
+        payOrder.setMerchantOrderId(String.valueOf(order.getId()));
+        payOrder.setPrice(order.getPayPrice());
+        payOrder.setSuccessTime(LocalDateTime.now());
+        when(payOrderApi.getOrder(1002L)).thenReturn(CommonResult.success(payOrder));
+
+        orderService.updateOrderPaid(order.getId(), 1002L);
 
         TradeOrderDO dbOrder = tradeOrderMapper.selectById(order.getId());
         assertEquals(TradeOrderStatusEnum.COMPLETED.getStatus(), dbOrder.getStatus());

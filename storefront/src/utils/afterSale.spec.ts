@@ -63,7 +63,7 @@ describe('canApplyRefund —— 订单项上该不该出现「申请退款」', 
     expect(canApplyRefund(item({ afterSaleStatus: 99 }), OrderStatus.UNDELIVERED)).toBe(false)
   })
 
-  it('**企业授权订单一律不给入口**（012 / Q79，后端售后接口同样会拒）', () => {
+  it('**企业授权 / 会员订阅订单一律不给入口**（012 Q79 / 2026-10-27，后端售后接口同样会拒）', () => {
     for (const status of [OrderStatus.UNDELIVERED, OrderStatus.DELIVERED, OrderStatus.COMPLETED]) {
       expect(canApplyRefund(item(), status, true)).toBe(false)
     }

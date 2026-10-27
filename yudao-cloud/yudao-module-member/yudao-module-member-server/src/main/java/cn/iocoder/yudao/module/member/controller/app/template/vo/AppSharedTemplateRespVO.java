@@ -18,5 +18,7 @@ public class AppSharedTemplateRespVO {
     private String keywords;
     private String publisherNickname;
     private LocalDateTime publishedTime;
+    /** 示意图（SVG data URL，由正文即时生成）。 */
+    private String thumb;
 
 }

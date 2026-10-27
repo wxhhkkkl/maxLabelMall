@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.member.controller.admin.template.vo.AdminSharedTe
 import cn.iocoder.yudao.module.member.controller.admin.template.vo.AdminSharedTemplateRespVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.template.MaxLabelSharedTemplateDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.service.template.MaxLabelTemplateSketch;
 import cn.iocoder.yudao.module.member.service.template.SharedTemplateService;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -78,6 +79,7 @@ public class AdminSharedTemplateController {
 
     private AdminSharedTemplateRespVO toRespVO(MaxLabelSharedTemplateDO shared) {
         AdminSharedTemplateRespVO resp = BeanUtils.toBean(shared, AdminSharedTemplateRespVO.class);
+        resp.setThumb(MaxLabelTemplateSketch.dataUrl(shared.getContent(), shared.getWidthMm(), shared.getHeightMm()));
         MemberUserDO user = memberUserService.getUser(shared.getPublisherMemberId());
         if (user != null) {
             resp.setPublisherNickname(user.getNickname());

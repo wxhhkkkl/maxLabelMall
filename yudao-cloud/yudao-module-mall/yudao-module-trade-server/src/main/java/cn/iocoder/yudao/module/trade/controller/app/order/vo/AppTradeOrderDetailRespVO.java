@@ -96,6 +96,13 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "是否企业授权订单（用户端不支持退款）", example = "false")
     private Boolean enterprise;
 
+    /**
+     * 是否个人会员订阅订单（2026-10-27）。**用户端不允许申请退款** ——
+     * 前端据此隐藏「申请退款」入口，后端在售后创建时同样会拒绝。
+     */
+    @Schema(description = "是否个人会员订阅订单（用户端不支持退款）", example = "false")
+    private Boolean subscription;
+
     @Schema(description = "发货物流公司编号", example = "10")
     private Long logisticsId;
 

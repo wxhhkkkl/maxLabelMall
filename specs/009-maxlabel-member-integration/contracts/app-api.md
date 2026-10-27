@@ -65,14 +65,15 @@
 
 ```jsonc
 { "code": 0, "data": [
-  { "spuId": 300, "skuId": 301, "name": "MaxLabel 会员授权（月）",
+  { "spuId": 300, "skuId": 301, "name": "MaxLabel 会员授权（月）", "edition": "professional",
     "periodMonths": 1, "price": 2900, "picUrl": "…", "stock": 999, "sort": 1 },
-  { "spuId": 300, "skuId": 302, "name": "MaxLabel 会员授权（年）",
+  { "spuId": 300, "skuId": 302, "name": "MaxLabel 会员授权（年）", "edition": "professional",
     "periodMonths": 12, "price": 29900, "picUrl": "…", "stock": 999, "sort": 2 }
 ], "msg": "" }
 ```
 
 - 价格单位：**分**（与 yudao 商品一致）；
+- `edition`：该周期授予的桌面端版本（`standard` / `professional` / `enterprise`，Q80）；
 - 只返回 `enabled=1` 的计划；商品下架/售罄时 `stock` 反映实时值；
 - 桌面端与门面站都只做展示，不自行算价。
 
@@ -91,11 +92,13 @@ Query：`pageNo`（≥1）、`pageSize`（1–200）、`keyword?`（名称/关�
   { "id": 9001, "name": "顺丰面单 100×150", "sizeBytes": 48211,
     "widthMm": 100.0, "heightMm": 150.0, "category": "物流",
     "keywords": "顺丰,面单", "shareStatus": 2,
+    "thumb": "data:image/svg+xml;base64,PHN2Zy…",
     "createTime": "2026-10-20T10:00:00+08:00", "updateTime": "2026-10-20T10:00:00+08:00" }
 ] }, "msg": "" }
 ```
 
 `shareStatus`：`null` 未共享 / `0` 待审核 / `1` 已公开 / `2` 已驳回 / `3` 已下架。
+`thumb`：后端从 `.msdx` 正文即时生成的 SVG data URL 示意图（2026-10-27 新增）。
 
 ### 2.2 `GET /member/cloud-template/get?id=`
 
@@ -105,6 +108,7 @@ Query：`pageNo`（≥1）、`pageSize`（1–200）、`keyword?`（名称/关�
   "content": "{\"format\":\"maxlabel-msdx\",\"version\":2,…}",
   "sizeBytes": 48211, "widthMm": 100.0, "heightMm": 150.0,
   "category": "物流", "keywords": "顺丰,面单", "shareStatus": 2,
+  "thumb": "data:image/svg+xml;base64,PHN2Zy…",
   "createTime": "…", "updateTime": "…"
 }, "msg": "" }
 ```
@@ -189,7 +193,8 @@ Query：`pageNo`、`pageSize`（1–200）、`keyword?`、`category?`、`widthMi
 { "code": 0, "data": { "total": 12, "list": [
   { "id": 7001, "name": "标准物流面单", "widthMm": 100.0, "heightMm": 150.0,
     "category": "物流", "keywords": "面单,快递",
-    "publisherNickname": "张**", "publishedTime": "2026-10-20T12:00:00+08:00" }
+    "publisherNickname": "张**", "publishedTime": "2026-10-20T12:00:00+08:00",
+    "thumb": "data:image/svg+xml;base64,PHN2Zy…" }
 ] }, "msg": "" }
 ```
 
@@ -205,7 +210,8 @@ Query：`pageNo`、`pageSize`（1–200）、`keyword?`、`category?`、`widthMi
   "content": "{…清洗后的 msdx…}",
   "widthMm": 100.0, "heightMm": 150.0,
   "category": "物流", "keywords": "面单,快递",
-  "publisherNickname": "张**", "publishedTime": "2026-10-20T12:00:00+08:00"
+  "publisherNickname": "张**", "publishedTime": "2026-10-20T12:00:00+08:00",
+  "thumb": "data:image/svg+xml;base64,PHN2Zy…"
 }, "msg": "" }
 ```
 

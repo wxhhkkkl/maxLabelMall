@@ -29,6 +29,7 @@ describe('共享模板审核页', () => {
         publisherNickname: '张三', publisherMobile: '138****0000',
         name: '标准物流面单', sizeBytes: 40120, widthMm: 100, heightMm: 150,
         category: '物流', keywords: '面单', auditStatus: 0,
+        thumb: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
         createTime: '2026-10-20T12:00:00'
       }]
     })
@@ -38,6 +39,8 @@ describe('共享模板审核页', () => {
     })
     await flushPromises()
 
+    expect(wrapper.text()).toContain('示意图')
+    expect(wrapper.find('img').exists()).toBe(true)
     expect(wrapper.text()).toContain('标准物流面单')
     expect(wrapper.text()).toContain('张三')
     expect(wrapper.text()).toContain('待审核')

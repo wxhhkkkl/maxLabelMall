@@ -1113,6 +1113,11 @@ describe('OrderDetailView —— 申请退款', () => {
     expect(w.find('.od-refund').exists()).toBe(false)
   })
 
+  it('**个人会员订阅订单没有退款入口**（2026-10-27，后端售后接口同样会拒）', async () => {
+    const w = await mountDetail(paid({ subscription: true }))
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
   it('点「申请退款」打开弹层', async () => {
     const w = await mountDetail(paid())
     await w.get('.od-refund').trigger('click')

@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.member.controller.app.template.vo.AppSharedTempla
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppSharedTemplateRespVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.template.MaxLabelSharedTemplateDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.service.template.MaxLabelTemplateSketch;
 import cn.iocoder.yudao.module.member.service.template.SharedTemplateService;
 import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,12 +52,14 @@ public class AppSharedTemplateController {
         MaxLabelSharedTemplateDO shared = sharedTemplateService.getPublicContent(id);
         AppSharedTemplateContentRespVO resp = BeanUtils.toBean(shared, AppSharedTemplateContentRespVO.class);
         resp.setPublisherNickname(publisherName(shared.getPublisherMemberId()));
+        resp.setThumb(MaxLabelTemplateSketch.dataUrl(shared.getContent(), shared.getWidthMm(), shared.getHeightMm()));
         return success(resp);
     }
 
     private AppSharedTemplateRespVO toRespVO(MaxLabelSharedTemplateDO shared) {
         AppSharedTemplateRespVO resp = BeanUtils.toBean(shared, AppSharedTemplateRespVO.class);
         resp.setPublisherNickname(publisherName(shared.getPublisherMemberId()));
+        resp.setThumb(MaxLabelTemplateSketch.dataUrl(shared.getContent(), shared.getWidthMm(), shared.getHeightMm()));
         return resp;
     }
 

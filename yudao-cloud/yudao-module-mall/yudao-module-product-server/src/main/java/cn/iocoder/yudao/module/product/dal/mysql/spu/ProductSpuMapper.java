@@ -78,6 +78,13 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         // 企业专享商品不进入公开商城（012 / Q72）
         query.and(w -> w.isNull(ProductSpuDO::getEnterpriseOnly)
                 .or().eq(ProductSpuDO::getEnterpriseOnly, false));
+        // 会员授权商品只在个人续费 / 企业采购页销售，不进入公开商城列表。
+        // 判定来源是授权计划表本身（而不是新增商品标志位），计划增删时自动同步。
+        // ⚠️ 子查询是裸 SQL，逻辑删除与租户条件都要自己写。
+        query.notExists("SELECT 1 FROM maxlabel_subscription_plan msp"
+                + " WHERE msp.spu_id = product_spu.id"
+                + " AND msp.tenant_id = product_spu.tenant_id"
+                + " AND msp.deleted = 0");
 
         // 筛选维度（特性 003 / FR-101）：
         // **每个已选值一条等值 EXISTS**，多条之间自然就是 AND。

@@ -28,5 +28,7 @@ public class AdminSharedTemplateRespVO {
     private LocalDateTime publishedTime;
     private LocalDateTime createTime;
     private String content;
+    /** 示意图（SVG data URL，由正文即时生成）。 */
+    private String thumb;
 
 }

@@ -225,7 +225,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
         List<TradeOrderItemDO> orderItems = buildTradeOrderItems(order, calculateRespBO);
-        // 1.3 企业订单：买家必须是企业 OWNER/ADMIN、必须用企业抬头，并快照企业
+        // 1.3 个人会员订阅订单：打快照标记（用户端禁止退款、支付后直接完成）
+        markSubscriptionOrder(order, orderItems);
+        // 1.4 企业订单：买家必须是企业 OWNER/ADMIN、必须用企业抬头，并快照企业
         validateEnterpriseOrder(userId, createReqVO, orderItems, order);
 
         // 2. 订单创建前的逻辑
@@ -302,6 +304,17 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     }
 
     /**
+     * 个人会员订阅订单：只要有一个订单项命中个人计划，就打快照标记。
+     * 企业计划由 {@link #validateEnterpriseOrder} 写 {@code maxlabelOrgId}，不在这里标记。
+     */
+    private void markSubscriptionOrder(TradeOrderDO order, List<TradeOrderItemDO> orderItems) {
+        if (orderItems == null || orderItems.stream().noneMatch(item -> isPersonalSubscriptionPlan(item.getSkuId()))) {
+            return;
+        }
+        order.setMaxlabelSubscription(true);
+    }
+
+    /**
      * 企业订单：买家必须是启用企业的 OWNER/ADMIN，并把企业快照进订单。
      * 发票**可以不开发票**；若开票，抬头类型必须是企业（FR-296 / Q73）。
      * 纯个人订单在这里直接返回，行为不变。
@@ -335,6 +348,12 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         ProductSubscriptionPlanRespDTO plan = productSubscriptionPlanApi.getBySkuId(skuId).getCheckedData();
         return plan != null && Boolean.TRUE.equals(plan.getEnabled())
                 && MaxLabelSubscriptionScopeEnum.ENTERPRISE.getScope().equals(plan.getScope());
+    }
+
+    private boolean isPersonalSubscriptionPlan(Long skuId) {
+        ProductSubscriptionPlanRespDTO plan = productSubscriptionPlanApi.getBySkuId(skuId).getCheckedData();
+        return plan != null && Boolean.TRUE.equals(plan.getEnabled())
+                && MaxLabelSubscriptionScopeEnum.PERSONAL.getScope().equals(plan.getScope());
     }
 
     private MemberOrgRespDTO requireEnterpriseAdmin(Long userId) {
@@ -430,9 +449,9 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         List<TradeOrderItemDO> orderItems = tradeOrderItemMapper.selectListByOrderId(id);
         tradeOrderHandlers.forEach(handler -> handler.afterPayOrder(order, orderItems));
 
-        // 4.1 企业授权订单是纯虚拟授权：没有发货动作，支付成功即完成。
+        // 4.1 企业授权 / 个人会员订阅是纯虚拟授权：没有发货动作，支付成功即完成。
         //     混买实物时 deliveryType 不会是 VIRTUAL，仍走原发货流程。
-        if (order.getMaxlabelOrgId() != null
+        if ((order.getMaxlabelOrgId() != null || Boolean.TRUE.equals(order.getMaxlabelSubscription()))
                 && Objects.equals(order.getDeliveryType(), DeliveryTypeEnum.VIRTUAL.getType())) {
             tradeOrderMapper.updateById(new TradeOrderDO().setId(id)
                     .setStatus(TradeOrderStatusEnum.COMPLETED.getStatus())

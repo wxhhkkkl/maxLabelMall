@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.subscriptionplan.MaxLabelSubscriptionPlanDO;
+import cn.iocoder.yudao.module.product.dal.mysql.subscriptionplan.MaxLabelSubscriptionPlanMapper;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,8 @@ public class ProductSpuVisibilityTest extends BaseDbUnitTest {
 
     @Resource
     private ProductSpuMapper productSpuMapper;
+    @Resource
+    private MaxLabelSubscriptionPlanMapper subscriptionPlanMapper;
 
     private Long publicSpuId;
     private Long enterpriseSpuId;
@@ -47,6 +51,24 @@ public class ProductSpuVisibilityTest extends BaseDbUnitTest {
 
     @Test
     void publicPageExcludesEnterpriseOnlySpu() {
+        AppProductSpuPageReqVO reqVO = new AppProductSpuPageReqVO();
+        reqVO.setPageNo(1);
+        reqVO.setPageSize(10);
+        PageResult<ProductSpuDO> result = productSpuMapper.selectPage(reqVO, Set.of());
+
+        assertEquals(1, result.getTotal());
+        assertEquals(publicSpuId, result.getList().get(0).getId());
+    }
+
+    @Test
+    void publicPageExcludesSubscriptionPlanSpu() {
+        // 会员授权商品只在个人续费/企业采购页销售，不进入公开商城列表。
+        Long subscriptionSpuId = insertSpu("MaxLabel 会员授权", false);
+        subscriptionPlanMapper.insert(MaxLabelSubscriptionPlanDO.builder()
+                .spuId(subscriptionSpuId).skuId(9001L).periodMonths(12)
+                .scope(1).edition("professional").enabled(true).sort(0)
+                .build());
+
         AppProductSpuPageReqVO reqVO = new AppProductSpuPageReqVO();
         reqVO.setPageNo(1);
         reqVO.setPageSize(10);

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "user_ip"                 varchar  NOT NULL,
     "user_remark"             varchar,
     "maxlabel_org_id"         bigint   NULL,
+    "maxlabel_subscription"   bit      NOT NULL DEFAULT FALSE,
     "status"                  int      NOT NULL,
     "product_count"           int      NOT NULL,
     "cancel_type"             int,

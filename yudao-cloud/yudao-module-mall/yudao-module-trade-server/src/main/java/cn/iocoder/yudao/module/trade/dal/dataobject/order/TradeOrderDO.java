@@ -84,6 +84,11 @@ public class TradeOrderDO extends BaseDO {
      */
     private Long maxlabelOrgId;
     /**
+     * 是否 MaxLabel 个人会员订阅订单（下单时按订单项 SKU 命中个人计划快照）。
+     * 用户端不允许退款；纯虚拟订单支付成功后直接完成。
+     */
+    private Boolean maxlabelSubscription;
+    /**
      * 订单状态
      *
      * 枚举 {@link TradeOrderStatusEnum}

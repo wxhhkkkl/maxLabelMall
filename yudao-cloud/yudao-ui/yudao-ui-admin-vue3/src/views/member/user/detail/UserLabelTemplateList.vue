@@ -1,6 +1,19 @@
 <template>
   <ContentWrap>
     <el-table v-loading="loading" :data="list" :stripe="true" :show-overflow-tooltip="true">
+      <el-table-column label="示意图" width="130">
+        <template #default="{ row }">
+          <el-image
+            v-if="row.thumb"
+            :src="row.thumb"
+            :preview-src-list="[row.thumb]"
+            preview-teleported
+            fit="contain"
+            class="tpl-sketch"
+          />
+          <span v-else class="tpl-sketch-empty">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="名称" prop="name" min-width="180" />
       <el-table-column label="大小" width="100">
         <template #default="{ row }">{{ formatSize(row.sizeBytes) }}</template>
@@ -31,7 +44,20 @@
   </ContentWrap>
 
   <Dialog v-model="previewVisible" title="模板预览" width="760px">
-    <el-input v-model="previewContent" :rows="20" readonly type="textarea" />
+    <div class="tpl-preview">
+      <div class="tpl-preview-sketch">
+        <el-image
+          v-if="previewThumb"
+          :src="previewThumb"
+          :preview-src-list="[previewThumb]"
+          preview-teleported
+          fit="contain"
+          class="tpl-preview-image"
+        />
+        <span v-else class="tpl-sketch-empty">暂无示意图</span>
+      </div>
+      <el-input v-model="previewContent" :rows="14" readonly type="textarea" />
+    </div>
   </Dialog>
 </template>
 
@@ -50,6 +76,7 @@ const list = ref<LabelTemplateVO[]>([])
 const total = ref(0)
 const previewVisible = ref(false)
 const previewContent = ref('')
+const previewThumb = ref('')
 const queryParams = reactive({ pageNo: 1, pageSize: 10, userId: props.userId })
 
 const SHARE_TEXT: Record<number, string> = { 0: '待审核', 1: '已公开', 2: '已驳回', 3: '已下架' }
@@ -71,7 +98,9 @@ const getList = async () => {
 }
 
 const preview = async (id: number) => {
-  previewContent.value = (await getTemplateContent(id)).content ?? ''
+  const detail = await getTemplateContent(id)
+  previewContent.value = detail.content ?? ''
+  previewThumb.value = detail.thumb ?? ''
   previewVisible.value = true
 }
 
@@ -88,3 +117,42 @@ const download = async (id: number) => {
 
 onMounted(getList)
 </script>
+
+<style scoped>
+.tpl-sketch {
+  width: 96px;
+  height: 60px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: zoom-in;
+}
+
+.tpl-sketch-empty {
+  color: var(--el-text-color-placeholder);
+}
+
+.tpl-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tpl-preview-sketch {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: #fafafa;
+  padding: 12px;
+}
+
+.tpl-preview-image {
+  width: 100%;
+  max-width: 420px;
+  height: 220px;
+  cursor: zoom-in;
+}
+</style>

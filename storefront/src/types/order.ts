@@ -240,6 +240,11 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
    * 后端售后创建接口也会拒绝，这里只是别给一个注定被拒的按钮。
    */
   enterprise?: boolean
+  /**
+   * 是否个人会员订阅订单（2026-10-27）。为 `true` 时**用户端同样不出现「申请退款」入口** ——
+   * 后端售后创建接口也会拒绝。
+   */
+  subscription?: boolean
 }
 
 /**

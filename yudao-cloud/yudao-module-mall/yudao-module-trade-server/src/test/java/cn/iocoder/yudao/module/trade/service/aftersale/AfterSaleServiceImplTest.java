@@ -21,13 +21,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 /**
- * {@link AfterSaleServiceImpl} 的单元测试 —— 只钉 012 这一条：
- * **企业授权订单在用户端不允许申请退款**（Q79）。
+ * {@link AfterSaleServiceImpl} 的单元测试 —— 只钉这一条：
+ * **企业授权 / 个人会员订阅订单在用户端不允许申请退款**（Q79 / 2026-10-27）。
  *
  * 运营后台的人工退款不经过 `createAfterSale`，所以这里只验用户端入口。
  */
@@ -66,6 +67,19 @@ public class AfterSaleServiceImplTest extends BaseDbUnitTest {
         ServiceException exception = assertThrows(ServiceException.class,
                 () -> afterSaleService.createAfterSale(3L, request()));
         assertEquals(ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED.getCode(), exception.getCode());
+    }
+
+    @Test
+    void subscriptionOrderRefundRejected() {
+        when(tradeOrderQueryService.getOrderItem(3L, 1L)).thenReturn(
+                item(1L, 2L, 1000, TradeOrderItemAfterSaleStatusEnum.NONE.getStatus()));
+        // 订单：个人会员订阅快照 → 用户端退款同样拒绝
+        when(tradeOrderQueryService.getOrder(3L, 2L)).thenReturn(
+                TradeOrderDO.builder().id(2L).maxlabelSubscription(true).build());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> afterSaleService.createAfterSale(3L, request()));
+        assertEquals(SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED.getCode(), exception.getCode());
     }
 
     private static TradeOrderItemDO item(Long id, Long orderId, Integer payPrice, Integer afterSaleStatus) {

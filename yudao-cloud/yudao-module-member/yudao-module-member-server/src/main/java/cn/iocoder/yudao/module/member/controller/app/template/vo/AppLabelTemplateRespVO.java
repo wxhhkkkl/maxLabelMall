@@ -19,6 +19,8 @@ public class AppLabelTemplateRespVO {
     private String keywords;
     /** 共享状态：null 未共享 / 0 待审核 / 1 已公开 / 2 已驳回 / 3 已下架 */
     private Integer shareStatus;
+    /** 示意图（SVG data URL，由正文即时生成）。 */
+    private String thumb;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 

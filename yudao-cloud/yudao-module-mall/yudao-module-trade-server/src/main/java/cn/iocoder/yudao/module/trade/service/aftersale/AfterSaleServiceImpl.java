@@ -147,6 +147,10 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (order.getMaxlabelOrgId() != null) {
             throw exception(ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED);
         }
+        // 个人会员订阅订单：同样不允许用户端退款（2026-10-27）。后台人工退款保留。
+        if (Boolean.TRUE.equals(order.getMaxlabelSubscription())) {
+            throw exception(SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED);
+        }
         // TODO 芋艿：超过一定时间，不允许售后
         // 已取消，无法发起售后
         if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {

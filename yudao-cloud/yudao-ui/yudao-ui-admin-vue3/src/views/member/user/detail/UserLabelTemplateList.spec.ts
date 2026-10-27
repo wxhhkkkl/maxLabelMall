@@ -25,12 +25,14 @@ describe('会员标签模板页签', () => {
       list: [{
         id: 9, name: '顺丰面单', sizeBytes: 48211, widthMm: 100, heightMm: 150,
         category: '物流', keywords: '面单', shareStatus: 1,
+        thumb: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
         createTime: '2026-10-20T10:00:00', updateTime: '2026-10-20T10:00:00'
       }]
     })
     getContent.mockResolvedValue({
       id: 9, name: '顺丰面单', sizeBytes: 48211, widthMm: 100, heightMm: 150,
       category: '物流', keywords: '面单', shareStatus: 1,
+      thumb: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
       createTime: '', updateTime: '', content: '{"format":"maxlabel-msdx"}'
     })
 
@@ -39,6 +41,8 @@ describe('会员标签模板页签', () => {
       global: { plugins: [createPinia()] }
     })
     await flushPromises()
+    expect(wrapper.text()).toContain('示意图')
+    expect(wrapper.find('img').exists()).toBe(true)
     expect(wrapper.text()).toContain('顺丰面单')
     expect(wrapper.text()).toContain('已公开')
     expect(wrapper.text()).toContain('100 × 150 mm')

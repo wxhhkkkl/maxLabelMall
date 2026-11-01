@@ -132,3 +132,9 @@
   .mall-home-consult { padding: 20px; gap: 18px; }
   .mall-home-consult h2 { line-height: 1.8; font-size: 14px; }
 }
+
+.mall-label-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.mall-customize-label { display: inline-flex; align-items: center; gap: 14px; padding: 9px 17px; border: 1px solid #2e7cd6; border-radius: 5px; color: #2e7cd6; background: #fff; font-size: 12px; text-decoration: none; }
+.mall-customize-label .mall-icon { width: 13px; height: 13px; }
+.mall-customize-label:hover { background: #eaf1ff; }
+.mall-customize-label:focus-visible { outline: 2px solid #2e7cd6; outline-offset: 3px; }

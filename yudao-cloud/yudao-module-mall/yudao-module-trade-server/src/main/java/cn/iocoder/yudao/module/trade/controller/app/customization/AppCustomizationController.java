@@ -49,8 +49,7 @@ public class AppCustomizationController {
     }
 
     @PostMapping("/quote")
-    @Operation(summary = "定制报价（不落库）")
-    @PermitAll
+    @Operation(summary = "定制报价（需登录，不落库）")
     public CommonResult<AppCustomizationQuoteRespVO> quote(@Valid @RequestBody AppCustomizationQuoteReqVO reqVO) {
         CustomizationQuoteBO quote = customizationPriceService.quote(CustomizationSpecConvert.toSpec(reqVO),
                 getLoginUserId(), reqVO.getAddressId(), reqVO.getDeliveryType());

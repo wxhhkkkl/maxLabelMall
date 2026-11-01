@@ -121,12 +121,14 @@ function categoryIcon(name: string) {
           >
           <div class="mall-home-banner-copy">
             <span class="mall-banner-eyebrow">标签耗材 · 源头供应</span>
-            <h2>铜板不干胶</h2><p>厂家直供，多规格支持定制</p><button
+            <h2>铜板不干胶</h2><p>厂家直供，多规格支持定制</p><div class="mall-label-actions"><button
               type="button"
               @click="emit('select', categories.find(c => /卷筒|标签/.test(c.name))?.id)"
             >
               选购标签 <MallIcon name="chevron" />
             </button>
+            <RouterLink to="/customization" class="mall-customize-label">定制标签 <MallIcon name="chevron" /></RouterLink>
+            </div>
           </div>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import { useUserStore } from '@/store/user'
+import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +24,10 @@ vi.mock('@/api/upload', () => ({
 const authState = vi.hoisted(() => ({ token: 'token' as string | null }))
 vi.mock('@/utils/auth', () => ({
   getAccessToken: () => authState.token,
+  clearTokens: () => { authState.token = null },
 }))
+
+vi.mock('@/api/member', () => ({ getMemberUser: vi.fn().mockResolvedValue({}), logout: vi.fn() }))
 
 const View = (await import('./CustomizationView.vue')).default
 
@@ -49,7 +54,7 @@ function mountView() {
   })
   return mount(View, {
     global: {
-      plugins: [router],
+      plugins: [createPinia(), router],
       stubs: { CheckoutInvoiceCard: true },
     },
   })
@@ -247,6 +252,10 @@ describe('CustomizationView（014 / US48）', () => {
 
     const router = w.vm.$router
     const push = vi.spyOn(router, 'push')
+    expect(quoteCustomization).not.toHaveBeenCalled()
+    expect(w.find('#customizationQuoteTotal').exists()).toBe(false)
+    expect(w.get('.quote-actions').text()).toContain('登录后查看报价')
+    expect(w.find('.custom-progress').exists()).toBe(false)
     await w.get('#customizationSubmit').trigger('click')
     await flushPromises()
 
@@ -255,6 +264,81 @@ describe('CustomizationView（014 / US48）', () => {
     }))
     // 选中的材质仍在页面上
     expect(w.get('#customizationMaterial-3').classes()).toContain('is-active')
+    w.unmount()
+    vi.useRealTimers()
+  })
+})
+
+
+describe('定制设计联动', () => {
+  it('选择加工方式后显示对应图示，配置摘要和排版随尺寸列数更新', async () => {
+    const w = mountView()
+    await flushPromises()
+    expect(w.get('#customizationMode-2 svg').attributes('aria-label')).toBe('黑色可变数据标签')
+    await pickAll(w)
+    await w.get('#customizationWidth').setValue(60)
+    await w.get('#customizationHeight').setValue(40)
+    await w.get('#customizationColumns').setValue(3)
+    await w.get('#customizationRows').setValue(4)
+    expect(w.get('.live-preview svg').attributes('aria-label')).toContain('平张排版：3列，4行，60乘40毫米')
+    expect(w.get('.live-spec').text()).toContain('60 × 40 mm')
+    expect(w.get('.live-spec').text()).toContain('可移除铜版')
+    expect(w.get('#customizationForm-2').attributes('aria-pressed')).toBe('true')
+    await w.get('#customizationCorner-2').trigger('click')
+    expect(w.get('#customizationCorner-2 svg').attributes('aria-label')).toBe('直角标签')
+    w.unmount()
+  })
+})
+
+
+describe('自动报价与提交门禁', () => {
+  it('配置未完成、尺寸无效或报价更新期间禁止提交，移除手动计算按钮', async () => {
+    vi.useFakeTimers()
+    const w = mountView()
+    await flushPromises()
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeDefined()
+    expect(w.find('#customizationCalc').exists()).toBe(false)
+    await pickAll(w)
+    expect(w.text()).toContain('上传设计图')
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeDefined()
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeUndefined()
+    await w.get('#customizationWidth').setValue(0)
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeDefined()
+    expect(w.find('#customizationQuoteTotal').exists()).toBe(false)
+    await w.get('#customizationWidth').setValue(60)
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeDefined()
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(w.get('#customizationSubmit').attributes('disabled')).toBeUndefined()
+    w.unmount()
+    vi.useRealTimers()
+  })
+})
+
+
+describe('报价登录权限', () => {
+  it('原页登录后自动报价，退出后立即隐藏总价，配置保持不变', async () => {
+    vi.useFakeTimers()
+    authState.token = null
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    expect(quoteCustomization).not.toHaveBeenCalled()
+    const user = useUserStore()
+    authState.token = 'new-token'
+    await user.syncAfterLogin()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    expect(w.get('.quote-actions #customizationQuoteTotal').text()).toContain('463.20')
+    expect(w.get('#customizationMaterial-3').attributes('aria-pressed')).toBe('true')
+    await user.logout()
+    await flushPromises()
+    expect(w.find('#customizationQuoteTotal').exists()).toBe(false)
+    expect(w.get('.quote-actions').text()).toContain('登录后查看报价')
     w.unmount()
     vi.useRealTimers()
   })

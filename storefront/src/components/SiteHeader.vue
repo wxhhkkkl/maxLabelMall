@@ -43,7 +43,6 @@ const NAV = [
   { to: '/', label: '首页', name: 'home' },
   { to: '/mall', label: '商城', name: 'mall' },
   { to: '/software', label: '标签软件', name: 'software' },
-  { to: '/customization', label: '印刷定制', name: 'customization' },
   { to: '/solutions', label: '行业方案', name: 'solutions' },
   { to: '/support', label: '服务支持', name: 'support' },
   { to: '/about', label: '公司介绍', name: 'about' },

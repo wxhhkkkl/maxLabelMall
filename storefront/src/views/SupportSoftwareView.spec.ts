@@ -87,3 +87,19 @@ describe('服务支持 · 软件与驱动（013 / US49）', () => {
     expect(wrapper.find('input[type="search"]').exists()).toBe(false)
   })
 })
+
+
+describe('下载加载恢复', () => {
+  it('请求失败显示重试入口，重试后恢复列表状态', async () => {
+    listAll.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce([])
+    const w = mount(SupportSoftwareView)
+    await flushPromises()
+    expect(w.get('[role="alert"]').text()).toContain('加载失败')
+    await w.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(listAll).toHaveBeenCalledTimes(2)
+    expect(w.find('[role="alert"]').exists()).toBe(false)
+    expect(w.text()).toContain('暂无可用下载')
+    w.unmount()
+  })
+})

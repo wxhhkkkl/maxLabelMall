@@ -1,0 +1,12 @@
+# 应用机：清理 xxl-job 执行器超过 7 天的执行日志
+#
+# 安装位置：/etc/cron.d/maxlabel-xxl-log-clean
+#
+# 为什么不用 xxl-job 自带的清理：执行器的 JobLogFileCleanThread 确实在跑，
+# 但它读的是 `xxl.job.executor.logretentiondays` —— 应用配置里是 **30 天**。
+# 实测每天约 390M，30 天稳态就是 9~12G，40G 的系统盘扛不住。
+# 这个 cron 把窗口收到 7 天；两者不冲突（30 天的清理照样会在后面兜底）。
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+30 3 * * * root find /opt/maxlabel/logs/xxl-job -maxdepth 1 -type d -mtime +7 -exec rm -rf {} +

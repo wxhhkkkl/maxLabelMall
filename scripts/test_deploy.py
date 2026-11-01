@@ -144,3 +144,27 @@ def test_scan_jar_for_ecj_ignores_third_party_libs(tmp_path):
         z.writestr('BOOT-INF/lib/guava.jar', other.read_bytes())
 
     assert dp.scan_jar_for_ecj(jar) == []
+
+
+# ── 旧 jar 备份的清理（2026-11-01 磁盘写满事故后加的）──────────────────────────────
+#
+# 事故：/root 下攒了 40 份 `yudao-server.jar.bak-*`（每份 247MB），根分区 100% 写满。
+# nginx 连 client_body_temp / proxy_temp 都写不了，表现为图片上传 500、
+# 地区树（174KB）响应被截断 → 前端「自动识别地址」失效。
+
+def test_备份只保留最新两份():
+    names = [f'yudao-server.jar.bak-2026102{i}-120000' for i in range(1, 6)]
+    assert dp.plan_backup_prune(names) == names[:3]
+
+
+def test_备份按名字排序而不是按传入顺序():
+    """时间戳定长，字典序 == 时间序；调用方从 `ls` 拿到的顺序不一定可靠。"""
+    names = ['yudao-server.jar.bak-20261027-191200',
+             'yudao-server.jar.bak-20261009-1225',
+             'yudao-server.jar.bak-20261010-163523']
+    assert dp.plan_backup_prune(names) == ['yudao-server.jar.bak-20261009-1225']
+
+
+def test_备份不足两份时一个都不删():
+    assert dp.plan_backup_prune(['yudao-server.jar.bak-20261027-191200']) == []
+    assert dp.plan_backup_prune([]) == []

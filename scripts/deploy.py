@@ -52,11 +52,14 @@ LOCAL_JAR = ROOT / 'yudao-cloud' / 'yudao-server' / 'target' / 'yudao-server.jar
 
 REMOTE_WWW = '/var/www/maxlabel'
 REMOTE_APP = '/opt/maxlabel/app'
+REMOTE_BACKUP_PREFIX = '/root/yudao-server.jar.bak-'
+BACKUP_KEEP = 2  # 发布成功后只保留最近 2 份旧 jar（见 2026-11-01 磁盘写满事故）
 SERVICE = 'maxlabel'
 BACKEND_PORT = 48080
 # nginx 上的 default_server 凭 Host 头区分站点，所以源站自检要带上它
 PUBLIC_HOST = 'new.yuwangchenfa.com'
 BACKEND_BOOT_WAIT = 120  # 实测约 73 秒起来，留足余量
+FREE_SPACE_MARGIN = 512 * 1024 * 1024  # 发布时除「新 jar + 备份」外还要留的余量
 
 
 # ────────────────────────────── 纯函数区（见 test_deploy.py） ──────────────────────────────
@@ -78,6 +81,21 @@ def plan_uploads(files, remote_size):
         else:
             send.append(rel)
     return send, skip
+
+
+def plan_backup_prune(names, keep=BACKUP_KEEP):
+    """发布成功后，算出该删哪些旧 jar 备份。
+
+    :param names: 备份文件名列表（`yudao-server.jar.bak-yyyyMMdd-HHmmss`）
+    :param keep: 保留最新的几份
+    :return: 要删除的文件名列表
+
+    备份名里的时间戳是定长的，所以**字典序就是时间序**，不需要解析日期。
+    ⚠️ 每份 247MB；2026-11-01 就是因为攒了 40 份把根分区写满，
+    连带 nginx 临时文件写不进去 —— 表现为图片传不了、地区树响应被截断。
+    """
+    ordered = sorted(names)
+    return ordered[:-keep] if keep > 0 else ordered
 
 
 def local_entries(dist_dir):
@@ -345,6 +363,23 @@ def deploy_backend(*, skip_build, dry_run):
         return
 
     with Server() as srv:
+        # ⚠️ 空间检查：一次发布要同时容纳「staging 新 jar」与「旧 jar 备份」，
+        #    2026-11-01 根分区被历史备份写满后，nginx 连 client_body_temp 都写不了，
+        #    表现为图片上传 500、地区树响应被截断。宁可在上传前拒绝，也别发到一半。
+        need = LOCAL_JAR.stat().st_size * 2 + FREE_SPACE_MARGIN
+        avail, _ = srv.run('df -B1 --output=avail / | tail -1')
+        try:
+            avail = int(avail)
+        except ValueError:
+            avail = None  # 取不到就不拦，避免 df 输出格式差异误伤
+        if avail is not None and avail < need:
+            sys.exit(
+                f'[✗] / 只剩 {avail / 1024 ** 3:.1f}G，本次发布需要 {need / 1024 ** 3:.1f}G'
+                f'（新 jar + 备份 + 余量）。先清理旧备份与日志：\n'
+                f'    ls -1 {REMOTE_BACKUP_PREFIX}* | sort | head -n -{BACKUP_KEEP} | xargs rm -f\n'
+                f'    : > /opt/maxlabel/logs/app.log'
+            )
+
         stamp = time.strftime('%Y%m%d-%H%M%S')
         staging = f'{REMOTE_APP}/yudao-server.jar.new'
         print(f'[上传] → {staging}（257 MB 实测约 3.5 分钟）')
@@ -371,6 +406,13 @@ def deploy_backend(*, skip_build, dry_run):
         srv.run('systemctl restart ' + SERVICE)
         print(f'[重启] systemctl restart {SERVICE}，等待起来（约 73 秒）…')
         verify_backend(srv)
+
+        # 新版本确认在跑之后才清旧备份 —— 每份 247MB，不清理迟早再次写满根分区
+        names, _ = srv.run(f'ls -1 {REMOTE_BACKUP_PREFIX}* 2>/dev/null')
+        stale = plan_backup_prune(names.splitlines())
+        if stale:
+            srv.run('rm -f ' + ' '.join(stale))
+            print(f'[清理] 删除 {len(stale)} 份旧 jar 备份，保留最近 {BACKUP_KEEP} 份')
 
 
 def verify_backend(srv):

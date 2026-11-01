@@ -51,6 +51,8 @@ public class TradeOrderController {
     @Resource
     private TradeOrderQueryService tradeOrderQueryService;
     @Resource
+    private cn.iocoder.yudao.module.trade.service.customization.CustomizationOrderService customizationOrderService;
+    @Resource
     private cn.iocoder.yudao.module.trade.framework.delivery.config.TradeExpressProperties tradeExpressProperties;
     @Resource
     private TradeOrderLogService tradeOrderLogService;
@@ -125,7 +127,52 @@ public class TradeOrderController {
         TradeOrderDetailRespVO respVO = TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser);
         // 对公转账信息（008）：待收款标记 + 确认痕迹（FR-205 的可追溯）
         buildOfflinePayment(respVO, order);
+        // 印刷定制（014）：不是定制单时为 null
+        if (Boolean.TRUE.equals(order.getCustomization())) {
+            respVO.setCustomization(true);
+            respVO.setCustomizationDetail(buildCustomizationDetail(order.getId()));
+        }
         return success(respVO);
+    }
+
+    /** 定制要求（014）：含下单时的参数快照 */
+    private AdminCustomizationDetailRespVO buildCustomizationDetail(Long orderId) {
+        cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationOrderDO row =
+                customizationOrderService.getByOrderId(orderId);
+        if (row == null) {
+            return null;
+        }
+        AdminCustomizationDetailRespVO vo = new AdminCustomizationDetailRespVO();
+        vo.setId(row.getId());
+        vo.setMaterialId(row.getMaterialId());
+        vo.setMaterialName(row.getMaterialName());
+        vo.setWidth(row.getWidth());
+        vo.setHeight(row.getHeight());
+        vo.setQuantity(row.getQuantity());
+        vo.setUnitArea(row.getUnitArea());
+        vo.setTotalArea(row.getTotalArea());
+        vo.setMode(row.getMode());
+        vo.setForm(row.getForm());
+        vo.setSheetSpec(row.getSheetSpec());
+        vo.setFinishing(row.getFinishing());
+        vo.setTearLine(row.getTearLine());
+        vo.setRowCount(row.getRowCount());
+        vo.setColumnCount(row.getColumnCount());
+        vo.setRowGap(row.getRowGap());
+        vo.setColumnGap(row.getColumnGap());
+        vo.setAxisDiameter(row.getAxisDiameter());
+        vo.setLabelCount(row.getLabelCount());
+        vo.setTemplateName(row.getTemplateName());
+        vo.setDieCut(row.getDieCut());
+        vo.setUrgent(row.getUrgent());
+        vo.setRemark(row.getRemark());
+        vo.setBreakdown(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                row.getPriceBreakdown(), AdminCustomizationDetailRespVO.Breakdown.class));
+        vo.setFiles(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(
+                row.getFiles(), AdminCustomizationDetailRespVO.File.class));
+        vo.setParamSnapshot(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                row.getParamSnapshot(), Object.class));
+        return vo;
     }
 
     /**

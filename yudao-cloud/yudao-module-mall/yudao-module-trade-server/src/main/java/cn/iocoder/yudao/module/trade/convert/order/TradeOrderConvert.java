@@ -67,6 +67,8 @@ public interface TradeOrderConvert {
             @Mapping(source = "calculateRespBO.deliveryType", target = "deliveryType"),
             @Mapping(target = "remark", ignore = true),
             @Mapping(source = "createReqVO.remark", target = "userRemark"),
+            // 014：`customization` 在请求里是规格对象、在订单里是布尔标记，由服务层单独写
+            @Mapping(target = "customization", ignore = true),
             @Mapping(source = "calculateRespBO.price.totalPrice", target = "totalPrice"),
             @Mapping(source = "calculateRespBO.price.discountPrice", target = "discountPrice"),
             @Mapping(source = "calculateRespBO.price.deliveryPrice", target = "deliveryPrice"),

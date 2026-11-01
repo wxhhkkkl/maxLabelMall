@@ -21,6 +21,55 @@
       </el-descriptions-item>
     </el-descriptions>
 
+    <!-- 印刷定制（014）：不是定制单时不渲染；这里给的是**下单时的参数快照** -->
+    <el-descriptions v-if="formData.customizationDetail" :column="2" title="定制要求">
+      <el-descriptions-item label="材质: ">
+        {{ formData.customizationDetail.materialName }}
+      </el-descriptions-item>
+      <el-descriptions-item label="尺寸 / 数量: ">
+        {{ formData.customizationDetail.width }} × {{ formData.customizationDetail.height }} mm ×
+        {{ formData.customizationDetail.quantity }} 张（总面积 {{ formData.customizationDetail.totalArea }} ㎡）
+      </el-descriptions-item>
+      <el-descriptions-item label="工艺: ">
+        <el-tag v-for="p in customizationProcesses" :key="p" class="mr-5px" size="small">{{ p }}</el-tag>
+      </el-descriptions-item>
+      <el-descriptions-item label="成品形态: ">
+        {{ formData.customizationDetail.form === 1 ? '卷筒（卷轴）' : '平张（单张）' }}
+        <template v-if="formData.customizationDetail.form === 1">
+          · 轴芯 {{ formData.customizationDetail.axisDiameter }}
+        </template>
+        <template v-else> · {{ formData.customizationDetail.sheetSpec }}</template>
+      </el-descriptions-item>
+      <el-descriptions-item label="排版: ">
+        {{ formData.customizationDetail.rowCount }} 行 × {{ formData.customizationDetail.columnCount }} 列，
+        间距 {{ formData.customizationDetail.rowGap }}/{{ formData.customizationDetail.columnGap }} mm
+      </el-descriptions-item>
+      <el-descriptions-item label="备注: ">
+        {{ formData.customizationDetail.remark || '—' }}
+      </el-descriptions-item>
+      <el-descriptions-item label="价格明细: ">
+        打印 {{ fenToYuan(formData.customizationDetail.breakdown.print) }} 元
+        <template v-if="formData.customizationDetail.breakdown.printing">
+          · 印刷 {{ fenToYuan(formData.customizationDetail.breakdown.printing) }} 元
+        </template>
+        <template v-if="formData.customizationDetail.breakdown.dieCut">
+          · 模切 {{ fenToYuan(formData.customizationDetail.breakdown.dieCut) }} 元
+        </template>
+        <template v-if="formData.customizationDetail.breakdown.urgent">
+          · 加急 {{ fenToYuan(formData.customizationDetail.breakdown.urgent) }} 元
+        </template>
+        · 合计 {{ fenToYuan(formData.customizationDetail.breakdown.total) }} 元
+      </el-descriptions-item>
+      <el-descriptions-item label="设计文件: ">
+        <div v-for="file in formData.customizationDetail.files" :key="file.url">
+          <el-link type="primary" :href="file.url" target="_blank">{{ file.name }}</el-link>
+        </div>
+      </el-descriptions-item>
+      <el-descriptions-item label="参数快照: " :span="2">
+        <pre class="customization-snapshot">{{ JSON.stringify(formData.customizationDetail.paramSnapshot, null, 2) }}</pre>
+      </el-descriptions-item>
+    </el-descriptions>
+
     <!-- 订单状态 -->
     <el-descriptions :column="1" title="订单状态">
       <el-descriptions-item label="订单状态: ">
@@ -353,6 +402,21 @@ const formData = ref<TradeOrderApi.OrderVO>({
   logs: []
 })
 
+/** 定制工艺摘要（014）：打印是基础项，其余按需出现 */
+const customizationProcesses = computed(() => {
+  const detail = formData.value.customizationDetail
+  if (!detail) return []
+  const parts = [
+    detail.mode === 1 ? '标签印刷（多色）'
+      : detail.mode === 3 ? '多色印刷+黑色打印'
+        : '标签打印（黑色）'
+  ]
+  parts.push(detail.finishing === 1 ? '圆角' : '直角')
+  if (detail.tearLine) parts.push('撕裂线')
+  if (detail.urgent) parts.push('加急')
+  return parts
+})
+
 /** 各种操作 */
 const updateRemarkForm = ref() // 订单备注表单 Ref
 const remark = () => {
@@ -670,5 +734,15 @@ onMounted(async () => {
   border-radius: 8px;
   margin-top: 12px;
   background: #f5f7fa;
+}
+.customization-snapshot {
+  max-height: 240px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: #f5f7fa;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

@@ -115,6 +115,9 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
     private CartService cartService;
     @MockitoBean
     private TradeOrderInvoiceService tradeOrderInvoiceService;
+    /** 014：普通订单不经过定制计价，这里只需满足注入 */
+    @MockitoBean
+    private cn.iocoder.yudao.module.trade.service.customization.CustomizationPriceService customizationPriceService;
     @MockitoBean
     private TradeConfigService tradeConfigService;
     @MockitoBean

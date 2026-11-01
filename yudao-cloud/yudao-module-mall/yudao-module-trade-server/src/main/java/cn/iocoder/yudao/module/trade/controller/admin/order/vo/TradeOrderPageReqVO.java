@@ -71,4 +71,7 @@ public class TradeOrderPageReqVO extends PageParam {
     @InEnum(value = TerminalEnum.class, message = "订单来源 {value}")
     private Integer terminal;
 
+    @Schema(description = "是否定制订单：true 只看定制单；不传 = 全部", example = "true")
+    private Boolean customization;
+
 }

@@ -78,7 +78,8 @@ describe('SiteHeader —— 静态结构', () => {
   it('悬停展开子菜单，离开或 Escape 收起', async () => {
     vi.useFakeTimers()
     const w = mountHeader()
-    const item = w.findAll('.nav-item')[3]!
+    // 2026-11-01：新增「印刷定制」后，行业方案的下标由 3 → 4
+    const item = w.findAll('.nav-item')[4]!
     await item.trigger('mouseenter')
     expect(w.get('#nav-submenu-solutions').isVisible()).toBe(true)
     expect(w.get('#nav-submenu-solutions').text()).toContain('生产制造')
@@ -109,7 +110,7 @@ describe('SiteHeader —— 静态结构', () => {
     const labels = mountHeader()
       .findAll('.nav .nav-primary')
       .map((a) => a.text().replace('⌄', '').trim())
-    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持', '公司介绍'])
+    expect(labels).toEqual(['首页', '商城', '标签软件', '印刷定制', '行业方案', '服务支持', '公司介绍'])
   })
 
   it('**顶栏不再出现「领券中心」「我的订单」**（它们归个人中心）', () => {
@@ -127,7 +128,7 @@ describe('SiteHeader —— 静态结构', () => {
     const hrefs = w
       .findAll('.nav .nav-primary')
       .map((a) => a.attributes('href'))
-    expect(hrefs).toEqual(['/', '/mall', '/software', '/solutions', '/support', '/about'])
+    expect(hrefs).toEqual(['/', '/mall', '/software', '/customization', '/solutions', '/support', '/about'])
   })
 
   it('渲染购物车入口、登录入口与主按钮', () => {
@@ -150,7 +151,7 @@ describe('SiteHeader —— 静态结构', () => {
     const labels = mountHeader()
       .findAll('.mobile-nav [data-mobile-primary]')
       .map((a) => a.text().replace('＋', '').trim())
-    expect(labels).toEqual(['首页', '商城', '标签软件', '行业方案', '服务支持', '公司介绍'])
+    expect(labels).toEqual(['首页', '商城', '标签软件', '印刷定制', '行业方案', '服务支持', '公司介绍'])
   })
 
   it('**移动端汉堡菜单里必须有登录入口** —— `.login` 在 ≤768px 是隐藏的', () => {

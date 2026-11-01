@@ -32,6 +32,15 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "对公转账信息（不是对公单时为 null）")
     private AppOrderOfflinePayRespVO offlinePay;
 
+    /**
+     * 印刷定制（014）：**不是定制单时为 null** —— 前端据此渲染定制要求区块
+     */
+    @Schema(description = "是否定制订单")
+    private Boolean customization;
+
+    @Schema(description = "定制要求（不是定制单时为 null）")
+    private AppCustomizationDetailRespVO customizationDetail;
+
     @Schema(description = "用户备注", requiredMode = Schema.RequiredMode.REQUIRED, example = "你猜")
     private String userRemark;
 

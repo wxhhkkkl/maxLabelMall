@@ -71,6 +71,8 @@ import cn.iocoder.yudao.module.trade.service.offline.bo.TradeOrderOfflineConfirm
 import cn.iocoder.yudao.module.trade.service.message.TradeMessageService;
 import cn.iocoder.yudao.module.trade.service.message.bo.TradeOrderMessageWhenDeliveryOrderReqBO;
 import cn.iocoder.yudao.module.trade.service.order.handler.TradeOrderHandler;
+import cn.iocoder.yudao.module.trade.service.customization.CustomizationPriceService;
+import cn.iocoder.yudao.module.trade.service.customization.CustomizationSpecConvert;
 import cn.iocoder.yudao.module.trade.service.price.TradePriceService;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateReqBO;
 import cn.iocoder.yudao.module.trade.service.price.bo.TradePriceCalculateRespBO;
@@ -127,6 +129,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
     @Resource
     private TradePriceService tradePriceService;
+    @Resource
+    private CustomizationPriceService customizationPriceService;
     @Resource
     private DeliveryExpressService deliveryExpressService;
     @Resource
@@ -224,8 +228,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
         // 0. 008 对公转账：先校验入参里的支付渠道（**越早失败越好** —— 别等订单建了一半才发现）
         validatePayChannelCode(createReqVO);
-        // 1.1 价格计算
-        TradePriceCalculateRespBO calculateRespBO = calculatePrice(userId, createReqVO);
+        // 1.1 价格计算：定制单由定制计价服务生成订单项（014 / R89），其余走既有链路
+        TradePriceCalculateRespBO calculateRespBO = createReqVO.getCustomization() != null
+                ? customizationPriceService.calculateOrderPrice(userId,
+                        CustomizationSpecConvert.toSpec(createReqVO.getCustomization()))
+                : calculatePrice(userId, createReqVO);
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
         List<TradeOrderItemDO> orderItems = buildTradeOrderItems(order, calculateRespBO);
@@ -276,6 +283,8 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                                          TradePriceCalculateRespBO calculateRespBO) {
         TradeOrderDO order = TradeOrderConvert.INSTANCE.convert(userId, createReqVO, calculateRespBO);
         order.setType(calculateRespBO.getType());
+        // 定制单标记（014）：列表筛选与详情联查用
+        order.setCustomization(createReqVO.getCustomization() != null);
         order.setNo(tradeNoRedisDAO.generate(TradeNoRedisDAO.TRADE_ORDER_NO_PREFIX));
         order.setStatus(TradeOrderStatusEnum.UNPAID.getStatus());
         order.setRefundStatus(TradeOrderRefundStatusEnum.NONE.getStatus());

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.app.order.vo;
 
+import cn.iocoder.yudao.module.trade.controller.app.customization.vo.AppCustomizationSpecReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -50,6 +51,15 @@ public class AppTradeOrderCreateReqVO extends AppTradeOrderSettlementReqVO {
      */
     @Schema(description = "支付渠道：仅支持传 offline（对公转账）；不传 = 在线支付", example = "offline")
     private String payChannelCode;
+
+    /**
+     * 印刷定制规格（014）
+     *
+     * ⚠️ 传了它即表示这是一笔定制订单：价格由 `CustomizationPriceService` 重算，
+     * `items` 里的 `skuId` 只是隐藏的承载 SKU，客户端的任何金额都不参与计价。
+     */
+    @Schema(description = "印刷定制规格；不传 = 普通订单")
+    private AppCustomizationSpecReqVO customization;
 
     @AssertTrue(message = "配送方式不能为空")
     @JsonIgnore

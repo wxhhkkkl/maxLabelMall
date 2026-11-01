@@ -7,3 +7,7 @@ DELETE FROM trade_after_sale_log;
 DELETE FROM trade_brokerage_user;
 DELETE FROM trade_brokerage_record;
 DELETE FROM "trade_brokerage_withdraw";
+DELETE FROM trade_customization_order;
+DELETE FROM trade_customization_config;
+DELETE FROM trade_customization_area_rule;
+DELETE FROM trade_customization_material;

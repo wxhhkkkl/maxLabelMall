@@ -69,6 +69,13 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
     @Schema(description = "对公转账收款信息；不是对公单为 null")
     private TradeOrderOfflinePaymentRespVO offlinePayment;
 
+    /** 印刷定制（014）：不是定制单时为 null */
+    @Schema(description = "是否定制订单")
+    private Boolean customization;
+
+    @Schema(description = "定制要求（不是定制单时为 null）")
+    private AdminCustomizationDetailRespVO customizationDetail;
+
     @Schema(description = "管理后台 - 交易订单的详情的订单项目")
     @Data
     public static class Item extends TradeOrderItemBaseVO {

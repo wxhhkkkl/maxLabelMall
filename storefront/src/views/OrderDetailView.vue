@@ -554,10 +554,27 @@ function afterSaleText(it: OrderDetail['items'][number]): string {
   return afterSaleItemStatusText(it.afterSaleStatus)
 }
 
+/** 定制工艺摘要（014）：打印是基础项，其余按需出现 */
+const customizationProcessText = computed(() => {
+  const detail = order.value?.customizationDetail
+  if (!detail) return ''
+  const parts = [
+    detail.mode === 1 ? '标签印刷（多色）'
+      : detail.mode === 3 ? '多色印刷+黑色打印'
+        : '标签打印（黑色）',
+  ]
+  parts.push(detail.finishing === 1 ? '圆角' : '直角')
+  if (detail.tearLine) parts.push('撕裂线')
+  if (detail.urgent) parts.push('加急')
+  return parts.join(' / ')
+})
+
 /** 该项现在能不能申请退款（判定与口径说明见 `utils/afterSale.ts`） */
 function canRefund(it: OrderDetail['items'][number]): boolean {
   return order.value
-    ? canApplyRefund(it, order.value.status, order.value.enterprise || order.value.subscription)
+    // 014 / Q96：定制单用户端不提供自助退款（与 012 的企业 / 订阅单同一口径）
+    ? canApplyRefund(it, order.value.status,
+      order.value.enterprise || order.value.subscription || order.value.customization === true)
     : false
 }
 
@@ -571,7 +588,7 @@ function openRefund(it: OrderDetail['items'][number]) {
 
 /** 该商品能不能撤销申请（判定与口径说明见 `utils/afterSale.ts`） */
 function canCancelRefund(it: OrderDetail['items'][number]): boolean {
-  return canCancelAfterSale(it)
+  return !order.value?.customization && canCancelAfterSale(it)
 }
 
 function openCancelRefund(it: OrderDetail['items'][number]) {
@@ -943,6 +960,69 @@ onMounted(async () => {
             <div class="od-price">{{ formatYuan(it.price) }}</div>
             <div class="od-count">×{{ it.count }}</div>
           </div>
+        </div>
+
+        <!--
+          印刷定制要求（014）：**非定制单不渲染**。
+          这里是用户端唯一能看到完整定制规格与文件的地方（FR-374）。
+        -->
+        <div v-if="order.customizationDetail" class="ml-card">
+          <div class="ml-card-title">定制要求</div>
+          <div class="dl-table">
+            <div class="dl-row">
+              <span class="dl-name">材质</span>
+              <span class="dl-val">{{ order.customizationDetail.materialName }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">尺寸</span>
+              <span class="dl-val">
+                {{ order.customizationDetail.width }} × {{ order.customizationDetail.height }} mm
+                × {{ order.customizationDetail.quantity }} 张
+              </span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">工艺</span>
+              <span class="dl-val">{{ customizationProcessText }}</span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">成品形态</span>
+              <span class="dl-val">
+                {{ order.customizationDetail.form === 1 ? '卷筒（卷轴）' : '平张（单张）' }}
+                <template v-if="order.customizationDetail.form === 1">
+                  · 轴芯 {{ order.customizationDetail.axisDiameter }}
+                </template>
+                <template v-else> · {{ order.customizationDetail.sheetSpec }}</template>
+              </span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">排版</span>
+              <span class="dl-val">
+                {{ order.customizationDetail.rowCount }} 行 × {{ order.customizationDetail.columnCount }} 列，
+                间距 {{ order.customizationDetail.rowGap }}/{{ order.customizationDetail.columnGap }} mm
+              </span>
+            </div>
+            <div class="dl-row">
+              <span class="dl-name">备注</span>
+              <span class="dl-val">{{ order.customizationDetail.remark || '—' }}</span>
+            </div>
+          </div>
+          <ul v-if="order.customizationDetail.files?.length" class="custom-files">
+            <li v-for="file in order.customizationDetail.files" :key="file.url">
+              <a :href="file.url" target="_blank" rel="noopener noreferrer">{{ file.name }}</a>
+            </li>
+          </ul>
+          <p class="ml-hint">
+            价格明细：打印 {{ formatYuan(order.customizationDetail.breakdown.print) }}
+            <template v-if="order.customizationDetail.breakdown.printing">
+              · 印刷 {{ formatYuan(order.customizationDetail.breakdown.printing) }}
+            </template>
+            <template v-if="order.customizationDetail.breakdown.dieCut">
+              · 模切 {{ formatYuan(order.customizationDetail.breakdown.dieCut) }}
+            </template>
+            <template v-if="order.customizationDetail.breakdown.urgent">
+              · 加急 {{ formatYuan(order.customizationDetail.breakdown.urgent) }}
+            </template>
+          </p>
         </div>
 
         <!-- 金额构成：促销优惠与优惠券抵扣分列两行，无积分行（FR-026g） -->

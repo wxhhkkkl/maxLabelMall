@@ -197,7 +197,46 @@ export interface ExpressTrack {
   content: string
 }
 
+/** 印刷定制要求（014）：只有定制单才有 */
+export interface OrderCustomizationDetail {
+  materialName: string
+  width: number
+  height: number
+  quantity: number
+  unitArea: number
+  totalArea: number
+  /** 业务模式：1 印刷（多色）/ 2 打印（黑色）/ 3 两者 / 4 空白标签 */
+  mode: number
+  form?: number
+  sheetSpec?: string
+  finishing?: number
+  tearLine?: boolean
+  rowCount?: number
+  columnCount?: number
+  rowGap?: number
+  columnGap?: number
+  axisDiameter?: string
+  labelCount?: number
+  templateName?: string
+  dieCut: boolean
+  urgent: boolean
+  remark?: string | null
+  breakdown: {
+    print: number
+    printing: number
+    dieCut: number
+    urgent: number
+    subtotal: number
+    total: number
+  }
+  files: Array<{ name: string; url: string; size?: number; type?: string }>
+}
+
 export interface OrderDetail extends OrderPageItem, OrderPrice {
+  /** 是否定制订单（014）；普通订单为 null */
+  customization?: boolean | null
+  /** 定制要求；普通订单为 null */
+  customizationDetail?: OrderCustomizationDetail | null
   /** epoch 毫秒数（见 `createTime` 的说明） */
   payExpireTime: number | string
   /** 发货物流公司名称（后端 `AppTradeOrderDetailRespVO.logisticsName`） */

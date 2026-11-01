@@ -99,7 +99,8 @@ describe('路由表', () => {
     // 2026-10-20：MaxLabel 会员体系新增 /membership（33 → 34）
     // 2026-10-26：企业客户与席位授权新增 /enterprise/center、/enterprise/plan/:skuId（34 → 36）
     // 2026-10-27：013 软件与驱动新增 /support/software 与 /support/software/:id（36 → 38）
-    expect(paths).toHaveLength(37)
+    // 2026-11-01：014 印刷定制新增 /customization（38 → 39）
+    expect(paths).toHaveLength(38)
     expect(paths).toContain('/')
   })
 

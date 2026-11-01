@@ -21,6 +21,12 @@ Supporting artifacts for the active feature:
   📌 2026-10-27：**个人会员订阅订单用户端同样不允许退款**（后台保留人工通道）；纯虚拟订阅订单
   支付成功后直接置为「已完成」，历史已支付待发货订阅单由 `024` 迁移补成已完成（Q82）
 
+当前特性（014 印刷定制：选材质 / 尺寸 / 工艺 → 报价 → 支付，后台可查定制要求）：
+- specs/014-print-customization/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/014-print-customization/contracts/{app-api,admin-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/027-print-customization.sql`（4 表 + `trade_order.customization`
+  + 隐藏 SPU/SKU + 菜单），再发后端，最后发管理端 / 门面站
+
 上一个特性（发票收据、邮箱与抬头顺序）：
 - specs/011-invoice-receipt-email/{spec,plan,data-model,quickstart,tasks}.md
 - specs/011-invoice-receipt-email/contracts/{app-api,admin-api}.md

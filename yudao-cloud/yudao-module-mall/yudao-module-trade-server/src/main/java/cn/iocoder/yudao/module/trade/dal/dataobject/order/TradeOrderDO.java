@@ -89,6 +89,12 @@ public class TradeOrderDO extends BaseDO {
      */
     private Boolean maxlabelSubscription;
     /**
+     * 是否印刷定制订单（014）
+     *
+     * 定制要求放在 `trade_customization_order`，这里只用于筛选与详情联查。
+     */
+    private Boolean customization;
+    /**
      * 订单状态
      *
      * 枚举 {@link TradeOrderStatusEnum}

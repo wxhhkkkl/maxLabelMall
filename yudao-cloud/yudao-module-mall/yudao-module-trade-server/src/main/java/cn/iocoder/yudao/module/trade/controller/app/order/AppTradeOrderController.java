@@ -70,6 +70,8 @@ public class AppTradeOrderController {
     @Resource
     private TradeOrderInvoiceService tradeOrderInvoiceService;
     @Resource
+    private cn.iocoder.yudao.module.trade.service.customization.CustomizationOrderService customizationOrderService;
+    @Resource
     private TradeConfigService tradeConfigService;
     @Resource
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
@@ -141,6 +143,11 @@ public class AppTradeOrderController {
             //     ⚠️ 收款账户明细只在这里给（不下发到结算接口），因为客户是**下单之后**才需要
             //     照着它去银行打款的。
             respVO.setOfflinePay(buildOfflinePay(order));
+            // 2.6 印刷定制（014）：**不是定制单时为 null**
+            if (Boolean.TRUE.equals(order.getCustomization())) {
+                respVO.setCustomization(true);
+                respVO.setCustomizationDetail(buildCustomizationDetail(order.getId()));
+            }
         }
         return success(respVO);
     }
@@ -169,6 +176,42 @@ public class AppTradeOrderController {
                 .setAccountNo(tradeConfig.getOfflinePayAccountNo())
                 .setBankName(tradeConfig.getOfflinePayBankName())
                 .setTip(tradeConfig.getOfflinePayTip());
+    }
+
+    /** 定制要求（014）：价格明细与文件都是下单时的 JSON 快照 */
+    private AppCustomizationDetailRespVO buildCustomizationDetail(Long orderId) {
+        cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationOrderDO row =
+                customizationOrderService.getByOrderId(orderId);
+        if (row == null) {
+            return null;
+        }
+        AppCustomizationDetailRespVO vo = new AppCustomizationDetailRespVO();
+        vo.setMaterialName(row.getMaterialName());
+        vo.setWidth(row.getWidth());
+        vo.setHeight(row.getHeight());
+        vo.setQuantity(row.getQuantity());
+        vo.setUnitArea(row.getUnitArea());
+        vo.setTotalArea(row.getTotalArea());
+        vo.setMode(row.getMode());
+        vo.setForm(row.getForm());
+        vo.setSheetSpec(row.getSheetSpec());
+        vo.setFinishing(row.getFinishing());
+        vo.setTearLine(row.getTearLine());
+        vo.setRowCount(row.getRowCount());
+        vo.setColumnCount(row.getColumnCount());
+        vo.setRowGap(row.getRowGap());
+        vo.setColumnGap(row.getColumnGap());
+        vo.setAxisDiameter(row.getAxisDiameter());
+        vo.setLabelCount(row.getLabelCount());
+        vo.setTemplateName(row.getTemplateName());
+        vo.setDieCut(row.getDieCut());
+        vo.setUrgent(row.getUrgent());
+        vo.setRemark(row.getRemark());
+        vo.setBreakdown(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                row.getPriceBreakdown(), AppCustomizationDetailRespVO.Breakdown.class));
+        vo.setFiles(cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(
+                row.getFiles(), AppCustomizationDetailRespVO.File.class));
+        return vo;
     }
 
     @GetMapping("/get-express-track-list")

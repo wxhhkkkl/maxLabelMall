@@ -160,4 +160,13 @@ public interface ErrorCodeConstants {
     // 个人会员订阅订单**用户端同样不允许退款**（2026-10-27）：后台人工通道保留
     ErrorCode SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_004, "会员订阅订单不支持退款，如有特殊情况请联系平台处理");
 
+    // ========== 印刷定制 1-011-011-000 ==========
+    ErrorCode CUSTOMIZATION_MATERIAL_NOT_AVAILABLE = new ErrorCode(1_011_011_000, "该材质不存在或已停用");
+    ErrorCode CUSTOMIZATION_SPEC_OUT_OF_RANGE = new ErrorCode(1_011_011_001, "尺寸或数量超出该材质的允许范围");
+    ErrorCode CUSTOMIZATION_AREA_NOT_MATCHED = new ErrorCode(1_011_011_002, "当前面积没有对应的计价区间，请联系客服");
+    ErrorCode CUSTOMIZATION_AREA_RULE_INVALID = new ErrorCode(1_011_011_003, "面积区间配置不合法（重叠、倒挂或断档）");
+    ErrorCode CUSTOMIZATION_FILE_INVALID = new ErrorCode(1_011_011_004, "设计文件不合规（数量 1~5、PDF/AI/CDR/JPG/PNG、单文件不超过 16MB）");
+    ErrorCode CUSTOMIZATION_PRICE_CHANGED = new ErrorCode(1_011_011_005, "价格已更新，请确认后重新提交");
+    ErrorCode CUSTOMIZATION_ORDER_SUBMIT_TOO_FAST = new ErrorCode(1_011_011_006, "请勿重复提交，请稍后再试");
+
 }

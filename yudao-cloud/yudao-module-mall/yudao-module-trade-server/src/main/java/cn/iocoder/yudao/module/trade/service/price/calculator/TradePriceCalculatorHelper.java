@@ -54,8 +54,19 @@ public class TradePriceCalculatorHelper {
             orderItem.setSpuId(sku.getSpuId()).setSkuId(sku.getId())
                     .setCount(item.getCount()).setCartId(item.getCartId()).setSelected(item.getSelected());
             // sku 价格
-            orderItem.setPrice(sku.getPrice()).setPayPrice(sku.getPrice() * item.getCount())
-                    .setDiscountPrice(0).setDeliveryPrice(0).setCouponPrice(0).setPointPrice(0).setVipPrice(0);
+            if (item.getCustomTotalPrice() != null) {
+                // 定制单（014）：服务端已算出总价，反推单价并把取整差额记入商品级优惠，
+                // 保证 payPrice 严格等于报价（R90）。单价向上取整，差额 >= 0。
+                int count = Math.max(1, item.getCount());
+                int unitPrice = (item.getCustomTotalPrice() + count - 1) / count;
+                int discount = unitPrice * count - item.getCustomTotalPrice();
+                orderItem.setPrice(unitPrice).setPayPrice(item.getCustomTotalPrice())
+                        .setDiscountPrice(discount).setDeliveryPrice(0).setCouponPrice(0)
+                        .setPointPrice(0).setVipPrice(0);
+            } else {
+                orderItem.setPrice(sku.getPrice()).setPayPrice(sku.getPrice() * item.getCount())
+                        .setDiscountPrice(0).setDeliveryPrice(0).setCouponPrice(0).setPointPrice(0).setVipPrice(0);
+            }
             // sku 信息
             orderItem.setPicUrl(sku.getPicUrl()).setProperties(sku.getProperties())
                     .setWeight(sku.getWeight()).setVolume(sku.getVolume());

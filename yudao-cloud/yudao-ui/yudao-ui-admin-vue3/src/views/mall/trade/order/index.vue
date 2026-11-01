@@ -36,6 +36,12 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="定制订单" prop="customization">
+        <el-select v-model="queryParams.customization" class="!w-280px" clearable placeholder="全部">
+          <el-option label="仅看定制单" :value="true" />
+          <el-option label="仅看普通单" :value="false" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="创建时间" prop="createTime">
         <el-date-picker
           v-model="queryParams.createTime"
@@ -322,6 +328,7 @@ const queryParams = ref({
   status: undefined, // 订单状态（下拉单选）
   statuses: tabStatuses(DEFAULT_TAB), // 订单状态（标签页多选）
   payChannelCode: undefined, // 支付方式
+  customization: undefined, // 是否定制订单（014）
   createTime: undefined, // 创建时间
   terminal: undefined, // 订单来源
   type: undefined, // 订单类型
@@ -413,6 +420,7 @@ const resetQuery = () => {
     status: undefined, // 订单状态（下拉单选）
     statuses: tabStatuses(activeTab.value), // 订单状态（标签页多选）
     payChannelCode: undefined, // 支付方式
+    customization: undefined, // 是否定制订单（014）
     createTime: undefined, // 创建时间
     terminal: undefined, // 订单来源
     type: undefined, // 订单类型

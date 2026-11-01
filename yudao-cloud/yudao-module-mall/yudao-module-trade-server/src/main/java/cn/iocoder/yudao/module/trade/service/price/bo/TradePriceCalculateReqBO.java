@@ -116,6 +116,18 @@ public class TradePriceCalculateReqBO {
         private Long cartId;
 
         /**
+         * 定制单的**服务端计算总价**（分），仅服务端内部设置
+         *
+         * 价格计算时由它反推单价与取整差额：
+         * `price = ceil(总价 / count)`、`discountPrice = price × count − 总价`，
+         * 保证订单项实付严格等于报价（R90）。
+         *
+         * ⚠️ **不从 HTTP 入参反序列化**：客户端的任何金额都只用于「价格已变」的确认，
+         * 不作为计价依据（宪法原则 III）。
+         */
+        private Integer customTotalPrice;
+
+        /**
          * 是否选中
          */
         @NotNull(message = "是否选中不能为空")

@@ -44,6 +44,7 @@ const router = createRouter({
           props: true,
         },
         { path: 'software', name: 'software', component: () => import('@/views/SoftwareView.vue') },
+        { path: 'customization', name: 'customization', component: () => import('@/views/CustomizationView.vue') },
         { path: 'membership', name: 'membership', component: () => import('@/views/MembershipView.vue') },
         {
           path: 'enterprise/center',

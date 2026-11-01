@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "refund_status"           int      NULL,
     "refund_price"            int      NULL,
     "after_sale_status"       int      NULL,
-    "coupon_id"               bigint   NOT NULL,
+    -- ⚠️ 线上是 `bigint UNSIGNED NULL DEFAULT NULL`（见 `sql/mysql/mall-2026-04-18.sql`）。
+    --    这里原先写成 NOT NULL，与线上不符：定制单（014）本来就不带优惠券，`couponId` 为 null。
+    "coupon_id"               bigint   NULL,
     "coupon_price"            int      NOT NULL,
     "use_point"               int      NULL,
     "point_price"             int      NOT NULL,

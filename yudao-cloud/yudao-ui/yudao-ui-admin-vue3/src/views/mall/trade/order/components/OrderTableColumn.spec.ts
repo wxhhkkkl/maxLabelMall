@@ -135,6 +135,23 @@ describe('后台订单列表 —— 订单信息条', () => {
   })
 })
 
+describe('后台订单列表 —— 定制单标记（014）', () => {
+  it('定制单带「定制」标记，运营要能一眼分清（FR-375 / US2）', async () => {
+    const w = mountTable([order({ customization: true })])
+    await flushPromises()
+
+    expect(w.find('.order-custom-tag').exists()).toBe(true)
+    expect(w.find('.order-custom-tag').text()).toContain('定制')
+  })
+
+  it('普通订单没有该标记', async () => {
+    const w = mountTable([order()])
+    await flushPromises()
+
+    expect(w.find('.order-custom-tag').exists()).toBe(false)
+  })
+})
+
 describe('后台订单列表 —— 各列的信息落位', () => {
   it('金额：实付 + 商品原价（原价带「元」）', async () => {
     const w = mountTable([order()])

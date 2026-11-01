@@ -88,7 +88,7 @@
 ### Tests for US49（先写、先失败）
 
 - [x] T034 [P] [US49] 列表筛选单测 `…/trade-server/src/test/java/cn/iocoder/yudao/module/trade/dal/mysql/order/TradeOrderMapperCustomizationTest.java`：`customization=true` 只返回定制单；统计复用同一条件
-- [ ] T035 [P] [US49] 详情单测 `…/trade-server/src/test/java/cn/iocoder/yudao/module/trade/controller/admin/order/TradeOrderCustomizationDetailTest.java`：定制单带 `customizationDetail` 与快照，普通单不返回
+- [x] T035 [P] [US49] 详情单测 `…/trade-server/src/test/java/cn/iocoder/yudao/module/trade/controller/admin/order/TradeOrderCustomizationDetailTest.java`：定制单带 `customizationDetail` 与快照，普通单不返回
 - [x] T036 [P] [US49] 管理端接口单测 `yudao-cloud/yudao-ui/yudao-ui-admin-vue3/src/api/mall/trade/order/index.spec.ts`：新增 `customization` 参数透传
 
 ### Implementation for US49
@@ -133,7 +133,8 @@
 - [x] T051 [P] 在 `yudao-cloud/yudao-module-mall/yudao-module-trade-server/` 跑 `mvn -pl yudao-module-mall/yudao-module-trade-server -am test`，确认普通订单、对公转账、订阅订单用例全绿
 - [x] T052 [P] 在 `storefront/` 与 `yudao-cloud/yudao-ui/yudao-ui-admin-vue3/` 跑 `vitest`，确认无回归
 - [ ] T053 按 `specs/014-print-customization/quickstart.md` §1~§6 手工走查并记录；§7（SC-144）按计划显式不验证
-- [ ] T054 用 `specs/014-print-customization/contracts/app-api.md` 的 quote 接口做性能实测（`yudao-cloud/yudao-module-mall/yudao-module-trade-server/src/main/java/cn/iocoder/yudao/module/trade/controller/app/customization/AppCustomizationController.java`），目标 p95 < 200 ms
+      —— 2026-11-01：§1 计价表已用线上只读 quote 接口逐条核对通过（1.1~1.6b 全部符合）；**§2~§6 待人工走查**（会创建真实订单 / 改配置）
+- [x] T054 用 `specs/014-print-customization/contracts/app-api.md` 的 quote 接口做性能实测（`yudao-cloud/yudao-module-mall/yudao-module-trade-server/src/main/java/cn/iocoder/yudao/module/trade/controller/app/customization/AppCustomizationController.java`），目标 p95 < 200 ms
 - [x] T055 在 `storefront/src/views/CustomizationView.vue` 与 `…/controller/app/customization/` 检查四类错误文案与空状态：材质为空、区间未配置、文件不合规、价格已变
 - [x] T056 更新 `CLAUDE.md` 的当前特性段落，并把 `027` 加入上线顺序说明
 
@@ -206,3 +207,16 @@ Task: "T019 storefront/src/views/CustomizationView.spec.ts"
 - 隐藏 SPU/SKU 由迁移预置，**任何回滚都不要删**
 - 定制单强制不参与优惠券与积分（R96）
 - 改价冲突 MUST NOT 建单（Q101）
+
+---
+
+## Phase 7: Convergence
+
+> 2026-11-01 `/speckit-converge` 对当前代码的核查结果。按严重度排序，前 3 条为测试缺口（宪法原则 I）。
+
+- [x] T057 **CRITICAL** 为 R90 订单项金额落法补单测：`TradePriceCalculatorHelper.buildCalculateResp` 在 `customTotalPrice != null` 时的「单价向上取整、`discountPrice` 吸收取整差额、`payPrice` 等于报价」，以及定制建单后 `customization = true`、订单项恰好 1 条且 `cartId` 为空 per `Constitution I` / `T017`（missing）
+- [x] T058 为 `storefront/src/views/CustomizationView.spec.ts` 补齐 T019 声称但缺失的用例：尺寸/数量越界校验、改输入后报价刷新、文件数量与扩展名拦截、登录后已填内容保留、开票选项提交 per `T019`（partial）
+- [x] T059 为 `storefront/src/views/OrderDetailView.spec.ts` 补一条「定制单没有自助退款入口」的回归用例（与既有的企业单 / 订阅单两条并列） per `T019` / `Q96` / `FR-373`（partial）
+- [x] T060 改价确认弹层展示**新旧金额与差额**（当前只显示新价；提交返回 `changed` 时先留存原 `payable` 再覆盖） per `Q101` / `T032`（partial）
+- [x] T061 管理端订单列表加「定制」标记：`TradeOrderPageItemRespVO` 与转换补 `customization` 字段，列表行展示 tag（筛选已可用，缺的是「一眼分清」） per `FR-375` / `US2` / `T039`（partial）
+- [x] T062 材质「停用」与「删除」补 `@LogRecord` 操作记录（操作人、时间、变更前后状态），与新增/编辑一致 per `FR-380` / `US50`（partial）

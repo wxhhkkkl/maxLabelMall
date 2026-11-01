@@ -156,6 +156,10 @@
             -->
             <el-tag v-if="scope.row.offlineWaiting" type="warning">待收款</el-tag>
             <dict-tag v-else :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="scope.row.status" />
+            <!-- 印刷定制（014 / FR-375）：筛选能隔离，但混合列表里还得「一眼分清」 -->
+            <div v-if="scope.row.customization" class="order-custom-tag">
+              <el-tag type="success" size="small">定制</el-tag>
+            </div>
             <!-- 售后状态原来独占一列；收成一列后挂在状态下面，免得"退款中"在列表上看不见 -->
             <div v-if="hasAfterSale(scope.row)" class="order-after-sale">
               <dict-tag
@@ -328,6 +332,10 @@ const openDetail = (id?: number | null) => {
 
 /* 售后状态收进「状态」列后的第二行 */
 .order-after-sale {
+  margin-top: 4px;
+}
+
+.order-custom-tag {
   margin-top: 4px;
 }
 

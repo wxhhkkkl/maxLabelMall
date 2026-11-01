@@ -1118,6 +1118,30 @@ describe('OrderDetailView —— 申请退款', () => {
     expect(w.find('.od-refund').exists()).toBe(false)
   })
 
+  it('**定制订单没有退款入口**（014 / Q96：已投产的定制品自助退掉会实际损失）', async () => {
+    const d = paid()
+    const w = await mountDetail(
+      detail({
+        ...d,
+        customization: true,
+        customizationDetail: {
+          materialName: '可移除铜版',
+          width: 50,
+          height: 100,
+          quantity: 1000,
+          mode: 2,
+          form: 2,
+          rowCount: 1,
+          columnCount: 1,
+          rowGap: 3,
+          columnGap: 3,
+          breakdown: { print: 45520, printing: 0, dieCut: 0, urgent: 0, subtotal: 45520, total: 45520 },
+        } as never,
+      }),
+    )
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
   it('点「申请退款」打开弹层', async () => {
     const w = await mountDetail(paid())
     await w.get('.od-refund').trigger('click')

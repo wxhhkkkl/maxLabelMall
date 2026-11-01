@@ -42,6 +42,14 @@ public class TradeOrderPageItemRespVO extends TradeOrderBaseVO {
     @Schema(description = "是否待收款（对公转账单且未确认收款）", example = "true")
     private Boolean offlineWaiting;
 
+    /**
+     * 是不是**印刷定制单**（014 / FR-375）
+     *
+     * 列表筛选能隔离出来，但运营在混合列表里还得「一眼分清」—— 前端据此打「定制」标记。
+     */
+    @Schema(description = "是否印刷定制订单", example = "true")
+    private Boolean customization;
+
     @Schema(description = "管理后台 - 交易订单的分页项的订单项目")
     @Data
     public static class Item extends TradeOrderItemBaseVO {

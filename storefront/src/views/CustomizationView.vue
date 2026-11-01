@@ -34,6 +34,7 @@ const route = useRoute()
 const router = useRouter()
 
 const FILE_ACCEPT = '.pdf,.ai,.cdr,.jpg,.jpeg,.png'
+const FILE_EXTENSIONS = ['pdf', 'ai', 'cdr', 'jpg', 'jpeg', 'png']
 const FILE_MAX_SIZE = 16 * 1024 * 1024
 const FILE_MAX_COUNT = 5
 const FIXED_GAP = 3
@@ -101,6 +102,8 @@ const submitError = ref('')
 const sizeError = ref('')
 const quantityError = ref('')
 const priceChanged = ref<CustomizationQuote | null>(null)
+/** 改价前的应付金额：弹层要展示「贵了多少」（Q101），只给新价等于让客户盲签 */
+const priceChangedFrom = ref<number | null>(null)
 
 const currentMaterial = computed(() => materials.value.find((m) => m.id === materialId.value) ?? null)
 const loggedIn = computed(() => !!getAccessToken())
@@ -259,6 +262,12 @@ async function onPickFiles(e: Event): Promise<void> {
         fileError.value = '单个文件不能超过 16MB'
         continue
       }
+      // `accept` 只是选择器的提示，用户仍可切到「所有文件」—— 白名单要自己判
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!FILE_EXTENSIONS.includes(ext)) {
+        fileError.value = `不支持的文件格式：${file.name}（仅支持 PDF / AI / CDR / JPG / PNG）`
+        continue
+      }
       const url = await uploadFile(file)
       files.value = [...files.value, { name: file.name, url, size: file.size, type: file.type }]
     }
@@ -319,6 +328,8 @@ async function submit(expectedAmount?: number): Promise<void> {
       invoice: invoiceEnabled.value ? { ...invoiceForm.value } : undefined,
     })
     if (resp.changed) {
+      // 先留住旧价，再让新报价覆盖面板
+      priceChangedFrom.value = quote.value?.payable ?? null
       priceChanged.value = resp.quote ?? null
       if (resp.quote) quote.value = resp.quote
       return
@@ -596,7 +607,14 @@ onMounted(load)
 
     <MlModal :open="!!priceChanged" title="价格已更新" @close="priceChanged = null">
       <p>配置期间的参数发生了变化，请确认新价格后再提交：</p>
-      <p v-if="priceChanged" class="price-change">{{ formatYuan(quote?.payable ?? 0) }}</p>
+      <div v-if="priceChanged" class="price-change-table">
+        <p><span>原价</span><b>{{ formatYuan(priceChangedFrom ?? 0) }}</b></p>
+        <p><span>新价</span><b class="price-change">{{ formatYuan(quote?.payable ?? 0) }}</b></p>
+        <p>
+          <span>差额</span>
+          <b class="price-change">{{ formatYuan((quote?.payable ?? 0) - (priceChangedFrom ?? 0)) }}</b>
+        </p>
+      </div>
       <template #foot>
         <button class="btn-cyan" type="button" @click="priceChanged = null">先不提交</button>
         <button id="customizationConfirmPrice" class="btn-buy" type="button" @click="confirmNewPrice">按新价格提交</button>
@@ -648,6 +666,9 @@ onMounted(load)
 .quote-total { margin-top: 8px; padding-top: 12px; border-top: 1px solid #e6ecf5; font-size: 18px; }
 .quote-calc, .quote-submit { width: 100%; margin-top: 10px; }
 .price-change { font-size: 22px; font-weight: 700; }
+.price-change-table { margin: 8px 0; }
+.price-change-table p { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 0; font-size: 14px; }
+.price-change-table span { color: #5b6c8f; }
 .ml-20px { margin-left: 20px; }
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }

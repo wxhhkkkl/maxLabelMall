@@ -19,8 +19,9 @@ vi.mock('@/api/address', () => ({
 vi.mock('@/api/upload', () => ({
   uploadFile: (...a: unknown[]) => uploadFile(...a),
 }))
+const authState = vi.hoisted(() => ({ token: 'token' as string | null }))
 vi.mock('@/utils/auth', () => ({
-  getAccessToken: () => 'token',
+  getAccessToken: () => authState.token,
 }))
 
 const View = (await import('./CustomizationView.vue')).default
@@ -55,6 +56,7 @@ function mountView() {
 }
 
 beforeEach(() => {
+  authState.token = 'token'
   listCustomizationMaterials.mockReset().mockResolvedValue([material])
   quoteCustomization.mockReset().mockResolvedValue(quote)
   createCustomizationOrder.mockReset()
@@ -128,6 +130,131 @@ describe('CustomizationView（014 / US48）', () => {
 
     expect(createCustomizationOrder).toHaveBeenCalledWith(expect.objectContaining({ expectedAmount: 46320 }))
     expect(w.text()).toContain('价格已更新')
+    w.unmount()
+    vi.useRealTimers()
+  })
+
+  it('改价弹层同时展示原价、新价与差额（Q101）', async () => {
+    vi.useFakeTimers()
+    createCustomizationOrder.mockResolvedValue({ changed: true, quote: { ...quote, payable: 47320 } })
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    const input = w.get('#customizationFile')
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' })
+    Object.defineProperty(file, 'size', { value: 1024 })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+
+    await w.get('#customizationSubmit').trigger('click')
+    await flushPromises()
+
+    // 客户要确认的是「贵了多少」，只给新价等于让他盲签
+    expect(w.text()).toContain('463.20') // 原价
+    expect(w.text()).toContain('473.20') // 新价
+    expect(w.text()).toContain('10.00') // 差额
+    w.unmount()
+    vi.useRealTimers()
+  })
+
+  it('尺寸超出材质上下限时提示允许范围，且不发起提交', async () => {
+    vi.useFakeTimers()
+    createCustomizationOrder.mockResolvedValue({ id: 123 })
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    await w.get('#customizationWidth').setValue(5000)
+    await w.get('#customizationWidth').trigger('blur')
+    await flushPromises()
+    expect(w.text()).toContain('尺寸需在 10~2000')
+
+    await w.get('#customizationSubmit').trigger('click')
+    await flushPromises()
+    expect(createCustomizationOrder).not.toHaveBeenCalled()
+    w.unmount()
+    vi.useRealTimers()
+  })
+
+  it('修改数量后重新报价', async () => {
+    vi.useFakeTimers()
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    quoteCustomization.mockClear()
+
+    await w.get('#customizationQuantity').setValue(2000)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(quoteCustomization).toHaveBeenCalledWith(expect.objectContaining({ quantity: 2000 }))
+    w.unmount()
+    vi.useRealTimers()
+  })
+
+  it('白名单之外的文件格式在上传前被拦下', async () => {
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+
+    const input = w.get('#customizationFile')
+    const exe = new File(['x'], 'virus.exe', { type: 'application/octet-stream' })
+    Object.defineProperty(input.element, 'files', { value: [exe], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(uploadFile).not.toHaveBeenCalled()
+    expect(w.text()).toContain('不支持的文件格式')
+    w.unmount()
+  })
+
+  it('最多上传 5 个文件，超出的被忽略', async () => {
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+
+    const files = Array.from({ length: 6 }, (_, i) => {
+      const f = new File(['x'], `a${i}.pdf`, { type: 'application/pdf' })
+      Object.defineProperty(f, 'size', { value: 1024 })
+      return f
+    })
+    const input = w.get('#customizationFile')
+    Object.defineProperty(input.element, 'files', { value: files, configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(uploadFile).toHaveBeenCalledTimes(5)
+    expect(w.text()).toContain('最多上传 5 个文件')
+    w.unmount()
+  })
+
+  it('未登录点提交时引导登录，已填内容不丢', async () => {
+    vi.useFakeTimers()
+    authState.token = null
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    const router = w.vm.$router
+    const push = vi.spyOn(router, 'push')
+    await w.get('#customizationSubmit').trigger('click')
+    await flushPromises()
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ login: '1' }),
+    }))
+    // 选中的材质仍在页面上
+    expect(w.get('#customizationMaterial-3').classes()).toContain('is-active')
     w.unmount()
     vi.useRealTimers()
   })

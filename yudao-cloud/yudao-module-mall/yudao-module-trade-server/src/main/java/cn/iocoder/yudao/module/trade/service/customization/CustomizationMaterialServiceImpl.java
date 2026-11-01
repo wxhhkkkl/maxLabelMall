@@ -25,6 +25,10 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.CUSTOMIZATI
 import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.CUSTOMIZATION_TYPE;
 import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_CREATE_SUB_TYPE;
 import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_CREATE_SUCCESS;
+import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_DELETE_SUB_TYPE;
+import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_DELETE_SUCCESS;
+import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_STATUS_SUB_TYPE;
+import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_STATUS_SUCCESS;
 import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_UPDATE_SUB_TYPE;
 import static cn.iocoder.yudao.module.trade.enums.customization.CustomizationLogRecordConstants.MATERIAL_UPDATE_SUCCESS;
 
@@ -105,6 +109,8 @@ public class CustomizationMaterialServiceImpl implements CustomizationMaterialSe
     }
 
     @Override
+    @LogRecord(type = CUSTOMIZATION_TYPE, subType = MATERIAL_STATUS_SUB_TYPE,
+            bizNo = "{{#id}}", success = MATERIAL_STATUS_SUCCESS)
     public void updateMaterialStatus(Long id, Integer status) {
         if (getMaterial(id) == null) {
             throw exception(CUSTOMIZATION_MATERIAL_NOT_AVAILABLE);
@@ -116,6 +122,8 @@ public class CustomizationMaterialServiceImpl implements CustomizationMaterialSe
     }
 
     @Override
+    @LogRecord(type = CUSTOMIZATION_TYPE, subType = MATERIAL_DELETE_SUB_TYPE,
+            bizNo = "{{#id}}", success = MATERIAL_DELETE_SUCCESS)
     public void deleteMaterial(Long id) {
         if (getMaterial(id) == null) {
             throw exception(CUSTOMIZATION_MATERIAL_NOT_AVAILABLE);

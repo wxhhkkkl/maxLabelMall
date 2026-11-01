@@ -18,6 +18,8 @@ import cn.iocoder.yudao.module.promotion.api.combination.CombinationRecordApi;
 import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.member.api.address.dto.MemberAddressRespDTO;
+import cn.iocoder.yudao.module.trade.controller.app.customization.vo.AppCustomizationSpecReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
@@ -815,6 +817,83 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         // 订单仍是待发货
         assertEquals(TradeOrderStatusEnum.UNDELIVERED.getStatus(),
                 tradeOrderMapper.selectById(order.getId()).getStatus());
+    }
+
+    // ==================== 014 印刷定制：建单标记与订单项 ====================
+
+    private AppTradeOrderCreateReqVO customizationCreateReq() {
+        AppCustomizationSpecReqVO spec = new AppCustomizationSpecReqVO();
+        spec.setMaterialId(3L);
+        spec.setWidth(50);
+        spec.setHeight(100);
+        spec.setQuantity(1000);
+        spec.setMode(2);
+        spec.setForm(2);
+        spec.setRowCount(1);
+        spec.setColumnCount(1);
+
+        AppTradeOrderCreateReqVO reqVO = new AppTradeOrderCreateReqVO();
+        reqVO.setItems(new ArrayList<>()); // 定制单由服务端生成订单项，不需要购物车入参
+        reqVO.setAddressId(7L);
+        reqVO.setDeliveryType(1);
+        reqVO.setCustomization(spec);
+        return reqVO;
+    }
+
+    private void mockCustomizationPrice() {
+        // 报价 455.20 元 / 1000 张：单价 46、差额 480 分记入商品优惠（R90）
+        TradePriceCalculateRespBO calculateRespBO = new TradePriceCalculateRespBO();
+        calculateRespBO.setType(0);
+        calculateRespBO.setDeliveryType(1);
+        TradePriceCalculateRespBO.Price price = new TradePriceCalculateRespBO.Price();
+        price.setTotalPrice(46000);
+        price.setDiscountPrice(480);
+        price.setDeliveryPrice(0);
+        price.setCouponPrice(0);
+        price.setPointPrice(0);
+        price.setVipPrice(0);
+        price.setPayPrice(45520);
+        calculateRespBO.setPrice(price);
+        TradePriceCalculateRespBO.OrderItem item = new TradePriceCalculateRespBO.OrderItem();
+        item.setSpuId(990001L).setSkuId(990002L).setCount(1000).setSelected(true)
+                .setPrice(46).setDiscountPrice(480).setPayPrice(45520).setSpuName("印刷定制 · 可移除铜版");
+        calculateRespBO.setItems(List.of(item));
+        when(customizationPriceService.calculateOrderPrice(any(), any())).thenReturn(calculateRespBO);
+    }
+
+    /**
+     * 定制单建单：打上 `customization` 标记，订单项恰好 1 条且不带 cartId（FR-379），金额来自定制报价。
+     */
+    @Test
+    public void testCreateOrder_customization_marksOrderAndSingleItemWithoutCartId() {
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-CUS");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        MemberAddressRespDTO address = new MemberAddressRespDTO();
+        address.setId(7L);
+        address.setName("张三");
+        address.setMobile("13800008888");
+        address.setAreaId(110101);
+        address.setDetailAddress("xx 路 1 号");
+        when(addressApi.getAddress(7L, 88L)).thenReturn(CommonResult.success(address));
+        mockCustomizationPrice();
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            TradeOrderDO order = orderService.createOrder(88L, customizationCreateReq());
+
+            assertEquals(Boolean.TRUE, order.getCustomization());
+            assertEquals(45520, order.getPayPrice());
+            List<TradeOrderItemDO> items = tradeOrderItemMapper.selectListByOrderId(order.getId());
+            assertEquals(1, items.size());
+            assertNull(items.get(0).getCartId());
+            assertEquals(1000, items.get(0).getCount());
+            assertEquals(46, items.get(0).getPrice());
+            assertEquals(480, items.get(0).getDiscountPrice());
+            assertEquals(45520, items.get(0).getPayPrice());
+        }
     }
 
     @Test

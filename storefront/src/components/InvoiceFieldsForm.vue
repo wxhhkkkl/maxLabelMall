@@ -74,6 +74,8 @@ function fillFrom(title: InvoiceTitle) {
     titleAddress: title.titleAddress ?? '',
     titlePhone: title.titlePhone ?? '',
     bankName: title.bankName ?? '',
+    bankAccount: title.bankAccount ?? '',
+    bankCode: title.bankCode ?? '',
     email: title.email ?? '',
   }
 }
@@ -185,12 +187,30 @@ function fillFrom(title: InvoiceTitle) {
           autocomplete="off"
         >
       </MlField>
-      <MlField label="开户行及账号">
+      <MlField label="开户行">
         <input
           id="invoiceBankName"
           v-model="model.bankName"
           class="ml-input"
-          placeholder="例如：工商银行南京分行 6222 0000 0000 0000"
+          placeholder="例如：工商银行南京分行"
+          autocomplete="off"
+        >
+      </MlField>
+      <MlField label="银行账户">
+        <input
+          id="invoiceBankAccount"
+          v-model="model.bankAccount"
+          class="ml-input"
+          placeholder="银行账号"
+          autocomplete="off"
+        >
+      </MlField>
+      <MlField label="行号">
+        <input
+          id="invoiceBankCode"
+          v-model="model.bankCode"
+          class="ml-input"
+          placeholder="开户行联行号 / CNAPS"
           autocomplete="off"
         >
       </MlField>

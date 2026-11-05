@@ -23,6 +23,7 @@ import MlModal from '@/components/base/MlModal.vue'
 import { InvoiceTitleKind, InvoiceType, type Address, type InvoiceApplyForm } from '@/types'
 import { useUserStore } from '@/store/user'
 import { formatYuan } from '@/utils/money'
+import { getLastInvoiceChoice, saveLastInvoiceChoice } from '@/utils/last-invoice'
 
 /**
  * 印刷定制（014）—— 单页渐进式四步（按参考站点截图）：
@@ -88,14 +89,17 @@ const quoting = ref(false)
 const addresses = ref<Address[]>([])
 const addressId = ref<number | null>(null)
 const invoiceEnabled = ref(false)
+const lastInvoiceChoice = getLastInvoiceChoice()
 const invoiceForm = ref<InvoiceApplyForm>({
-  type: InvoiceType.NORMAL,
-  titleKind: InvoiceTitleKind.COMPANY,
+  type: lastInvoiceChoice?.type ?? InvoiceType.NORMAL,
+  titleKind: lastInvoiceChoice?.titleKind ?? InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  bankAccount: '',
+  bankCode: '',
   email: '',
 })
 
@@ -368,6 +372,12 @@ async function submit(expectedAmount?: number): Promise<void> {
       priceChanged.value = resp.quote ?? null
       if (resp.quote) quote.value = resp.quote
       return
+    }
+    if (invoiceEnabled.value) {
+      saveLastInvoiceChoice({
+        type: invoiceForm.value.type,
+        titleKind: invoiceForm.value.titleKind,
+      })
     }
     if (resp.id) await router.push(`/order/${resp.id}`)
   } catch (err) {

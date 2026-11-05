@@ -33,6 +33,8 @@ const emptyForm = (): InvoiceApplyForm => ({
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  bankAccount: '',
+  bankCode: '',
   email: '',
 })
 
@@ -58,6 +60,8 @@ watch(() => props.open, (value) => {
         titleAddress: title.titleAddress ?? '',
         titlePhone: title.titlePhone ?? '',
         bankName: title.bankName ?? '',
+        bankAccount: title.bankAccount ?? '',
+        bankCode: title.bankCode ?? '',
         email: title.email ?? '',
       }
     : emptyForm()
@@ -84,6 +88,8 @@ async function onSubmit() {
       titleAddress: form.value.titleAddress,
       titlePhone: form.value.titlePhone,
       bankName: form.value.bankName,
+      bankAccount: form.value.bankAccount,
+      bankCode: form.value.bankCode,
       email: form.value.email,
       defaultStatus: isDefault.value,
     }

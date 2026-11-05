@@ -25,6 +25,7 @@ import { useUserStore } from '@/store/user'
 import type { Address, CartItem, InvoiceApplyForm, SettlementCoupon, SettlementResp } from '@/types'
 import { InvoiceTitleKind, InvoiceType } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
+import { getLastInvoiceChoice, saveLastInvoiceChoice } from '@/utils/last-invoice'
 import { reconcile } from '@/utils/money'
 
 /**
@@ -116,15 +117,18 @@ const remark = ref('')
  * 客户要复用，得在自己的抬头簿里存一条（US23）。
  */
 const invoiceEnabled = ref(false)
+const lastInvoiceChoice = getLastInvoiceChoice()
 const invoiceForm = ref<InvoiceApplyForm>({
-  type: InvoiceType.NORMAL,
+  type: lastInvoiceChoice?.type ?? InvoiceType.NORMAL,
   // 默认「企业」—— 与后端枚举的默认档一致；客户是个人就在卡片上改成「个人」（Q38）
-  titleKind: InvoiceTitleKind.COMPANY,
+  titleKind: lastInvoiceChoice?.titleKind ?? InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  bankAccount: '',
+  bankCode: '',
   email: '',
 })
 
@@ -277,6 +281,12 @@ async function onSubmit() {
     await cartStore.onOrderPlaced()
 
     priceChangePending.value = false
+    if (invoiceEnabled.value) {
+      saveLastInvoiceChoice({
+        type: invoiceForm.value.type,
+        titleKind: invoiceForm.value.titleKind,
+      })
+    }
     router.push(`/order/${res.id}`)
   } catch (e) {
     const msg = (e as { message?: string })?.message ?? ''

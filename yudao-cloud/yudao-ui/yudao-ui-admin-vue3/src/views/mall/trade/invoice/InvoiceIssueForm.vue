@@ -14,6 +14,26 @@
       <el-form-item label="抬头类型">
         <span>{{ formData.titleKindName || '—' }}</span>
       </el-form-item>
+      <template v-if="formData.type === 2">
+        <el-form-item label="税号">
+          <span>{{ formData.taxNo || '—' }}</span>
+        </el-form-item>
+        <el-form-item label="注册地址">
+          <span>{{ formData.titleAddress || '—' }}</span>
+        </el-form-item>
+        <el-form-item label="注册电话">
+          <span>{{ formData.titlePhone || '—' }}</span>
+        </el-form-item>
+        <el-form-item label="开户行">
+          <span>{{ formData.bankName || '—' }}</span>
+        </el-form-item>
+        <el-form-item label="银行账户">
+          <span>{{ formData.bankAccount || '—' }}</span>
+        </el-form-item>
+        <el-form-item label="行号">
+          <span>{{ formData.bankCode || '—' }}</span>
+        </el-form-item>
+      </template>
       <el-form-item label="开票金额">
         <span>{{ fenToYuan(formData.amount) }} 元</span>
       </el-form-item>

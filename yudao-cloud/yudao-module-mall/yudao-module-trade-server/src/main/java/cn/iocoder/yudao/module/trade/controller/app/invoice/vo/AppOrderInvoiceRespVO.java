@@ -43,8 +43,14 @@ public class AppOrderInvoiceRespVO {
     @Schema(description = "注册电话")
     private String titlePhone;
 
-    @Schema(description = "开户行及账号")
+    @Schema(description = "开户行（银行名称/支行）")
     private String bankName;
+
+    @Schema(description = "银行账户（账号）")
+    private String bankAccount;
+
+    @Schema(description = "开户行行号（联行号 / CNAPS）")
+    private String bankCode;
 
     @Schema(description = "接收发票 / 收据的邮箱（选填）", example = "finance@example.com")
     private String email;

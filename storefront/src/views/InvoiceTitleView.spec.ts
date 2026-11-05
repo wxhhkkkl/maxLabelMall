@@ -137,6 +137,8 @@ describe('发票抬头簿页面', () => {
       titleAddress: '南京市玄武区某某路 1 号',
       titlePhone: '18913984596',
       bankName: '工商银行南京分行 6222',
+      bankAccount: '',
+      bankCode: '',
       email: '',
       defaultStatus: true,
     })

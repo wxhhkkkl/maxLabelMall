@@ -547,6 +547,8 @@ describe('CheckoutView —— 下单时申请开票（006 / FR-153 / FR-156 / FR
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      bankAccount: '',
+      bankCode: '',
       email: '',
     })
   })

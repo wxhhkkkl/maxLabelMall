@@ -27,7 +27,9 @@ export interface TradeOrderInvoiceVO {
   taxNo?: string // 纳税人识别号
   titleAddress?: string // 注册地址
   titlePhone?: string // 注册电话
-  bankName?: string // 开户行及账号
+  bankName?: string // 开户行（银行名称/支行）
+  bankAccount?: string // 银行账户（账号）
+  bankCode?: string // 开户行行号（联行号 / CNAPS）
   email?: string // 接收发票 / 收据的邮箱（选填）
   invoiceFileUrl?: string // 发票文件地址（已开票才有）
   issueTime?: Date // 开票时间

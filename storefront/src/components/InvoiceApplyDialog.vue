@@ -6,6 +6,7 @@ import InvoiceFieldsForm from '@/components/InvoiceFieldsForm.vue'
 import MlModal from '@/components/base/MlModal.vue'
 import { InvoiceTitleKind, InvoiceType, type InvoiceApplyForm } from '@/types/invoice'
 import { invoiceFieldError } from '@/utils/invoice'
+import { getLastInvoiceChoice, saveLastInvoiceChoice } from '@/utils/last-invoice'
 
 /**
  * 订单详情**补开票**弹层（US20 / FR-163）。
@@ -19,16 +20,21 @@ import { invoiceFieldError } from '@/utils/invoice'
 const props = defineProps<{ open: boolean; orderId: number }>()
 const emit = defineEmits<{ close: []; submitted: [] }>()
 
-const emptyForm = (): InvoiceApplyForm => ({
-  type: InvoiceType.NORMAL,
-  titleKind: InvoiceTitleKind.COMPANY,
-  titleName: '',
-  taxNo: '',
-  titleAddress: '',
-  titlePhone: '',
-  bankName: '',
-  email: '',
-})
+const emptyForm = (): InvoiceApplyForm => {
+  const last = getLastInvoiceChoice()
+  return {
+    type: last?.type ?? InvoiceType.NORMAL,
+    titleKind: last?.titleKind ?? InvoiceTitleKind.COMPANY,
+    titleName: '',
+    taxNo: '',
+    titleAddress: '',
+    titlePhone: '',
+    bankName: '',
+    bankAccount: '',
+    bankCode: '',
+    email: '',
+  }
+}
 
 const form = ref<InvoiceApplyForm>(emptyForm())
 const submitting = ref(false)
@@ -55,6 +61,7 @@ async function onSubmit() {
   submitting.value = true
   try {
     await createOrderInvoice({ orderId: props.orderId, ...form.value })
+    saveLastInvoiceChoice({ type: form.value.type, titleKind: form.value.titleKind })
     emit('submitted')
     emit('close')
   } catch (e) {

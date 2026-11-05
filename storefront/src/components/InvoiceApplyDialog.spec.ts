@@ -54,6 +54,8 @@ describe('订单详情补开票弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      bankAccount: '',
+      bankCode: '',
       email: '',
     })
     expect(w.emitted('submitted')).toHaveLength(1)

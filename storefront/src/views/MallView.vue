@@ -17,7 +17,7 @@ import ProductCard from '@/components/ProductCard.vue'
 import MallHome from '@/components/MallHome.vue'
 import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
-import { getLastSearchKeyword, saveLastSearchKeyword } from '@/utils/last-search'
+import { getLastSearchKeyword, getSearchHistory, saveLastSearchKeyword } from '@/utils/last-search'
 import '@/styles/mall.css'
 
 // 分类、搜索、排序及分页均由后端处理；展示方式只改变当前商品的布局。
@@ -35,6 +35,8 @@ const searchInput = ref('')
 /** 上一次搜索的词（本地存储）。输入框为空时作为灰色提示显示，点「搜索」直接复用它 */
 const lastKeyword = ref(getLastSearchKeyword())
 const searchPlaceholder = computed(() => lastKeyword.value || '搜索商品名称、型号或规格')
+/** 最近搜索记忆词（最新在前，最多 8 条） */
+const searchHistory = ref<string[]>(getSearchHistory())
 const categoryId = ref<number | undefined>(Number.isSafeInteger(initialCategoryId) && initialCategoryId > 0 ? initialCategoryId : undefined)
 const sortKey = ref<'default' | 'sales' | 'priceAsc' | 'priceDesc'>('default')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -129,8 +131,14 @@ function runSearch(term: string) {
   if (term) {
     saveLastSearchKeyword(term)
     lastKeyword.value = term
+    searchHistory.value = getSearchHistory()
   }
   load()
+}
+
+function pickHistory(term: string) {
+  searchInput.value = term
+  runSearch(term)
 }
 
 function onSearch() {
@@ -293,12 +301,13 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
   <div class="mall-page">
     <div class="mall-container mall-topline">
       <div><h1>标签商城</h1><p>打印设备与标签耗材，按需挑选。</p></div>
-      <form
-        id="mallSearchBox"
-        class="mall-search"
-        role="search"
-        @submit.prevent="onSearch"
-      >
+      <div class="mall-search-wrap">
+        <form
+          id="mallSearchBox"
+          class="mall-search"
+          role="search"
+          @submit.prevent="onSearch"
+        >
         <svg
           width="20"
           height="20"
@@ -337,7 +346,23 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
         >
           搜索
         </button>
-      </form>
+        </form>
+        <div
+          v-if="searchHistory.length"
+          class="mall-search-history"
+          aria-label="最近搜索"
+        >
+          <span class="msh-label">最近搜索</span>
+          <button
+            v-for="term in searchHistory"
+            :key="term"
+            type="button"
+            @click="pickHistory(term)"
+          >
+            {{ term }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <LoadingState

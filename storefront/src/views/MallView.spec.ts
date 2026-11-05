@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { Category, ProductSpu } from '@/types'
-import { LAST_SEARCH_KEY } from '@/utils/last-search'
+import { LAST_SEARCH_KEY, SEARCH_HISTORY_KEY } from '@/utils/last-search'
 
 const addToCartMock = vi.fn()
 vi.mock('@/api/cart', () => ({
@@ -689,6 +689,19 @@ describe('MallView —— 记住上次搜索（本地存储）', () => {
   it('从没搜过时仍是默认提示', async () => {
     const w = await mountMall()
     expect(placeholder(w)).toBe('搜索商品名称、型号或规格')
+  })
+
+  it('展示多条最近搜索记忆，点击记忆词直接搜索', async () => {
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(['碳带', '热敏纸']))
+    const w = await mountMall([spu(1)], 1)
+
+    const chips = w.findAll('.mall-search-history button')
+    expect(chips.map((chip) => chip.text())).toEqual(['碳带', '热敏纸'])
+
+    await chips[1].trigger('click')
+    await flushPromises()
+    expect(lastParams().keyword).toBe('热敏纸')
+    expect((w.get('#mallSearch').element as HTMLInputElement).value).toBe('热敏纸')
   })
 
   it('提交搜索后把关键词记在本地，输入框清空时以灰色提示直接显示它', async () => {

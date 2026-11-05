@@ -2,15 +2,13 @@ package cn.iocoder.yudao.module.member.controller.app.template;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.member.controller.app.share.vo.AppPlatformContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppSharedTemplateContentRespVO;
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppSharedTemplatePageReqVO;
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppSharedTemplateRespVO;
-import cn.iocoder.yudao.module.member.dal.dataobject.template.MaxLabelSharedTemplateDO;
-import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelPlatformContentDO;
+import cn.iocoder.yudao.module.member.service.share.PlatformContentService;
 import cn.iocoder.yudao.module.member.service.template.MaxLabelTemplateSketch;
-import cn.iocoder.yudao.module.member.service.template.SharedTemplateService;
-import cn.iocoder.yudao.module.member.service.user.MemberUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,53 +21,71 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
-@Tag(name = "用户 App - MaxLabel 共享模板")
+/**
+ * 旧版平台共享模板库端点：保留路径与字段，内部代理到平台共享内容。
+ */
+@Tag(name = "用户 App - MaxLabel 共享模板（兼容）")
 @RestController
 @RequestMapping("/member/shared-template")
 @Validated
 public class AppSharedTemplateController {
 
+    private static final String PUBLISHER = "平台运营";
+
     @Resource
-    private SharedTemplateService sharedTemplateService;
-    @Resource
-    private MemberUserService memberUserService;
+    private PlatformContentService platformContentService;
 
     @GetMapping("/page")
-    @Operation(summary = "获得平台共享模板分页")
+    @Operation(summary = "获得平台共享内容分页")
     public CommonResult<PageResult<AppSharedTemplateRespVO>> getPage(@Valid AppSharedTemplatePageReqVO reqVO) {
-        PageResult<MaxLabelSharedTemplateDO> page = sharedTemplateService.getPublicPage(reqVO);
+        AppPlatformContentPageReqVO pageReq = new AppPlatformContentPageReqVO();
+        pageReq.setKeyword(reqVO.getKeyword());
+        pageReq.setCategory(reqVO.getCategory());
+        pageReq.setWidthMin(reqVO.getWidthMin());
+        pageReq.setWidthMax(reqVO.getWidthMax());
+        pageReq.setHeightMin(reqVO.getHeightMin());
+        pageReq.setHeightMax(reqVO.getHeightMax());
+        pageReq.setPageNo(reqVO.getPageNo());
+        pageReq.setPageSize(reqVO.getPageSize());
+        PageResult<MaxLabelPlatformContentDO> page = platformContentService.getOnlinePage(pageReq);
         List<AppSharedTemplateRespVO> list = page.getList().stream().map(this::toRespVO).toList();
         return success(new PageResult<>(list, page.getTotal()));
     }
 
     @GetMapping("/get")
-    @Operation(summary = "获得平台共享模板正文")
+    @Operation(summary = "获得平台共享内容正文")
     @Parameter(name = "id", required = true)
     public CommonResult<AppSharedTemplateContentRespVO> get(@RequestParam("id") Long id) {
-        MaxLabelSharedTemplateDO shared = sharedTemplateService.getPublicContent(id);
-        AppSharedTemplateContentRespVO resp = BeanUtils.toBean(shared, AppSharedTemplateContentRespVO.class);
-        resp.setPublisherNickname(publisherName(shared.getPublisherMemberId()));
-        resp.setThumb(MaxLabelTemplateSketch.dataUrl(shared.getContent(), shared.getWidthMm(), shared.getHeightMm()));
+        MaxLabelPlatformContentDO content = platformContentService.getOnline(id);
+        AppSharedTemplateContentRespVO resp = new AppSharedTemplateContentRespVO();
+        copy(resp, content);
+        resp.setContent(content.getContent());
         return success(resp);
     }
 
-    private AppSharedTemplateRespVO toRespVO(MaxLabelSharedTemplateDO shared) {
-        AppSharedTemplateRespVO resp = BeanUtils.toBean(shared, AppSharedTemplateRespVO.class);
-        resp.setPublisherNickname(publisherName(shared.getPublisherMemberId()));
-        resp.setThumb(MaxLabelTemplateSketch.dataUrl(shared.getContent(), shared.getWidthMm(), shared.getHeightMm()));
+    private AppSharedTemplateRespVO toRespVO(MaxLabelPlatformContentDO content) {
+        AppSharedTemplateRespVO resp = new AppSharedTemplateRespVO();
+        copy(resp, content);
         return resp;
     }
 
-    private String publisherName(Long memberId) {
-        MemberUserDO user = memberUserService.getUser(memberId);
-        if (user == null) return "匿名会员";
-        if (user.getNickname() != null && !user.getNickname().isBlank()) return user.getNickname();
-        String mobile = user.getMobile();
-        if (mobile == null || mobile.length() < 7) return "匿名会员";
-        return mobile.substring(0, 3) + "****" + mobile.substring(mobile.length() - 4);
+    private void copy(AppSharedTemplateRespVO resp, MaxLabelPlatformContentDO content) {
+        resp.setId(content.getId());
+        resp.setName(content.getName());
+        resp.setContentType(content.getContentType());
+        resp.setWidthMm(content.getWidthMm());
+        resp.setHeightMm(content.getHeightMm());
+        resp.setCategory(content.getCategory());
+        resp.setKeywords(content.getKeywords());
+        resp.setPublisherNickname(PUBLISHER);
+        resp.setPublishedTime(content.getPublishedTime());
+        resp.setThumb(Objects.equals(content.getContentType(), 1) && content.getContent() != null
+                ? MaxLabelTemplateSketch.dataUrl(content.getContent(), content.getWidthMm(), content.getHeightMm())
+                : null);
     }
 
 }

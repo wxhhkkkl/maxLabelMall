@@ -18,6 +18,8 @@ public class AppSharedTemplateRespVO {
     private String keywords;
     private String publisherNickname;
     private LocalDateTime publishedTime;
+    /** 内容类型：1 模板 2 txt 3 excel 4 csv 5 图片 */
+    private Integer contentType;
     /** 示意图（SVG data URL，由正文即时生成）。 */
     private String thumb;
 

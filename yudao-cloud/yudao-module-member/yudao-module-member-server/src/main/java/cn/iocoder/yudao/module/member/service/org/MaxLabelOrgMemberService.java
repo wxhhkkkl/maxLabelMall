@@ -22,6 +22,9 @@ public interface MaxLabelOrgMemberService {
 
     PageResult<MaxLabelOrgMemberDO> getMemberPage(Long orgId, String keyword, PageParam pageParam);
 
+    /** 企业全部在册成员（文件夹可见名单编辑用） */
+    java.util.List<MaxLabelOrgMemberDO> getMemberList(Long orgId);
+
     MaxLabelOrgMemberDO getByMemberId(Long memberId);
 
     int getMemberCount(Long orgId);

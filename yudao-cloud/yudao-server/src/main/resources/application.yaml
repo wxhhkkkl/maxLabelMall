@@ -385,6 +385,9 @@ yudao:
         map-config-key: ''
         default-from-area-id:
         default-from-address: ''
+  maxlabel:
+    share:
+      content-max-bytes: 16777216 # 共享内容单文件上限，默认 16 MB
   iot:
     message-bus:
       type: redis # 消息总线的类型

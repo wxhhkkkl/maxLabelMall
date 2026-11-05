@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMemberMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgSeatMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.share.MaxLabelShareFolderMemberMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
 import cn.iocoder.yudao.module.member.enums.org.MaxLabelOrgRoleEnum;
 import com.mzt.logapi.starter.annotation.LogRecord;
@@ -51,6 +52,8 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
     private MemberUserMapper memberUserMapper;
     @Resource
     private MaxLabelOrgService orgService;
+    @Resource
+    private MaxLabelShareFolderMemberMapper shareFolderMemberMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -99,6 +102,7 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
             throw exception(MEMBER_ORG_OWNER_REQUIRED);
         }
         orgMemberMapper.deleteByOrgIdAndMemberId(orgId, memberId);
+        shareFolderMemberMapper.deleteByMemberId(memberId);
         revokeSeat(orgId, memberId, operatorType, operatorId);
     }
 
@@ -160,6 +164,7 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
             throw exception(MEMBER_ORG_OWNER_CANNOT_LEAVE);
         }
         orgMemberMapper.deleteByOrgIdAndMemberId(relation.getOrgId(), memberId);
+        shareFolderMemberMapper.deleteByMemberId(memberId);
         revokeSeat(relation.getOrgId(), memberId, OPERATOR_MEMBER, memberId);
     }
 
@@ -179,6 +184,11 @@ public class MaxLabelOrgMemberServiceImpl implements MaxLabelOrgMemberService {
             memberIds = ids;
         }
         return orgMemberMapper.selectPageByOrgId(orgId, memberIds, pageParam);
+    }
+
+    @Override
+    public java.util.List<MaxLabelOrgMemberDO> getMemberList(Long orgId) {
+        return orgMemberMapper.selectListByOrgId(orgId);
     }
 
     @Override

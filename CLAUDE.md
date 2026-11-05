@@ -4,9 +4,9 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/012-enterprise-seat-licensing/plan.md
+specs/016-shared-content-space/plan.md
 
-Supporting artifacts for the active feature:
+企业席位（012）相关产物：
 - specs/012-enterprise-seat-licensing/spec.md — 功能规格（Q65~Q74：企业 / 席位 / 有效期 / 可见性）
 - specs/012-enterprise-seat-licensing/plan.md — 4 表 + 3 列 + 权益解析 + 企业中心
 - specs/012-enterprise-seat-licensing/data-model.md — 企业 / 企业成员 / 授权批次 / 席位
@@ -21,7 +21,20 @@ Supporting artifacts for the active feature:
   📌 2026-10-27：**个人会员订阅订单用户端同样不允许退款**（后台保留人工通道）；纯虚拟订阅订单
   支付成功后直接置为「已完成」，历史已支付待发货订阅单由 `024` 迁移补成已完成（Q82）
 
-当前特性（014 印刷定制：选材质 / 尺寸 / 工艺 → 报价 → 支付，后台可查定制要求）：
+当前特性（016 共享内容空间：个人 / 企业 / 平台）：
+- specs/016-shared-content-space/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/016-shared-content-space/contracts/{app-api,admin-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/033-shared-content-space.sql`（5 张新表 + 两张旧表迁移 +
+  平台内容菜单），再发后端，最后发管理端 / 桌面端
+  📌 口径：免费 10 MB / 专业 100 MB / 企业 300 MB 共享池；企业空间仅持席成员可用（管理员不豁免）；
+  平台共享只允许后台管理人员上传（会员投稿关闭）；个人空间不可分享；存量模板全部计入配额
+
+上一个特性（015 发货前修改收货地址：仅待发货，从地址簿选）：
+- specs/015-order-address-edit/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/015-order-address-edit/contracts/app-api.md
+  ⚠️ 无数据库变更；服务端新增 C 端 `PUT /trade/order/update-address`，门面站订单详情加入口
+
+上一个特性（014 印刷定制：选材质 / 尺寸 / 工艺 → 报价 → 支付，后台可查定制要求）：
 - specs/014-print-customization/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/014-print-customization/contracts/{app-api,admin-api}.md
   ⚠️ **上线顺序**：先执行 `sql/mysql/027-print-customization.sql`（4 表 + `trade_order.customization`

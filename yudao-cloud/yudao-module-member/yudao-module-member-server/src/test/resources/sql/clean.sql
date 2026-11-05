@@ -3,6 +3,8 @@ DELETE FROM "member_address";
 DELETE FROM "member_tag";
 DELETE FROM "member_level";
 DELETE FROM "member_group";
+DELETE FROM "maxlabel_share_folder_member";
+DELETE FROM "maxlabel_share_folder";
 DELETE FROM "maxlabel_org_seat";
 DELETE FROM "maxlabel_org_license";
 DELETE FROM "maxlabel_org_member";

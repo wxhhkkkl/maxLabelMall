@@ -87,4 +87,21 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_ORG_SEAT_NOT_EXISTS = new ErrorCode(1_004_015_011, "该会员没有有效席位");
     ErrorCode MEMBER_ORG_RENEWAL_SEATS_TOO_FEW = new ErrorCode(1_004_015_012, "续费席位数不能少于当前席位数（当前 {} 个）");
 
+    //========== MaxLabel 共享内容空间 1-004-016-000 ==========
+    ErrorCode MEMBER_SHARE_SCOPE_INVALID = new ErrorCode(1_004_016_000, "空间类型不合法");
+    ErrorCode MEMBER_SHARE_CONTENT_NOT_FOUND = new ErrorCode(1_004_016_001, "内容不存在或无权限");
+    ErrorCode MEMBER_SHARE_CONTENT_TYPE_INVALID = new ErrorCode(1_004_016_002, "不支持的内容类型或扩展名");
+    ErrorCode MEMBER_SHARE_CONTENT_TOO_LARGE = new ErrorCode(1_004_016_003, "文件超过 16 MB 限制");
+    ErrorCode MEMBER_SHARE_CONTENT_INVALID = new ErrorCode(1_004_016_004, "内容或字段不合法");
+    ErrorCode MEMBER_SHARE_QUOTA_EXCEEDED = new ErrorCode(1_004_016_005, "空间容量不足（已用 {}，上限 {}）");
+    ErrorCode MEMBER_SHARE_FOLDER_NOT_FOUND = new ErrorCode(1_004_016_006, "文件夹不存在或无权限");
+    ErrorCode MEMBER_SHARE_FOLDER_NOT_EMPTY = new ErrorCode(1_004_016_007, "文件夹内还有内容，请先清空或移动");
+    ErrorCode MEMBER_SHARE_FOLDER_NO_ROOT = new ErrorCode(1_004_016_008, "企业空间必须先选择文件夹");
+    ErrorCode MEMBER_SHARE_SEAT_REQUIRED = new ErrorCode(1_004_016_009, "需要企业席位才能使用企业空间");
+    ErrorCode MEMBER_SHARE_ENTERPRISE_READ_ONLY = new ErrorCode(1_004_016_010, "企业授权已到期或企业已停用，仅可浏览、下载与删除");
+    ErrorCode MEMBER_SHARE_FOLDER_MEMBER_INVALID = new ErrorCode(1_004_016_011, "可见成员不属于本企业");
+    ErrorCode MEMBER_PLATFORM_CONTENT_NOT_FOUND = new ErrorCode(1_004_016_012, "平台内容不存在或已下架");
+    ErrorCode MEMBER_SHARED_TEMPLATE_SUBMIT_CLOSED = new ErrorCode(1_004_016_013, "会员投稿已关闭，请由平台运营维护");
+    ErrorCode MEMBER_SHARE_FILE_STORAGE_FAILED = new ErrorCode(1_004_016_014, "文件保存失败，请稍后重试");
+
 }

@@ -75,6 +75,9 @@ specs/016-shared-content-space/plan.md
   **部分退款不作废也不改金额**（FR-184，plan R2）、**下载失败只做到"不静默 + 求助路径"**（Edge Cases，plan R10）
   📌 之后又叠加了 **Q35~Q39**：退款撤回**已开票**的申请、抬头加**个人**类型、抬头按**票种**分开管理、
   必填收敛为「**名称 + 税号**」—— 以 spec 的 Clarifications 为准（原文保留，只作来龙去脉）
+  📌 **2026-11-05 专票字段拆分**：`trade_invoice_title` / `trade_order_invoice` 新增
+  `bank_account`（银行账户）与 `bank_code`（行号）；`bank_name` 现在只表示开户行。
+  上线必须先执行 `sql/mysql/035-invoice-bank-fields.sql`；历史 `bank_name` 中的合并文本不自动拆分。
 
 更早的特性（微信扫码登录与首次登录补全资料）：
 - specs/005-wechat-scan-login/{spec,plan,research,data-model,quickstart,tasks}.md

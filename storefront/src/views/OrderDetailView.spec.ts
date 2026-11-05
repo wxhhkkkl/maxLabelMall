@@ -1646,3 +1646,33 @@ describe('015 发货前修改收货地址', () => {
     expect(w.find('[data-testid="order-address-edit"]').exists()).toBe(false)
   })
 })
+
+describe('再次购买', () => {
+  it('已完成普通订单显示入口，并按原 SKU + 数量进入结算', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.COMPLETED,
+      canReorder: true,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    const push = vi.spyOn(router, 'push')
+    const button = w.findAll('button').find((item) => item.text().includes('再次购买'))
+    expect(button).toBeTruthy()
+
+    await button!.trigger('click')
+    expect(push).toHaveBeenCalledWith({
+      path: '/checkout',
+      query: { source: 'reorder', skuIds: '501', counts: '2' },
+    })
+  })
+
+  it('订阅 / 企业 / 定制单没有再次购买入口', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.COMPLETED,
+      canReorder: false,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    expect(w.findAll('button').some((item) => item.text().includes('再次购买'))).toBe(false)
+  })
+})

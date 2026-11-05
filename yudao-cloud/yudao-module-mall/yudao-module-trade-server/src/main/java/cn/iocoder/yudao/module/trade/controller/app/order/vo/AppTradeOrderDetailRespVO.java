@@ -112,6 +112,10 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "是否个人会员订阅订单（用户端不支持退款）", example = "false")
     private Boolean subscription;
 
+    /** 能否「再次购买」：仅普通商品单；定制 / 企业授权 / 订阅单为 false */
+    @Schema(description = "是否可以再次购买（仅普通商品单）", example = "true")
+    private Boolean canReorder;
+
     @Schema(description = "发货物流公司编号", example = "10")
     private Long logisticsId;
 

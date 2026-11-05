@@ -578,6 +578,28 @@ function onQrClosed() {
 // ========== 评价（按订单项） ==========
 
 /** 该项现在能不能评价。判定要**同时**看订单状态与两个层级的 commentStatus —— 见 `canCommentItem` */
+/** 再次购买：按原 SKU + 数量直接进结算，不经购物车。 */
+function onReorder() {
+  const o = order.value
+  if (!o) return
+  const items = o.items.filter(
+    (it) => Number.isInteger(Number(it.skuId)) && Number(it.skuId) > 0,
+  )
+  if (!items.length) {
+    message.value = '该订单的商品信息不完整，无法再次购买'
+    return
+  }
+  message.value = ''
+  void router.push({
+    path: '/checkout',
+    query: {
+      source: 'reorder',
+      skuIds: items.map((i) => Number(i.skuId)).join(','),
+      counts: items.map((i) => i.count).join(','),
+    },
+  })
+}
+
 function canComment(it: OrderDetail['items'][number]): boolean {
   return order.value ? canCommentItem(order.value, it) : false
 }
@@ -778,6 +800,13 @@ onMounted(async () => {
           <p v-if="isUnpaid && !offlineWaiting" class="od-deadline">
             支付截止 {{ formatDateTime(order.payExpireTime) }}，逾期订单将自动取消
           </p>
+        </div>
+
+        <!-- 再次购买：只普通商品单；定制 / 企业授权 / 订阅单服务端 canReorder=false -->
+        <div v-if="order.canReorder" class="od-actions od-reorder-actions">
+          <button class="btn-cart" type="button" @click="onReorder">
+            再次购买
+          </button>
         </div>
 
         <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货）。
@@ -1376,6 +1405,7 @@ onMounted(async () => {
 .dl-val { overflow-wrap: anywhere; line-height: 1.8; font-size: 13px; }
 .dl-name { font-size: 12px; }
 .account-order-detail .dl-table { border-radius: 10px; }
+.od-reorder-actions { margin-top: 16px; }
 .od-actions {
   display: flex;
   justify-content: flex-end;

@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_PLATFORM_CONTENT_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +60,32 @@ public class PlatformContentServiceImplTest {
         assertEquals(1, saved.getStatus());
         assertEquals(7L, saved.getPublisherUserId());
         assertNotNull(saved.getPublishedTime());
+    }
+
+    @Test
+    void uploadExcelInfersTypeFromExtension() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "a.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1, 2});
+        AdminPlatformContentUploadReqVO req = new AdminPlatformContentUploadReqVO();
+        req.setContentType(1);
+        req.setName("a.xlsx");
+        req.setFile(file);
+        when(fileStorage.store(any(), eq("a.xlsx"), eq(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")))
+                .thenReturn("http://file/a.xlsx");
+        doAnswer(invocation -> {
+            MaxLabelPlatformContentDO row = invocation.getArgument(0);
+            row.setId(9L);
+            return 1;
+        }).when(platformContentMapper).insert(any(MaxLabelPlatformContentDO.class));
+
+        assertEquals(9L, service.upload(7L, req));
+
+        ArgumentCaptor<MaxLabelPlatformContentDO> captor =
+                ArgumentCaptor.forClass(MaxLabelPlatformContentDO.class);
+        verify(platformContentMapper).insert(captor.capture());
+        assertEquals(3, captor.getValue().getContentType());
+        assertEquals(2, captor.getValue().getStorageType());
     }
 
     @Test

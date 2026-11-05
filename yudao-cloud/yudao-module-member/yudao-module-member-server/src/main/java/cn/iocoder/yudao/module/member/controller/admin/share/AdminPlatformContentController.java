@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentCategoryRespVO;
+import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentCategorySaveReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentDetailRespVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentRespVO;
@@ -11,6 +13,7 @@ import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformCon
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentStatusReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentUploadReqVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelPlatformContentDO;
+import cn.iocoder.yudao.module.member.service.share.PlatformContentCategoryService;
 import cn.iocoder.yudao.module.member.service.share.PlatformContentService;
 import cn.iocoder.yudao.module.member.service.template.MaxLabelTemplateSketch;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +38,8 @@ public class AdminPlatformContentController {
 
     @Resource
     private PlatformContentService platformContentService;
+    @Resource
+    private PlatformContentCategoryService categoryService;
 
     @GetMapping("/page")
     @Operation(summary = "平台共享内容分页")
@@ -94,6 +99,32 @@ public class AdminPlatformContentController {
     @PreAuthorize("@ss.hasPermission('member:platform-content:delete')")
     public CommonResult<Boolean> delete(@RequestParam("id") Long id) {
         platformContentService.delete(id);
+        return success(true);
+    }
+
+    @GetMapping("/category/list")
+    @Operation(summary = "平台共享内容分类列表")
+    @PreAuthorize("@ss.hasPermission('member:platform-content:query')")
+    public CommonResult<List<AdminPlatformContentCategoryRespVO>> getCategoryList() {
+        List<AdminPlatformContentCategoryRespVO> list = categoryService.getList().stream()
+                .map(category -> BeanUtils.toBean(category, AdminPlatformContentCategoryRespVO.class))
+                .toList();
+        return success(list);
+    }
+
+    @PostMapping("/category/create")
+    @Operation(summary = "新增平台共享内容分类")
+    @PreAuthorize("@ss.hasPermission('member:platform-content:update')")
+    public CommonResult<Long> createCategory(@Valid @RequestBody AdminPlatformContentCategorySaveReqVO reqVO) {
+        return success(categoryService.create(reqVO.getName(), reqVO.getSort()));
+    }
+
+    @DeleteMapping("/category/delete")
+    @Operation(summary = "删除平台共享内容分类")
+    @Parameter(name = "id", required = true)
+    @PreAuthorize("@ss.hasPermission('member:platform-content:update')")
+    public CommonResult<Boolean> deleteCategory(@RequestParam("id") Long id) {
+        categoryService.delete(id);
         return success(true);
     }
 

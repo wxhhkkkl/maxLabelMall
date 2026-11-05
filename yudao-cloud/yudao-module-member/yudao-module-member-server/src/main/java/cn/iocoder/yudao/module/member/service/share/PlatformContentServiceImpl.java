@@ -82,8 +82,9 @@ public class PlatformContentServiceImpl implements PlatformContentService {
     @LogRecord(type = MEMBER_SHARE_TYPE, subType = MEMBER_PLATFORM_CONTENT_CREATE_SUB_TYPE,
             bizNo = "{{#reqVO.name}}", success = MEMBER_PLATFORM_CONTENT_CREATE_SUCCESS)
     public Long upload(Long userId, AdminPlatformContentUploadReqVO reqVO) throws Exception {
-        validateContentType(reqVO.getContentType(), true);
-        validateName(reqVO.getName(), reqVO.getContentType());
+        Integer contentType = ShareContentTypes.infer(reqVO.getName(), reqVO.getContentType());
+        validateContentType(contentType, true);
+        validateName(reqVO.getName(), contentType);
         MultipartFile file = reqVO.getFile();
         if (file == null || file.isEmpty()) {
             throw exception(MEMBER_SHARE_CONTENT_INVALID);
@@ -93,17 +94,17 @@ public class PlatformContentServiceImpl implements PlatformContentService {
             throw exception(MEMBER_SHARE_CONTENT_TOO_LARGE);
         }
         MaxLabelPlatformContentDO content;
-        if (isTextType(reqVO.getContentType())) {
-            String text = sanitize(reqVO.getContentType(), new String(bytes, StandardCharsets.UTF_8));
-            java.math.BigDecimal[] dimensions = Objects.equals(reqVO.getContentType(), TYPE_TEMPLATE)
+        if (isTextType(contentType)) {
+            String text = sanitize(contentType, new String(bytes, StandardCharsets.UTF_8));
+            java.math.BigDecimal[] dimensions = Objects.equals(contentType, TYPE_TEMPLATE)
                     ? ShareTemplateSize.resolve(text, reqVO.getWidthMm(), reqVO.getHeightMm())
                     : new java.math.BigDecimal[]{reqVO.getWidthMm(), reqVO.getHeightMm()};
-            content = build(reqVO.getContentType(), reqVO.getName(), STORAGE_TEXT, text, null, "",
+            content = build(contentType, reqVO.getName(), STORAGE_TEXT, text, null, "",
                     text.getBytes(StandardCharsets.UTF_8).length,
                     dimensions[0], dimensions[1], reqVO.getCategory(), reqVO.getKeywords());
         } else {
             String fileUrl = fileStorage.store(bytes, reqVO.getName(), file.getContentType());
-            content = build(reqVO.getContentType(), reqVO.getName(), STORAGE_FILE, null, fileUrl,
+            content = build(contentType, reqVO.getName(), STORAGE_FILE, null, fileUrl,
                     file.getContentType(), bytes.length, reqVO.getWidthMm(), reqVO.getHeightMm(),
                     reqVO.getCategory(), reqVO.getKeywords());
         }

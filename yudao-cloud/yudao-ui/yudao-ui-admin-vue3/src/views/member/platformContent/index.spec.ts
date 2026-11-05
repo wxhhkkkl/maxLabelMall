@@ -10,7 +10,10 @@ vi.mock('@/api/member/platformContent', () => ({
     update: vi.fn(),
     upload: vi.fn(),
     updateStatus: vi.fn(),
-    delete: vi.fn()
+    delete: vi.fn(),
+    getCategories: vi.fn(),
+    createCategory: vi.fn(),
+    deleteCategory: vi.fn()
   }
 }))
 
@@ -18,10 +21,13 @@ import { PlatformContentApi } from '@/api/member/platformContent'
 import PlatformContentIndex from './index.vue'
 
 const getPage = vi.mocked(PlatformContentApi.getPage)
+const getCategories = vi.mocked(PlatformContentApi.getCategories)
 const directive = { mounted: () => {} }
 
 beforeEach(() => {
   getPage.mockReset()
+  getCategories.mockReset()
+  getCategories.mockResolvedValue([])
 })
 
 describe('平台共享内容页', () => {

@@ -13,6 +13,11 @@
           <el-option label="图片" :value="5" />
         </el-select>
       </el-form-item>
+      <el-form-item label="分类">
+        <el-select v-model="queryParams.category" clearable filterable placeholder="全部" class="!w-150px">
+          <el-option v-for="category in categories" :key="category.id" :label="category.name" :value="category.name" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="状态">
         <el-select v-model="queryParams.status" clearable placeholder="全部" class="!w-120px">
           <el-option label="上架" :value="1" />
@@ -25,6 +30,10 @@
         <el-button type="primary" plain @click="openCreate"
                    v-hasPermi="['member:platform-content:create']">
           <Icon icon="ep:plus" class="mr-5px" />上传内容
+        </el-button>
+        <el-button @click="categoryVisible = true"
+                   v-hasPermi="['member:platform-content:update']">
+          分类管理
         </el-button>
       </el-form-item>
     </el-form>
@@ -73,12 +82,19 @@
   </ContentWrap>
 
   <PlatformContentForm v-model:visible="formVisible" :id="formId" @success="getList" />
+  <PlatformCategoryDialog v-model:visible="categoryVisible" @changed="onCategoryChanged" />
 </template>
 
 <script setup lang="ts">
-import { PlatformContentApi, type PlatformContentPageReqVO, type PlatformContentVO } from '@/api/member/platformContent'
+import {
+  PlatformContentApi,
+  type PlatformContentCategoryVO,
+  type PlatformContentPageReqVO,
+  type PlatformContentVO
+} from '@/api/member/platformContent'
 import { dateFormatter } from '@/utils/formatTime'
 import PlatformContentForm from './PlatformContentForm.vue'
+import PlatformCategoryDialog from './PlatformCategoryDialog.vue'
 
 defineOptions({ name: 'MemberPlatformContent' })
 
@@ -88,6 +104,8 @@ const list = ref<PlatformContentVO[]>([])
 const total = ref(0)
 const formVisible = ref(false)
 const formId = ref<number>()
+const categoryVisible = ref(false)
+const categories = ref<PlatformContentCategoryVO[]>([])
 
 const queryParams = reactive<PlatformContentPageReqVO>({ pageNo: 1, pageSize: 10 })
 
@@ -110,8 +128,18 @@ const handleQuery = () => {
 const resetQuery = () => {
   queryParams.keyword = undefined
   queryParams.contentType = undefined
+  queryParams.category = undefined
   queryParams.status = undefined
   handleQuery()
+}
+
+const loadCategories = async () => {
+  categories.value = (await PlatformContentApi.getCategories()) ?? []
+}
+
+const onCategoryChanged = async () => {
+  await loadCategories()
+  await getList()
 }
 
 const openCreate = () => {
@@ -149,7 +177,10 @@ const sizeText = (bytes?: number) => {
   return `${bytes} B`
 }
 
-onMounted(getList)
+onMounted(() => {
+  void loadCategories()
+  void getList()
+})
 </script>
 
 <style scoped>

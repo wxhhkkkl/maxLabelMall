@@ -130,6 +130,27 @@ public class ShareContentServiceImplTest {
     }
 
     @Test
+    void uploadExcelInfersTypeFromExtension() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "a.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1, 2});
+        AppShareContentUploadReqVO req = new AppShareContentUploadReqVO();
+        req.setScope(1);
+        req.setContentType(1); // 前端未切换类型
+        req.setName("a.xlsx");
+        req.setFile(file);
+        when(fileStorage.store(any(), eq("a.xlsx"), eq(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")))
+                .thenReturn("http://file/a.xlsx");
+
+        assertEquals(9L, contentService.upload(MEMBER_ID, req));
+
+        ArgumentCaptor<MaxLabelShareContentDO> captor = ArgumentCaptor.forClass(MaxLabelShareContentDO.class);
+        verify(contentMapper).insert(captor.capture());
+        assertEquals(3, captor.getValue().getContentType());
+        assertEquals(2, captor.getValue().getStorageType());
+    }
+
+    @Test
     void uploadImageStoresFileAndMetadata() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png",
                 new byte[]{1, 2, 3});

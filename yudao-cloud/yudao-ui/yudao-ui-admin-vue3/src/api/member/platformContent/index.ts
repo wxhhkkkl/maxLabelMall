@@ -27,6 +27,12 @@ export interface PlatformContentPageReqVO extends PageParam {
   status?: number
 }
 
+export interface PlatformContentCategoryVO {
+  id?: number
+  name: string
+  sort?: number
+}
+
 export const PlatformContentApi = {
   getPage: async (params: PlatformContentPageReqVO) => {
     return await request.get<PageResult<PlatformContentVO[]>>({
@@ -51,5 +57,14 @@ export const PlatformContentApi = {
   },
   delete: async (id: number) => {
     return await request.delete<boolean>({ url: '/member/platform-content/delete', params: { id } })
+  },
+  getCategories: async () => {
+    return await request.get<PlatformContentCategoryVO[]>({ url: '/member/platform-content/category/list' })
+  },
+  createCategory: async (name: string, sort?: number) => {
+    return await request.post<number>({ url: '/member/platform-content/category/create', data: { name, sort } })
+  },
+  deleteCategory: async (id: number) => {
+    return await request.delete<boolean>({ url: '/member/platform-content/category/delete', params: { id } })
   }
 }

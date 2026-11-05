@@ -99,8 +99,9 @@ public class ShareContentServiceImpl implements ShareContentService {
             bizNo = "{{#reqVO.name}}", success = MEMBER_SHARE_CONTENT_CREATE_SUCCESS)
     public Long upload(Long memberId, AppShareContentUploadReqVO reqVO) throws Exception {
         Target target = prepareTarget(memberId, reqVO.getScope(), reqVO.getFolderId());
-        validateContentType(reqVO.getContentType(), true);
-        validateName(reqVO.getName(), reqVO.getContentType());
+        Integer contentType = ShareContentTypes.infer(reqVO.getName(), reqVO.getContentType());
+        validateContentType(contentType, true);
+        validateName(reqVO.getName(), contentType);
         MultipartFile file = reqVO.getFile();
         if (file == null || file.isEmpty()) {
             throw exception(MEMBER_SHARE_CONTENT_INVALID);
@@ -109,10 +110,10 @@ public class ShareContentServiceImpl implements ShareContentService {
         if (bytes.length > properties.getContentMaxBytes()) {
             throw exception(MEMBER_SHARE_CONTENT_TOO_LARGE);
         }
-        if (isTextType(reqVO.getContentType())) {
+        if (isTextType(contentType)) {
             AppShareContentSaveReqVO saveReq = new AppShareContentSaveReqVO();
             saveReq.setName(reqVO.getName());
-            saveReq.setContentType(reqVO.getContentType());
+            saveReq.setContentType(contentType);
             saveReq.setContent(new String(bytes, StandardCharsets.UTF_8));
             saveReq.setWidthMm(reqVO.getWidthMm());
             saveReq.setHeightMm(reqVO.getHeightMm());
@@ -123,7 +124,7 @@ public class ShareContentServiceImpl implements ShareContentService {
         // excel / 图片：先校验配额，再落对象存储，最后写内容行
         checkQuota(target.scope(), target, bytes.length, 0);
         String fileUrl = fileStorage.store(bytes, reqVO.getName(), file.getContentType());
-        MaxLabelShareContentDO content = buildContent(target, reqVO.getContentType(), reqVO.getName(),
+        MaxLabelShareContentDO content = buildContent(target, contentType, reqVO.getName(),
                 STORAGE_FILE, null, fileUrl, file.getContentType(), bytes.length,
                 reqVO.getWidthMm(), reqVO.getHeightMm(), reqVO.getCategory(), reqVO.getKeywords());
         contentMapper.insert(content);

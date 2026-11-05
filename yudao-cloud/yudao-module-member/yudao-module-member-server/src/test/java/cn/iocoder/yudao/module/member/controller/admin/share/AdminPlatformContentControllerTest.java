@@ -2,9 +2,12 @@ package cn.iocoder.yudao.module.member.controller.admin.share;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
+import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentCategorySaveReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminPlatformContentRespVO;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelPlatformContentCategoryDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelPlatformContentDO;
+import cn.iocoder.yudao.module.member.service.share.PlatformContentCategoryService;
 import cn.iocoder.yudao.module.member.service.share.PlatformContentService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.when;
 public class AdminPlatformContentControllerTest {
 
     @Mock private PlatformContentService platformContentService;
+    @Mock private PlatformContentCategoryService categoryService;
     @InjectMocks private AdminPlatformContentController controller;
 
     @BeforeEach
@@ -70,6 +74,18 @@ public class AdminPlatformContentControllerTest {
     }
 
     @Test
+    void categoryListAndCreateDelegate() {
+        when(categoryService.getList()).thenReturn(List.of(
+                MaxLabelPlatformContentCategoryDO.builder().id(3L).name("物流").sort(0).build()));
+        assertEquals("物流", controller.getCategoryList().getData().get(0).getName());
+
+        AdminPlatformContentCategorySaveReqVO req = new AdminPlatformContentCategorySaveReqVO();
+        req.setName("物流");
+        when(categoryService.create("物流", null)).thenReturn(3L);
+        assertEquals(3L, controller.createCategory(req).getData());
+    }
+
+    @Test
     void deleteDelegates() {
         assertTrue(controller.delete(8L).getData());
         verify(platformContentService).delete(8L);
@@ -91,12 +107,20 @@ public class AdminPlatformContentControllerTest {
                 "@ss.hasPermission('member:platform-content:update')");
         assertPermission("delete", Long.class,
                 "@ss.hasPermission('member:platform-content:delete')");
+        assertPermission("getCategoryList", null,
+                "@ss.hasPermission('member:platform-content:query')");
+        assertPermission("createCategory", AdminPlatformContentCategorySaveReqVO.class,
+                "@ss.hasPermission('member:platform-content:update')");
+        assertPermission("deleteCategory", Long.class,
+                "@ss.hasPermission('member:platform-content:update')");
     }
 
     private void assertPermission(String method, Class<?> parameter, String expected) throws Exception {
+        java.lang.reflect.Method target = parameter == null
+                ? AdminPlatformContentController.class.getMethod(method)
+                : AdminPlatformContentController.class.getMethod(method, parameter);
         org.springframework.security.access.prepost.PreAuthorize annotation =
-                AdminPlatformContentController.class.getMethod(method, parameter)
-                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+                target.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
         org.junit.jupiter.api.Assertions.assertNotNull(annotation, method);
         assertEquals(expected, annotation.value(), method);
     }

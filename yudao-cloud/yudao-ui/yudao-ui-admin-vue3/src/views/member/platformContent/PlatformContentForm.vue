@@ -27,7 +27,10 @@
                   placeholder="模板正文（.msdx JSON）或文本内容" />
       </el-form-item>
       <el-form-item label="分类">
-        <el-input v-model="formData.category" maxlength="64" class="!w-240px" />
+        <el-select v-model="formData.category" filterable allow-create clearable
+                   placeholder="选择或输入分类" class="!w-240px">
+          <el-option v-for="name in categoryOptions" :key="name" :label="name" :value="name" />
+        </el-select>
       </el-form-item>
       <el-form-item label="关键词">
         <el-input v-model="formData.keywords" maxlength="255" placeholder="多个关键词用逗号分隔" />
@@ -46,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { PlatformContentApi, type PlatformContentVO } from '@/api/member/platformContent'
+import { PlatformContentApi, type PlatformContentCategoryVO, type PlatformContentVO } from '@/api/member/platformContent'
 import type { FormInstance, UploadFile } from 'element-plus'
 
 defineOptions({ name: 'PlatformContentForm' })
@@ -58,6 +61,7 @@ const message = useMessage()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const file = ref<File>()
+const categories = ref<PlatformContentCategoryVO[]>([])
 const formData = reactive<PlatformContentVO>({
   contentType: 1,
   name: '',
@@ -70,6 +74,11 @@ const formData = reactive<PlatformContentVO>({
 
 const isText = computed(() => [1, 2, 4].includes(formData.contentType))
 const isTemplate = computed(() => formData.contentType === 1)
+const categoryOptions = computed(() => {
+  const names = categories.value.map((category) => category.name)
+  if (formData.category && !names.includes(formData.category)) names.push(formData.category)
+  return names
+})
 
 const rules = {
   contentType: [{ required: true, message: '请选择内容类型', trigger: 'change' }],
@@ -81,6 +90,11 @@ watch(
   async (visible) => {
     if (!visible) return
     file.value = undefined
+    try {
+      categories.value = (await PlatformContentApi.getCategories()) ?? []
+    } catch {
+      categories.value = []
+    }
     if (props.id) {
       const detail = await PlatformContentApi.get(props.id)
       Object.assign(formData, detail)
@@ -92,10 +106,23 @@ watch(
   }
 )
 
+const contentTypeOf = (fileName: string): number | undefined => {
+  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.') + 1)
+  if (ext === 'msdx') return 1
+  if (ext === 'txt') return 2
+  if (ext === 'xls' || ext === 'xlsx') return 3
+  if (ext === 'csv') return 4
+  if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].includes(ext)) return 5
+  return undefined
+}
+
 const onFileChange = (uploadFile: UploadFile) => {
   file.value = uploadFile.raw
-  if (!formData.name && uploadFile.name) {
-    formData.name = uploadFile.name
+  if (uploadFile.name) {
+    if (!formData.name) formData.name = uploadFile.name
+    // 选择 Excel 等文件时自动切换内容类型，避免「类型仍是模板」导致服务端拒绝。
+    const detected = contentTypeOf(uploadFile.name)
+    if (detected) formData.contentType = detected
   }
 }
 

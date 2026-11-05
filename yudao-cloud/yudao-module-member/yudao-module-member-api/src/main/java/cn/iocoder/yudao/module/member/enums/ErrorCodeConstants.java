@@ -103,5 +103,7 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_PLATFORM_CONTENT_NOT_FOUND = new ErrorCode(1_004_016_012, "平台内容不存在或已下架");
     ErrorCode MEMBER_SHARED_TEMPLATE_SUBMIT_CLOSED = new ErrorCode(1_004_016_013, "会员投稿已关闭，请由平台运营维护");
     ErrorCode MEMBER_SHARE_FILE_STORAGE_FAILED = new ErrorCode(1_004_016_014, "文件保存失败，请稍后重试");
+    ErrorCode MEMBER_PLATFORM_CONTENT_CATEGORY_EXISTS = new ErrorCode(1_004_016_015, "分类名称已存在");
+    ErrorCode MEMBER_PLATFORM_CONTENT_CATEGORY_NOT_FOUND = new ErrorCode(1_004_016_016, "分类不存在");
 
 }

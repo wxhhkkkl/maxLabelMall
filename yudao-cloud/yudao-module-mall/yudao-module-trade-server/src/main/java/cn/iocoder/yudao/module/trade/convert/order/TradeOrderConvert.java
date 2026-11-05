@@ -172,7 +172,12 @@ public interface TradeOrderConvert {
         // 转化 List
         List<AppTradeOrderPageItemRespVO> orderVOs = CollectionUtils.convertList(pageResult.getList(), order -> {
             List<TradeOrderItemDO> xOrderItems = orderItemMap.get(order.getId());
-            return convert02(order, xOrderItems);
+            AppTradeOrderPageItemRespVO orderVO = convert02(order, xOrderItems);
+            // 「再次购买」只给普通商品单：定制 / 企业授权 / 个人订阅都走各自流程（见 VO 注释）
+            orderVO.setCanReorder(order.getMaxlabelOrgId() == null
+                    && !Boolean.TRUE.equals(order.getMaxlabelSubscription())
+                    && !Boolean.TRUE.equals(order.getCustomization()));
+            return orderVO;
         });
         return new PageResult<>(orderVOs, pageResult.getTotal());
     }

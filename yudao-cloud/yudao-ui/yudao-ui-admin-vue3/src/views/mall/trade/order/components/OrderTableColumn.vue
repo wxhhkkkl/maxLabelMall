@@ -29,6 +29,8 @@
         <div class="order-head-bar">
           <div class="order-head-left">
             <span>订单编号：{{ scope.row.no }}</span>
+            <!-- 买家已删除：只对 C 端隐藏，运营仍然可见，这里标出来方便客服核查 -->
+            <el-tag v-if="scope.row.userDeleted" size="small" type="info">用户已删除</el-tag>
             <span v-if="scope.row.finishTime">
               完成时间：{{ formatDate(scope.row.finishTime) }}
             </span>

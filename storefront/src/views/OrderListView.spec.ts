@@ -7,9 +7,11 @@ import { OrderStatus, type OrderPageItem } from '@/types'
 
 const pageOrders = vi.fn()
 const cancelOrder = vi.fn()
+const deleteOrder = vi.fn()
 vi.mock('@/api/order', () => ({
   pageOrders: (...a: unknown[]) => pageOrders(...a),
   cancelOrder: (...a: unknown[]) => cancelOrder(...a),
+  deleteOrder: (...a: unknown[]) => deleteOrder(...a),
   getOrderDetail: vi.fn(),
   getOrderCount: vi.fn(),
   createOrder: vi.fn(),
@@ -36,6 +38,7 @@ const router = createRouter({
     { path: '/order', component: { template: '<div/>' } },
     { path: '/order/:id', component: { template: '<div/>' } },
     { path: '/mall', component: { template: '<div/>' } },
+    { path: '/checkout', component: { template: '<div/>' } },
   ],
 })
 
@@ -70,6 +73,8 @@ beforeEach(async () => {
   pageOrders.mockReset()
   cancelOrder.mockReset()
   cancelOrder.mockResolvedValue(true)
+  deleteOrder.mockReset()
+  deleteOrder.mockResolvedValue(true)
   await router.push('/order')
   await router.isReady()
 })
@@ -171,6 +176,119 @@ describe('OrderListView —— 取消订单（FR-036 / T112）', () => {
   })
 })
 
+/**
+ * 删除订单（假删除）：只对买家隐藏，运营后台仍可见。
+ *
+ * 可删范围由所有者拍板：**已取消 / 已完成**两个终态。
+ */
+describe('OrderListView —— 删除订单（假删除）', () => {
+  it('只有终态（已取消 / 已完成）给出删除入口', async () => {
+    const w = await mountList([
+      order(1, { status: OrderStatus.CANCELED }),
+      order(2, { status: OrderStatus.COMPLETED }),
+      order(3, { status: OrderStatus.UNPAID }),
+      order(4, { status: OrderStatus.UNDELIVERED }),
+      order(5, { status: OrderStatus.DELIVERED }),
+    ])
+    const cards = w.findAll('.order-card')
+    expect(cards[0]?.find('.delete-order').exists()).toBe(true)
+    expect(cards[1]?.find('.delete-order').exists()).toBe(true)
+    expect(cards[2]?.find('.delete-order').exists()).toBe(false)
+    expect(cards[3]?.find('.delete-order').exists()).toBe(false)
+    expect(cards[4]?.find('.delete-order').exists()).toBe(false)
+  })
+
+  it('删除前二次确认；确认后调后端并重新拉列表', async () => {
+    const w = await mountList([order(1, { status: OrderStatus.CANCELED })])
+    await w.get('.delete-order').trigger('click')
+    await flushPromises()
+    expect(w.find('.ml-modal').exists()).toBe(true)
+    expect(deleteOrder).not.toHaveBeenCalled()
+
+    const before = pageOrders.mock.calls.length
+    await w.get('#confirmDelete').trigger('click')
+    await flushPromises()
+    expect(deleteOrder).toHaveBeenCalledWith(1)
+    // 隐藏由后端处理，前端只重新拉一次列表
+    expect(pageOrders.mock.calls.length).toBeGreaterThan(before)
+  })
+
+  it('确认框里点「再想想」不发请求', async () => {
+    const w = await mountList([order(1, { status: OrderStatus.COMPLETED })])
+    await w.get('.delete-order').trigger('click')
+    await flushPromises()
+    await w.get('#dismissDelete').trigger('click')
+    await flushPromises()
+    expect(deleteOrder).not.toHaveBeenCalled()
+  })
+
+  it('删除失败时给出提示，订单仍在列表里', async () => {
+    deleteOrder.mockRejectedValue({ code: 400, message: '只有【已取消】或【已完成】的订单可以删除' })
+    const w = await mountList([order(1, { status: OrderStatus.CANCELED })])
+    await w.get('.delete-order').trigger('click')
+    await flushPromises()
+    await w.get('#confirmDelete').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('只有【已取消】或【已完成】的订单可以删除')
+    expect(w.text()).toContain('NO-1')
+  })
+})
+
+/**
+ * 再次购买（2026-11-04 所有者拍板）：按原 SKU + 数量**直接进结算**，不经购物车。
+ *
+ * 入口是否显示由服务端的 `canReorder` 决定（仅普通商品单）—— 前端不自己判断
+ * 定制 / 企业 / 订阅，因为列表 VO 里没有这些原始字段。
+ */
+describe('OrderListView —— 再次购买', () => {
+  it('只有服务端标记 canReorder 的订单才有入口', async () => {
+    const w = await mountList([
+      order(1, { canReorder: true }),
+      order(2, { canReorder: false }),
+      order(3),
+    ])
+    const cards = w.findAll('.order-card')
+    expect(cards[0]?.find('.reorder').exists()).toBe(true)
+    expect(cards[1]?.find('.reorder').exists()).toBe(false)
+    expect(cards[2]?.find('.reorder').exists()).toBe(false)
+  })
+
+  it('点击后按原 SKU + 数量直接跳到结算页（带 source=reorder）', async () => {
+    const w = await mountList([
+      order(1, {
+        canReorder: true,
+        items: [
+          { id: 11, skuId: 100, spuName: 'A', picUrl: '', count: 2, price: 1000 },
+          { id: 12, skuId: 200, spuName: 'B', picUrl: '', count: 3, price: 2000 },
+        ],
+      }),
+    ])
+    await w.get('.reorder').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/checkout')
+    expect(router.currentRoute.value.query).toMatchObject({
+      source: 'reorder',
+      skuIds: '100,200',
+      counts: '2,3',
+    })
+  })
+
+  it('订单项缺少 skuId（脏数据）→ 不跳转，给出提示', async () => {
+    const w = await mountList([
+      order(1, {
+        canReorder: true,
+        items: [{ id: 11, spuName: 'A', picUrl: '', count: 1, price: 1000 }],
+      }),
+    ])
+    await w.get('.reorder').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).not.toBe('/checkout')
+    expect(w.text()).toContain('商品信息不完整')
+  })
+})
+
 describe('OrderListView —— 空态与错误态（FR-044 / FR-045）', () => {
   it('没有订单时展示空状态并引导去商城', async () => {
     const w = await mountList([])
@@ -215,10 +333,11 @@ describe('OrderListView —— 去评价入口', () => {
     return w
   }
 
-  it('已完成且还有未评的项 → 有「去评价」，指向订单详情', async () => {
+  it('已完成且还有未评的项 → 有「评价」，指向订单详情', async () => {
     const w = await mountList(completed())
     const btn = w.find('.oc-comment')
     expect(btn.exists()).toBe(true)
+    expect(btn.text()).toBe('评价')
     // 是全站唯一的评价入口在详情页 —— 列表只把人送过去，不复制一份表单
     expect(btn.attributes('href')).toBe('/order/1')
   })

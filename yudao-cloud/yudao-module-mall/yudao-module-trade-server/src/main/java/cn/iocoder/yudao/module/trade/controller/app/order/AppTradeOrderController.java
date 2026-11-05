@@ -106,6 +106,13 @@ public class AppTradeOrderController {
         return success(true);
     }
 
+    @PutMapping("/update-address")
+    @Operation(summary = "修改订单收货地址", description = "仅待发货订单可修改；只更新收货快照，不重算金额")
+    public CommonResult<Boolean> updateOrderAddress(@Valid @RequestBody AppTradeOrderUpdateAddressReqVO reqVO) {
+        tradeOrderUpdateService.updateOrderAddress(getLoginUserId(), reqVO);
+        return success(true);
+    }
+
     @GetMapping("/get-detail")
     @Operation(summary = "获得交易订单")
     @Parameters({

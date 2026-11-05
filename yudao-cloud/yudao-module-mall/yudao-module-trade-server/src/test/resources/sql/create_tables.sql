@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "maxlabel_org_id"         bigint   NULL,
     "maxlabel_subscription"   bit      NOT NULL DEFAULT FALSE,
     "customization"           bit      NOT NULL DEFAULT FALSE,
+    "user_deleted"            bit      NOT NULL DEFAULT FALSE,
     "status"                  int      NOT NULL,
     "product_count"           int      NOT NULL,
     "cancel_type"             int,

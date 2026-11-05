@@ -28,7 +28,11 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     }
 
     default TradeOrderDO selectByIdAndUserId(Long id, Long userId) {
-        return selectOne(TradeOrderDO::getId, id, TradeOrderDO::getUserId, userId);
+        return selectOne(new LambdaQueryWrapperX<TradeOrderDO>()
+                .eq(TradeOrderDO::getId, id)
+                .eq(TradeOrderDO::getUserId, userId)
+                // 买家删除（假删除）后，用户态接口一律视为订单不存在
+                .eq(TradeOrderDO::getUserDeleted, false));
     }
 
     /**
@@ -119,6 +123,8 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     default PageResult<TradeOrderDO> selectPage(AppTradeOrderPageReqVO reqVO, Long userId) {
         return selectPage(reqVO, new LambdaQueryWrapperX<TradeOrderDO>()
                 .eq(TradeOrderDO::getUserId, userId)
+                // 买家删除（假删除）的单据只对 C 端隐藏，运营后台走另一个 selectPage 不带这个条件
+                .eq(TradeOrderDO::getUserDeleted, false)
                 .eqIfPresent(TradeOrderDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(TradeOrderDO::getCommentStatus, reqVO.getCommentStatus())
                 .orderByDesc(TradeOrderDO::getId)); // TODO 芋艿：未来不同的 status，不同的排序
@@ -127,6 +133,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     default Long selectCountByUserIdAndStatus(Long userId, Integer status, Boolean commentStatus) {
         return selectCount(new LambdaQueryWrapperX<TradeOrderDO>()
                 .eq(TradeOrderDO::getUserId, userId)
+                .eq(TradeOrderDO::getUserDeleted, false)
                 .eqIfPresent(TradeOrderDO::getStatus, status)
                 .eqIfPresent(TradeOrderDO::getCommentStatus, commentStatus));
     }
@@ -134,7 +141,8 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
     default TradeOrderDO selectOrderByIdAndUserId(Long orderId, Long loginUserId) {
         return selectOne(new LambdaQueryWrapperX<TradeOrderDO>()
                 .eq(TradeOrderDO::getId, orderId)
-                .eq(TradeOrderDO::getUserId, loginUserId));
+                .eq(TradeOrderDO::getUserId, loginUserId)
+                .eq(TradeOrderDO::getUserDeleted, false));
     }
 
     default List<TradeOrderDO> selectListByStatusAndCreateTimeLt(Integer status, LocalDateTime createTime) {

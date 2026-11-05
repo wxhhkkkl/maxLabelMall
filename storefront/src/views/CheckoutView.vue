@@ -45,8 +45,15 @@ import { reconcile } from '@/utils/money'
  * 4. **防重复提交**（FR-032）：提交中禁用按钮 + 幂等保护，连点只产生一笔订单。
  */
 const props = withDefaults(
-  defineProps<{ source?: 'product' | 'cart'; skuId?: number; count?: number; cartIds?: number[] }>(),
-  { source: 'product', count: 1 },
+  defineProps<{
+    source?: 'product' | 'cart' | 'reorder'
+    skuId?: number
+    count?: number
+    cartIds?: number[]
+    /** 「再次购买」的条目（`source=reorder` 时使用），见 utils/reorder.ts */
+    reorderItems?: Array<{ skuId: number; count: number }>
+  }>(),
+  { source: 'product', count: 1, reorderItems: () => [] },
 )
 
 const route = useRoute()
@@ -162,7 +169,10 @@ function buildInput(): TradeOrderInput {
   const items =
     props.source === 'cart'
       ? cartRows.value.map((i) => ({ cartId: i.id, skuId: i.sku.id, count: i.count }))
-      : [{ skuId: props.skuId ?? 0, count: props.count }]
+      : props.source === 'reorder'
+        // 再次购买：订单列表把历史订单项的 skuId + count 带过来，不经购物车
+        ? (props.reorderItems ?? []).map((i) => ({ skuId: i.skuId, count: i.count }))
+        : [{ skuId: props.skuId ?? 0, count: props.count }]
 
   return { items, addressId: addressId.value ?? undefined, couponId: couponId.value }
 }

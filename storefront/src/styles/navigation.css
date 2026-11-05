@@ -39,8 +39,11 @@
 .nav-submenu-mall .nav-submenu-groups { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
 .nav-submenu-mall .nav-group-wide { grid-column: span 2; }
 .nav-submenu-mall .nav-group-wide .nav-group-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
-.nav-submenu-mall .nav-submenu-groups h3 { margin: 0 0 10px; }
-.header .nav-submenu-mall .nav-group-links a { margin: 0; padding: 5px 0; }
+/* 商城菜单：一级分类（分组标题）用品牌蓝，二级分类用正文黑，拉开层级对比 */
+.nav-submenu-mall .nav-submenu-groups h3 { margin: 0 0 10px; color: #2e7cd6; }
+.header .nav-submenu-mall .nav-group-links a { margin: 0; padding: 5px 0; color: #16233f; }
+/* 上面这条与 `.header .nav-submenu a:hover` 同权重且更靠后，会盖掉悬停色，这里补回 */
+.header .nav-submenu-mall .nav-group-links a:hover { color: #2e7cd6; }
 .header a:focus-visible, .header summary:focus-visible { outline: 2px solid #2e7cd6; outline-offset: 4px; }
 .header .mobile-nav { max-height: calc(100dvh - 76px); overflow-y: auto; }
 .mobile-nav-group { border-bottom: 1px solid #eef2f7; }

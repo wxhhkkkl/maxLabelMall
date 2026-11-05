@@ -145,10 +145,11 @@ function settlementResp(over: Partial<SettlementResp> = {}): SettlementResp {
 }
 
 type CheckoutProps = {
-  source?: 'product' | 'cart'
+  source?: 'product' | 'cart' | 'reorder'
   skuId?: number
   count?: number
   cartIds?: number[]
+  reorderItems?: Array<{ skuId: number; count: number }>
 }
 
 async function mountCheckout(
@@ -348,6 +349,36 @@ describe('CheckoutView —— 购物车来源的入参（FR-025 / FR-031）', ()
     await mountCheckout(settlementResp(), { source: 'cart', cartIds: [5] })
     const input = settlement.mock.calls[0]?.[0] as { items: Array<{ cartId: number }> }
     expect(input.items.map((i) => i.cartId)).toEqual([5])
+  })
+})
+
+/**
+ * 再次购买（2026-11-04）：订单列表把历史订单项直接带进结算，不经购物车。
+ *
+ * ⚠️ 关键是**多件商品都要带上** —— 只结算第一件是这类"复制订单"最容易犯的错。
+ */
+describe('CheckoutView —— 再次购买来源的入参', () => {
+  const REORDER_ITEMS = [
+    { skuId: 100, count: 2 },
+    { skuId: 200, count: 3 },
+  ]
+
+  it('把订单项的 skuId + count 原样带进结算，且**不去读购物车**', async () => {
+    await mountCheckout(settlementResp(), { source: 'reorder', reorderItems: REORDER_ITEMS })
+
+    expect(listCart).not.toHaveBeenCalled()
+    const input = settlement.mock.calls[0]?.[0] as { items: unknown[] }
+    expect(input.items).toEqual(REORDER_ITEMS)
+  })
+
+  it('提交下单时同样带全部条目（不是只剩第一件）', async () => {
+    const w = await mountCheckout(settlementResp(), { source: 'reorder', reorderItems: REORDER_ITEMS })
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    const body = createOrder.mock.calls[0]?.[0] as { items: unknown[] }
+    expect(body.items).toEqual(REORDER_ITEMS)
   })
 })
 

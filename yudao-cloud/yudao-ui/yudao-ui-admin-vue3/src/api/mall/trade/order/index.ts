@@ -11,6 +11,7 @@ export interface OrderVO {
   userIp?: string // 用户 IP
   userRemark?: string // 用户备注
   status?: number | null // 订单状态
+  userDeleted?: boolean // 买家是否已在用户端删除（仅对 C 端隐藏，运营后台仍可见）
   productCount?: number | null // 购买的商品数量
   finishTime?: Date | null // 订单完成时间
   cancelTime?: Date | null // 订单取消时间

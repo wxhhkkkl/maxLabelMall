@@ -233,3 +233,20 @@ describe('后台订单列表 —— 各列的信息落位', () => {
     expect(w.find('.order-after-sale').exists()).toBe(false)
   })
 })
+
+describe('后台订单列表 —— 用户已删除标记', () => {
+  it('买家删除了订单 → 运营仍能看到该单，并标记「用户已删除」', async () => {
+    const w = mountTable([order({ userDeleted: true })])
+    await flushPromises()
+
+    expect(w.text()).toContain('NO-20261023-0001')
+    expect(w.text()).toContain('用户已删除')
+  })
+
+  it('普通订单没有该标记', async () => {
+    const w = mountTable([order()])
+    await flushPromises()
+
+    expect(w.text()).not.toContain('用户已删除')
+  })
+})

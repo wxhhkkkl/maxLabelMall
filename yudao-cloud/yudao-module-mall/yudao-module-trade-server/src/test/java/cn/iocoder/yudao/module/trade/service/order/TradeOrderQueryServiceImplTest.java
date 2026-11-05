@@ -95,6 +95,15 @@ public class TradeOrderQueryServiceImplTest extends BaseDbUnitTest {
     // ==================== 用例 ====================
 
     @Test
+    public void testGetOrder_userDeleted_returnsNull() {
+        // 买家删除后，订单详情对 C 端不可见；运营后台走另一个单参 getOrder(id)
+        when(tradeOrderMapper.selectById(1L)).thenReturn(TradeOrderDO.builder()
+                .id(1L).userId(88L).userDeleted(true).build());
+
+        assertNull(tradeOrderQueryService.getOrder(88L, 1L));
+    }
+
+    @Test
     public void testGetExpressTrackList_notShipped_returnsEmpty() {
         when(tradeOrderMapper.selectById(1L)).thenReturn(order(1L, null));
 

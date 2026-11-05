@@ -7,6 +7,7 @@ import {
 
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { getAccessToken } from '@/utils/auth'
+import { parseReorderItems } from '@/utils/reorder'
 
 /**
  * 路由表 —— 共 28 条（含个人中心新增页、行业详情、支持文章及联系支持）。
@@ -75,17 +76,24 @@ const router = createRouter({
           name: 'checkout',
           meta: { requiresAuth: true },
           component: () => import('@/views/CheckoutView.vue'),
-          // 结算页有两条来源（商品页直购 / 购物车），入参走 query，这里显式映射成
-          // props。**没有这个映射，`source` 会恒为默认的 `product`、`skuId` 恒为
-          // undefined** —— 页面打得开，但永远在结算一个不存在的商品。
+          // 结算页有三条来源（商品页直购 / 购物车 / 订单「再次购买」），入参走 query，
+          // 这里显式映射成 props。**没有这个映射，`source` 会恒为默认的 `product`、
+          // `skuId` 恒为 undefined** —— 页面打得开，但永远在结算一个不存在的商品。
           props: (route) => ({
-            source: route.query.source === 'cart' ? 'cart' : 'product',
+            source:
+              route.query.source === 'cart'
+                ? 'cart'
+                : route.query.source === 'reorder'
+                  ? 'reorder'
+                  : 'product',
             skuId: Number(route.query.skuId) || undefined,
             count: Number(route.query.count) || 1,
             cartIds: String(route.query.cartIds ?? '')
               .split(',')
               .filter(Boolean)
               .map(Number),
+            // 再次购买：历史订单的 skuId + count，见 utils/reorder.ts
+            reorderItems: parseReorderItems(route.query.skuIds, route.query.counts),
           }),
         },
         { path: 'order', name: 'order-list', meta: { requiresAuth: true }, component: () => import('@/views/OrderListView.vue') },

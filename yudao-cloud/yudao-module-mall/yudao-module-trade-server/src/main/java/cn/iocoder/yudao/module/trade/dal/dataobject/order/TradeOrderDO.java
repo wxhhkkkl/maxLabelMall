@@ -95,6 +95,13 @@ public class TradeOrderDO extends BaseDO {
      */
     private Boolean customization;
     /**
+     * 用户端是否已删除（假删除）
+     *
+     * ⚠️ 与 {@link BaseDO#deleted} 不同：置 true 只对 C 端隐藏，运营后台仍然可见。
+     * C 端所有查询都要带 `user_deleted = 0`。
+     */
+    private Boolean userDeleted;
+    /**
      * 订单状态
      *
      * 枚举 {@link TradeOrderStatusEnum}

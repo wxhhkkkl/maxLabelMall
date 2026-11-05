@@ -252,3 +252,37 @@ describe('需登录守卫（T074 / FR-015）', () => {
     expect(paths).not.toContain('/login')
   })
 })
+
+/**
+ * 结算页的 query → props（商品直购 / 购物车 / 再次购买）。
+ *
+ * ⚠️ 这段映射漏了或写错，页面本身照样打得开 —— 只是会拿 `skuId=0` 或空条目去结算，
+ * 所以单独钉一下「再次购买」新增的那条分支。
+ */
+describe('结算页 query → props', () => {
+  type PropsFn = (route: { query: Record<string, unknown> }) => Record<string, unknown>
+  const checkout = (
+    (realRouter as unknown as { options: { routes: Array<{ children?: Array<Record<string, unknown>> }> } })
+      .options.routes.flatMap((r) => r.children ?? [])
+  ).find((r) => r.name === 'checkout')
+
+  it('再次购买：source=reorder，且 skuIds/counts 解析成 reorderItems', () => {
+    // `options.routes` 里 `props` 还是原始的函数（不是归一化后的 `{ default }`）
+    const props = (checkout?.props as PropsFn)({
+      query: { source: 'reorder', skuIds: '100,200', counts: '2,3' },
+    })
+    expect(props.source).toBe('reorder')
+    expect(props.reorderItems).toEqual([
+      { skuId: 100, count: 2 },
+      { skuId: 200, count: 3 },
+    ])
+  })
+
+  it('没有 source 时仍是商品直购，不会误判成再次购买', () => {
+    const props = (checkout?.props as PropsFn)({
+      query: { skuId: '100', count: '2' },
+    })
+    expect(props.source).toBe('product')
+    expect(props.reorderItems).toEqual([])
+  })
+})

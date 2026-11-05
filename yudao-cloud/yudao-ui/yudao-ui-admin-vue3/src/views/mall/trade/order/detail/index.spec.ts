@@ -237,3 +237,18 @@ describe('后台订单详情 —— 物流信息', () => {
     expect(w.text()).toContain('已签收')
   })
 })
+
+describe('后台订单详情 —— 用户已删除标记（假删除）', () => {
+  it('买家删除后运营仍能打开详情，并看到「用户已删除」', async () => {
+    const w = await mountDetail(order({ status: 30, userDeleted: true }))
+
+    expect(w.text()).toContain('NO-1')
+    expect(w.text()).toContain('用户已删除')
+  })
+
+  it('普通订单没有该标记', async () => {
+    const w = await mountDetail()
+
+    expect(w.text()).not.toContain('用户已删除')
+  })
+})

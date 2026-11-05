@@ -41,6 +41,9 @@ public class TradeOrderBaseVO {
     @Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
 
+    @Schema(description = "买家是否已在用户端删除该订单（仅对 C 端隐藏，运营后台仍可见）", example = "false")
+    private Boolean userDeleted;
+
     @Schema(description = "购买的商品数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer productCount;
 

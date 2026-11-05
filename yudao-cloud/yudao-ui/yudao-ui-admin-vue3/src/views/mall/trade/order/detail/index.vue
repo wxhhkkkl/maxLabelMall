@@ -74,6 +74,8 @@
     <el-descriptions :column="1" title="订单状态">
       <el-descriptions-item label="订单状态: ">
         <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
+        <!-- 买家已删除（假删除）：C 端不可见，运营后台仍可见并在此标记 -->
+        <el-tag v-if="formData.userDeleted" class="ml-8px" type="info">用户已删除</el-tag>
       </el-descriptions-item>
       <!--
         确认对公转账收款（008 / FR-203）。**独立权限点、独立一行** ——

@@ -417,7 +417,7 @@ watch(
             @click="offlinePayChosen = false"
           >
             <b>在线支付</b>
-            <span>提交后选择支付宝等方式完成付款</span>
+            <span>提交后选择微信支付或支付宝完成付款</span>
           </div>
           <div
             id="payMethodOffline"

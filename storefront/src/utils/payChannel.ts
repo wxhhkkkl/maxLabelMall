@@ -16,9 +16,9 @@ import { isWechatBrowser } from './weixin'
  */
 
 const CHANNEL_LABELS: Record<string, string> = {
-  alipay_pc: '支付宝',
   wx_native: '微信支付',
   wx_pub: '微信支付（公众号）',
+  alipay_pc: '支付宝',
 }
 
 /**
@@ -32,7 +32,7 @@ const CHANNEL_ENV: Record<string, 'wechat' | 'non-wechat'> = {
   wx_native: 'non-wechat',
 }
 
-/** 已知渠道的展示顺序 —— 微信排在支付宝后面 */
+/** 已知渠道的展示顺序 —— 微信排在支付宝前面（2026-11-05 所有者调整） */
 const KNOWN_ORDER = Object.keys(CHANNEL_LABELS)
 
 export interface ChannelOption {

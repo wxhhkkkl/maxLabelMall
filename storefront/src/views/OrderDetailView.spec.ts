@@ -586,17 +586,17 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     expect(submitPay).not.toHaveBeenCalled() // 只是加载，不该自动提交
   })
 
-  it('待支付时展示渠道选择器：支付宝可选、微信置灰占位', async () => {
+  it('待支付时展示渠道选择器：微信置灰、支付宝可选', async () => {
     const w = await mountDetail()
     const opts = w.findAll('.pay-channel')
-    // 共两个入口、顺序固定：支付宝在前、微信在后
+    // 共两个入口、顺序固定：微信在前、支付宝在后
     expect(opts).toHaveLength(2)
-    expect(opts[0].text()).toContain('支付宝')
-    expect(opts[1].text()).toContain('微信支付')
-    expect(opts[0].classes()).not.toContain('is-disabled')
-    expect(opts[1].classes()).toContain('is-disabled')
+    expect(opts[0].text()).toContain('微信支付')
+    expect(opts[1].text()).toContain('支付宝')
+    expect(opts[0].classes()).toContain('is-disabled')
+    expect(opts[1].classes()).not.toContain('is-disabled')
     // 未开通的渠道要写明原因，不然用户会以为点了没反应
-    expect(opts[1].text()).toContain('即将上线')
+    expect(opts[0].text()).toContain('即将上线')
   })
 
   it('两个渠道都启用时，微信也可选', async () => {
@@ -613,7 +613,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await w.findAll('.pay-channel')[1].trigger('click')
     await w.get('#payOrder').trigger('click')
     await flushPromises()
-    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_native', undefined, expect.any(String))
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc', undefined, expect.any(String))
   })
 
   it('**已付款的订单不拉渠道列表** —— 没有支付可言，别白发请求', async () => {
@@ -795,7 +795,7 @@ describe('OrderDetailView —— 微信公众号 JSAPI 支付（wx_pub）', () =
   it('授权回跳后自动换 openid 并**接着把这一笔付掉**', async () => {
     setUa(UA_WECHAT)
     const invoke = installBridge()
-    // 两个渠道都开着，且支付宝排在前面 —— 用来验证续跑时会切回微信渠道
+    // 两个渠道都开着，且微信排在前面 —— 用来验证续跑时会切回微信渠道
     listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_pub'])
     bindSocialUser.mockResolvedValue('o-9')
     submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })

@@ -22,11 +22,14 @@ import cn.iocoder.yudao.module.member.api.address.dto.MemberAddressRespDTO;
 import cn.iocoder.yudao.module.trade.controller.app.customization.vo.AppCustomizationSpecReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
+import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderPageReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
+import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.member.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdatePriceReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
@@ -195,6 +198,7 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         orderItem.setCount(1);
         orderItem.setPrice(order.getPayPrice());
         orderItem.setDiscountPrice(0);
+        orderItem.setAdjustPrice(0); // 线上该列 NOT NULL；调价场景会读它做分摊
         orderItem.setPayPrice(order.getPayPrice());
         orderItem.setAfterSaleStatus(0);
         tradeOrderItemMapper.insert(orderItem);
@@ -896,6 +900,53 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         }
     }
 
+    // ==================== 买家删除订单（假删除） ====================
+
+    /**
+     * 买家删除：只置 `user_deleted`。
+     *
+     * ⚠️ 最要紧的是 `getDeleted()` 仍为 false —— 如果误用 `deleteById`，
+     * 运营后台也会跟着查不到（需求：运营人员可见）。
+     */
+    @Test
+    public void testDeleteOrder_canceled_hiddenFromMemberOnly() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.CANCELED.getStatus(), null, null,
+                LocalDateTime.now());
+
+        orderService.deleteOrder(order.getUserId(), order.getId());
+
+        TradeOrderDO actual = tradeOrderMapper.selectById(order.getId());
+        assertNotNull(actual, "运营后台仍要能查到");
+        assertEquals(Boolean.TRUE, actual.getUserDeleted());
+        assertEquals(Boolean.FALSE, actual.getDeleted(), "不能走全局逻辑删除");
+        // 买家侧：列表 / 计数 / 详情都不可见
+        assertTrue(tradeOrderMapper.selectPage(new AppTradeOrderPageReqVO(), order.getUserId())
+                .getList().isEmpty());
+        assertEquals(0L, tradeOrderMapper.selectCountByUserIdAndStatus(
+                order.getUserId(), null, null).longValue());
+        assertNull(tradeOrderMapper.selectOrderByIdAndUserId(order.getId(), order.getUserId()));
+    }
+
+    @Test
+    public void testDeleteOrder_completed_allowed() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.COMPLETED.getStatus(), null, null,
+                LocalDateTime.now());
+
+        orderService.deleteOrder(order.getUserId(), order.getId());
+
+        assertEquals(Boolean.TRUE, tradeOrderMapper.selectById(order.getId()).getUserDeleted());
+    }
+
+    @Test
+    public void testDeleteOrder_unpaid_fail() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNPAID.getStatus(), null, null,
+                LocalDateTime.now());
+
+        assertServiceException(() -> orderService.deleteOrder(order.getUserId(), order.getId()),
+                ORDER_DELETE_FAIL_STATUS);
+        assertEquals(Boolean.FALSE, tradeOrderMapper.selectById(order.getId()).getUserDeleted());
+    }
+
     @Test
     public void testDeliveryOrder_expressWithFromAddress_saved() {
         TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNDELIVERED.getStatus(),
@@ -910,6 +961,98 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         assertEquals(TradeOrderStatusEnum.DELIVERED.getStatus(), updated.getStatus());
         assertEquals(110108, updated.getDeliveryFromAreaId());
         assertEquals("西北旺亮甲店永丰中路100号北京人才教育基地红楼107", updated.getDeliveryFromAddress());
+    }
+
+    // ==================== 015 用户修改收货地址 ====================
+
+    private AppTradeOrderUpdateAddressReqVO updateAddressReq(Long id) {
+        AppTradeOrderUpdateAddressReqVO reqVO = new AppTradeOrderUpdateAddressReqVO();
+        reqVO.setId(id);
+        reqVO.setReceiverName("李四");
+        reqVO.setReceiverMobile("13900001111");
+        reqVO.setReceiverAreaId(310101);
+        reqVO.setReceiverDetailAddress("上海市黄浦区新地址 2 号");
+        return reqVO;
+    }
+
+    @Test
+    public void testUpdateOrderAddress_member_success() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNDELIVERED.getStatus(), null, null,
+                LocalDateTime.now());
+
+        orderService.updateOrderAddress(order.getUserId(), updateAddressReq(order.getId()));
+
+        TradeOrderDO updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals("李四", updated.getReceiverName());
+        assertEquals("13900001111", updated.getReceiverMobile());
+        assertEquals(310101, updated.getReceiverAreaId());
+        assertEquals("上海市黄浦区新地址 2 号", updated.getReceiverDetailAddress());
+        // 状态与金额不变
+        assertEquals(TradeOrderStatusEnum.UNDELIVERED.getStatus(), updated.getStatus());
+        assertEquals(order.getPayPrice(), updated.getPayPrice());
+    }
+
+    @Test
+    public void testUpdateOrderAddress_notOwner_fail() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNDELIVERED.getStatus(), null, null,
+                LocalDateTime.now());
+
+        assertServiceException(() -> orderService.updateOrderAddress(order.getUserId() + 1,
+                updateAddressReq(order.getId())), ORDER_NOT_FOUND);
+        assertEquals("张三", tradeOrderMapper.selectById(order.getId()).getReceiverName());
+    }
+
+    @Test
+    public void testUpdateOrderAddress_notUndelivered_fail() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.DELIVERED.getStatus(), null, null,
+                LocalDateTime.now());
+
+        assertServiceException(() -> orderService.updateOrderAddress(order.getUserId(),
+                updateAddressReq(order.getId())), ORDER_UPDATE_ADDRESS_FAIL_STATUS_NOT_DELIVERED);
+        assertEquals("张三", tradeOrderMapper.selectById(order.getId()).getReceiverName());
+    }
+
+    // ==================== 对公订单改价（2026-11-04 所有者拍板） ====================
+
+    private TradeOrderUpdatePriceReqVO updatePriceReq(Long id, int adjustPrice) {
+        TradeOrderUpdatePriceReqVO reqVO = new TradeOrderUpdatePriceReqVO();
+        reqVO.setId(id);
+        reqVO.setAdjustPrice(adjustPrice);
+        return reqVO;
+    }
+
+    /**
+     * 对公待收款单**没有在线支付单**（008 / Q41），改价不能去调 pay 模块。
+     *
+     * 之前这里必然报「支付订单不存在」并整笔回滚 —— 现在只更新订单金额，
+     * 确认收款时 `confirmOfflinePaid` 会按订单实付造支付单。
+     */
+    @Test
+    public void testUpdateOrderPrice_offlineWaiting_succeedsWithoutPayOrder() {
+        TradeOrderDO order = createWaitingOfflineOrder();
+        int oldPayPrice = order.getPayPrice();
+
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), -1000));
+
+        TradeOrderDO updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals(oldPayPrice - 1000, updated.getPayPrice());
+        assertEquals(-1000, updated.getAdjustPrice());
+        // 没有支付单可更新，也不应去调 pay 模块
+        verify(payOrderApi, never()).updatePayOrderPrice(any(), any());
+    }
+
+    /** 普通在线支付单：行为不变，仍要把新金额同步给支付单。 */
+    @Test
+    public void testUpdateOrderPrice_onlineOrder_stillSyncsPayOrder() {
+        when(payOrderApi.updatePayOrderPrice(any(), any())).thenReturn(CommonResult.success(true));
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNPAID.getStatus(),
+                PayChannelEnum.WX_LITE.getCode(), 7788L, LocalDateTime.now());
+
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), -1000));
+
+        assertEquals(order.getPayPrice() - 1000,
+                tradeOrderMapper.selectById(order.getId()).getPayPrice());
+        verify(payOrderApi).updatePayOrderPrice(7788L, order.getPayPrice() - 1000);
     }
 
 }

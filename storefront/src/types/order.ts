@@ -148,11 +148,21 @@ export interface OrderPageItem {
    */
   logisticsNo?: string | null
   /**
+   * 能否在用户端「再次购买」。
+   *
+   * ⚠️ 由**服务端**判定：只有普通商品单为 `true`；定制单 / 企业授权单 / 个人会员订阅单
+   * 都是 `false`（各自走定制、企业中心、会员订阅流程，不能拿订单项的 SKU 直接结算）。
+   * 列表 VO 没有定制/企业/订阅的原始字段，前端**拼不出来**，只按这个布尔值显示入口。
+   */
+  canReorder?: boolean
+  /**
    * 订单项。**名称 / 规格 / 单价 / 数量都是下单时的快照** —— 商品后续改名、
    * 换规格、调价都不应让历史订单跟着变。
    */
   items: Array<{
     id: number
+    /** 商品 SKU 编号（「再次购买」按它直接进结算） */
+    skuId?: number
     spuName: string
     picUrl: string
     /** 规格快照（后端 `properties`） */
@@ -291,6 +301,15 @@ export interface OrderDetail extends OrderPageItem, OrderPrice {
    * 后端售后创建接口也会拒绝。
    */
   subscription?: boolean
+}
+
+/** 015：修改订单收货地址（仅待发货）。 */
+export interface OrderAddressUpdateReq {
+  id: number
+  receiverName: string
+  receiverMobile: string
+  receiverAreaId: number
+  receiverDetailAddress: string
 }
 
 /**

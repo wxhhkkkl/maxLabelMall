@@ -20,6 +20,11 @@ vi.mock('@/api/invoice', () => ({
   deleteInvoiceTitle: vi.fn(),
 }))
 const cancelOrder = vi.fn()
+const updateOrderAddress = vi.fn()
+const listAddress = vi.fn()
+vi.mock('@/api/address', () => ({
+  listAddress: (...a: unknown[]) => listAddress(...a),
+}))
 const getExpressTrackList = vi.fn()
 const getExpressMapUrl = vi.fn()
 const submitPay = vi.fn()
@@ -28,6 +33,7 @@ const listEnabledChannelCodes = vi.fn()
 vi.mock('@/api/order', () => ({
   getOrderDetail: (...a: unknown[]) => getOrderDetail(...a),
   cancelOrder: (...a: unknown[]) => cancelOrder(...a),
+  updateOrderAddress: (...a: unknown[]) => updateOrderAddress(...a),
   getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
   getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
   pageOrders: vi.fn(),
@@ -171,6 +177,10 @@ beforeEach(async () => {
   createOrderInvoice.mockResolvedValue(77)
   cancelOrder.mockReset()
   cancelOrder.mockResolvedValue(true)
+  updateOrderAddress.mockReset()
+  updateOrderAddress.mockResolvedValue(true)
+  listAddress.mockReset()
+  listAddress.mockResolvedValue([])
   getExpressTrackList.mockReset()
   getExpressTrackList.mockResolvedValue([])
   getExpressMapUrl.mockReset()
@@ -1595,5 +1605,44 @@ describe('OrderDetailView —— 对公转账「待收款」（008 / FR-200 / FR
 
     expect(w.text()).toContain('无需支付')
     expect(w.find('#payOrder').exists()).toBe(false)
+  })
+})
+
+describe('015 发货前修改收货地址', () => {
+  it('待发货订单可选择地址并刷新详情', async () => {
+    listAddress.mockResolvedValue([
+      {
+        id: 7,
+        name: '李四',
+        mobile: '13900001111',
+        areaId: 310101,
+        areaName: '上海市 黄浦区',
+        detailAddress: '新地址 2 号',
+        defaultStatus: false,
+      },
+    ])
+    updateOrderAddress.mockResolvedValue(true)
+    const w = await mountDetail(detail({ status: OrderStatus.UNDELIVERED, payTime: PAID_AT }))
+    expect(getOrderDetail).toHaveBeenCalledTimes(1)
+
+    await w.get('[data-testid="order-address-edit"]').trigger('click')
+    await flushPromises()
+    expect(listAddress).toHaveBeenCalled()
+
+    await w.get('[data-testid="order-address-option-7"]').trigger('click')
+    await flushPromises()
+    expect(updateOrderAddress).toHaveBeenCalledWith({
+      id: 1,
+      receiverName: '李四',
+      receiverMobile: '13900001111',
+      receiverAreaId: 310101,
+      receiverDetailAddress: '新地址 2 号',
+    })
+    expect(getOrderDetail).toHaveBeenCalledTimes(2)
+  })
+
+  it('非待发货订单不显示修改入口', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.DELIVERED }))
+    expect(w.find('[data-testid="order-address-edit"]').exists()).toBe(false)
   })
 })

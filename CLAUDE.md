@@ -30,6 +30,10 @@ specs/016-shared-content-space/plan.md
   📌 口径：免费 10 MB / 专业 100 MB / 企业 300 MB 共享池；企业空间仅持席成员可用（管理员不豁免）；
   平台共享只允许后台管理人员上传（会员投稿关闭）；个人空间不可分享；存量模板全部计入配额
 
+📌 **2026-11-05 订单分页 500 事故**：032「买家删除订单」的 `trade_order.user_deleted` 列必须先执行
+`sql/mysql/032-order-user-delete.sql`；本次发版漏跑该脚本，导致 `/app-api/trade/order/page` 报
+`Unknown column` → 500，已补跑。以后凡是后端引用了新列，必须把对应 ALTER 脚本纳入发版顺序。
+
 上一个特性（015 发货前修改收货地址：仅待发货，从地址簿选）：
 - specs/015-order-address-edit/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/015-order-address-edit/contracts/app-api.md

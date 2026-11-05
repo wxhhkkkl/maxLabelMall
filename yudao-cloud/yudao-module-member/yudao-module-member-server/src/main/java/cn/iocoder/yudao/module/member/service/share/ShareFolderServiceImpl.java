@@ -79,6 +79,20 @@ public class ShareFolderServiceImpl implements ShareFolderService {
     }
 
     @Override
+    public List<ShareFolderInfo> getOrgListForAdmin(Long orgId) {
+        return folderMapper.selectListByOrgId(orgId).stream().map(folder -> {
+            ShareFolderInfo info = new ShareFolderInfo();
+            info.setId(folder.getId());
+            info.setName(folder.getName());
+            info.setMemberCount(folderMemberMapper.selectMemberIdsByFolderId(folder.getId()).size());
+            info.setContentCount(contentMapper.countByFolder(folder.getId()));
+            info.setUsedBytes(contentMapper.sumSizeByFolder(folder.getId()));
+            info.setCanManage(false);
+            return info;
+        }).toList();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = MEMBER_SHARE_TYPE, subType = MEMBER_SHARE_FOLDER_CREATE_SUB_TYPE,
             bizNo = "{{#memberId}}", success = MEMBER_SHARE_FOLDER_CREATE_SUCCESS)

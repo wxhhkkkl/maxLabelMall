@@ -73,6 +73,22 @@ public class ShareContentServiceImpl implements ShareContentService {
     }
 
     @Override
+    public PageResult<MaxLabelShareContentDO> getOrgPageForAdmin(Long orgId, Long folderId, String keyword,
+                                                                 Integer contentType,
+                                                                 cn.iocoder.yudao.framework.common.pojo.PageParam pageParam) {
+        return contentMapper.selectOrgPage(orgId, folderId, keyword, contentType, pageParam);
+    }
+
+    @Override
+    public MaxLabelShareContentDO getContentForAdmin(Long id) {
+        MaxLabelShareContentDO content = contentMapper.selectById(id);
+        if (content == null || !Objects.equals(content.getScope(), SCOPE_ENTERPRISE)) {
+            throw exception(MEMBER_SHARE_CONTENT_NOT_FOUND);
+        }
+        return content;
+    }
+
+    @Override
     public MaxLabelShareContentDO getContent(Long memberId, Long id) {
         MaxLabelShareContentDO content = contentMapper.selectById(id);
         requireReadable(memberId, content);

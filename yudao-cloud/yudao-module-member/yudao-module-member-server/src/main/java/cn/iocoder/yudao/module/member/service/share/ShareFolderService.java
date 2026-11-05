@@ -14,6 +14,9 @@ public interface ShareFolderService {
 
     List<ShareFolderInfo> getVisibleList(Long memberId);
 
+    /** 管理端：查看企业全部文件夹与用量，不校验席位/授权 */
+    List<ShareFolderInfo> getOrgListForAdmin(Long orgId);
+
     Long create(Long memberId, String name);
 
     void update(Long memberId, Long id, String name);

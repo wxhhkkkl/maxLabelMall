@@ -25,6 +25,19 @@ public interface MaxLabelShareContentMapper extends BaseMapperX<MaxLabelShareCon
                 .orderByDesc(MaxLabelShareContentDO::getId));
     }
 
+    /** 管理端：按企业查看全部共享内容，不校验席位与文件夹可见性。 */
+    default PageResult<MaxLabelShareContentDO> selectOrgPage(Long orgId, Long folderId, String keyword,
+                                                              Integer contentType, PageParam pageParam) {
+        LambdaQueryWrapperX<MaxLabelShareContentDO> wrapper = new LambdaQueryWrapperX<MaxLabelShareContentDO>()
+                .eq(MaxLabelShareContentDO::getScope, 2)
+                .eq(MaxLabelShareContentDO::getOrgId, orgId)
+                .eqIfPresent(MaxLabelShareContentDO::getFolderId, folderId)
+                .eqIfPresent(MaxLabelShareContentDO::getContentType, contentType);
+        appendKeyword(wrapper, keyword);
+        return selectPage(pageParam, wrapper.orderByDesc(MaxLabelShareContentDO::getCreateTime)
+                .orderByDesc(MaxLabelShareContentDO::getId));
+    }
+
     default PageResult<MaxLabelShareContentDO> selectEnterprisePage(Long orgId, Long folderId, String keyword,
                                                                     Integer contentType, PageParam pageParam) {
         LambdaQueryWrapperX<MaxLabelShareContentDO> wrapper = new LambdaQueryWrapperX<MaxLabelShareContentDO>()

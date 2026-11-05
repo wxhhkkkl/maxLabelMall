@@ -167,6 +167,8 @@ const statusText = computed(() =>
     : '',
 )
 const isUnpaid = computed(() => order.value?.status === OrderStatus.UNPAID)
+/** 待支付时详情页不显示「再次购买」：此时用户该做的是付款，不是重新下单。 */
+const showReorder = computed(() => Boolean(order.value?.canReorder) && !isUnpaid.value)
 /** 015：仅待发货、且订单确实有收货信息（虚拟商品单没有）时允许修改地址 */
 const canEditAddress = computed(() =>
   order.value?.status === OrderStatus.UNDELIVERED && Boolean(order.value?.receiverName),
@@ -803,7 +805,7 @@ onMounted(async () => {
         </div>
 
         <!-- 再次购买：只普通商品单；定制 / 企业授权 / 订阅单服务端 canReorder=false -->
-        <div v-if="order.canReorder" class="od-actions od-reorder-actions">
+        <div v-if="showReorder" class="od-actions od-reorder-actions">
           <button class="btn-cart" type="button" @click="onReorder">
             再次购买
           </button>

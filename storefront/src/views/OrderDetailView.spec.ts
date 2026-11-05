@@ -1666,6 +1666,16 @@ describe('再次购买', () => {
     })
   })
 
+  it('待支付订单详情不显示再次购买', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.UNPAID,
+      canReorder: true,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    expect(w.findAll('button').some((item) => item.text().includes('再次购买'))).toBe(false)
+  })
+
   it('订阅 / 企业 / 定制单没有再次购买入口', async () => {
     const base = detail()
     const w = await mountDetail(detail({

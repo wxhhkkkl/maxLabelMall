@@ -25,7 +25,8 @@ specs/016-shared-content-space/plan.md
 - specs/016-shared-content-space/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/016-shared-content-space/contracts/{app-api,admin-api}.md
   ⚠️ **上线顺序**：先执行 `sql/mysql/033-shared-content-space.sql`（5 张新表 + 两张旧表迁移 +
-  平台内容菜单），再发后端，最后发管理端 / 桌面端
+  平台内容菜单）、`034-platform-content-menu-category.sql`（菜单归入「软件管理」+ 分类表），
+  再发后端，最后发管理端 / 桌面端
   📌 口径：免费 10 MB / 专业 100 MB / 企业 300 MB 共享池；企业空间仅持席成员可用（管理员不豁免）；
   平台共享只允许后台管理人员上传（会员投稿关闭）；个人空间不可分享；存量模板全部计入配额
 

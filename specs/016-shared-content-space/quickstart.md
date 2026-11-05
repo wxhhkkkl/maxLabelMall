@@ -22,6 +22,7 @@
 
 ```bash
 mysql -h <host> -u <user> -p <db> < yudao-cloud/sql/mysql/033-shared-content-space.sql
+mysql -h <host> -u <user> -p <db> < yudao-cloud/sql/mysql/034-platform-content-menu-category.sql
 ```
 
 回查：
@@ -153,7 +154,8 @@ npm run test        # 纯函数与组件单测
 
 **顺序**（不可颠倒）：
 
-1. `033-shared-content-space.sql`（5 表 + 迁移 + 菜单）；
+1. `033-shared-content-space.sql`（5 表 + 迁移 + 菜单）、`034-platform-content-menu-category.sql`
+   （菜单归入「软件管理」+ 分类表）；
 2. 后端；
 3. 管理端（新平台内容页、删旧审核菜单）；
 4. 桌面端（三页签、移除投稿）。

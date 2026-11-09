@@ -4,6 +4,7 @@ import { onMounted, ref, watch } from 'vue'
 import { listInvoiceTitles } from '@/api/invoice'
 import InvoiceTitleDialog from '@/components/InvoiceTitleDialog.vue'
 import { InvoiceTitleKind, type InvoiceTitle, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types'
+import { getLastInvoiceTitleId, saveLastInvoiceTitleId } from '@/utils/last-invoice'
 
 /**
  * 「从已保存的抬头里选一条 / 没有就当场新增」的**选择器**（Q36）。
@@ -38,11 +39,21 @@ async function load() {
 /** 换票种 / 换抬头类型都要重新筛，并把选中态清掉（上一条多半不属于新组合） */
 watch([() => props.type, () => props.titleKind], () => {
   pickedId.value = null
-  void load()
+  void loadAndPick()
 })
+
+/** 优先上次选过的抬头；没有或不属于当前组合时退回默认抬头 */
+async function loadAndPick() {
+  await load()
+  const lastId = getLastInvoiceTitleId()
+  const preferred = titles.value.find((t) => t.id === lastId)
+    ?? titles.value.find((t) => t.defaultStatus)
+  if (preferred) pick(preferred)
+}
 
 function pick(title: InvoiceTitle) {
   pickedId.value = title.id
+  saveLastInvoiceTitleId(title.id)
   emit('picked', title)
 }
 
@@ -57,12 +68,9 @@ async function onCreated() {
 }
 
 onMounted(async () => {
-  await load()
-  // 有本票种的默认抬头 → **预先填好**（US23 场景 2）。只填字段，不替客户勾"要开票"
-  const preferred = titles.value.find((t) => t.defaultStatus)
-  if (preferred) {
-    pick(preferred)
-  }
+  // 有上次选过 / 默认的本票种抬头 → **预先填好**（US23 场景 2）。
+  // 只填字段，不替客户勾"要开票"——是否开票仍由结算页的复选框决定。
+  await loadAndPick()
 })
 </script>
 

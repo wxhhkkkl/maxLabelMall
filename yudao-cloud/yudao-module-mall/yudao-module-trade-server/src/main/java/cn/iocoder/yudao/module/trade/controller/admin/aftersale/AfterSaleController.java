@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayRefundNotifyReqDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.aftersale.vo.*;
+import cn.iocoder.yudao.module.trade.controller.app.aftersale.vo.AppAfterSaleCreateReqVO;
 import cn.iocoder.yudao.module.trade.convert.aftersale.AfterSaleConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.aftersale.AfterSaleLogDO;
@@ -89,6 +90,13 @@ public class AfterSaleController {
         MemberUserRespDTO user = memberUserApi.getUser(afterSale.getUserId()).getCheckedData();
         List<AfterSaleLogDO> logs = afterSaleLogService.getAfterSaleLogList(afterSale.getId());
         return success(AfterSaleConvert.INSTANCE.convert(afterSale, order, orderItem, user, logs));
+    }
+
+    @PostMapping("/agent-create")
+    @Operation(summary = "代客发起售后")
+    @PreAuthorize("@ss.hasPermission('trade:after-sale:agent-create')")
+    public CommonResult<Long> createAgentAfterSale(@Valid @RequestBody AppAfterSaleCreateReqVO createReqVO) {
+        return success(afterSaleService.createAfterSaleByAdmin(getLoginUserId(), createReqVO));
     }
 
     @PutMapping("/agree")

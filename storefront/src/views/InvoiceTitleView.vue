@@ -88,6 +88,8 @@ async function onSetDefault(title: InvoiceTitle) {
       titleAddress: title.titleAddress ?? '',
       titlePhone: title.titlePhone ?? '',
       bankName: title.bankName ?? '',
+      bankAccount: title.bankAccount ?? '',
+      bankCode: title.bankCode ?? '',
       email: title.email ?? '',
       defaultStatus: true,
     })
@@ -206,6 +208,18 @@ onMounted(load)
                     class="invoice-title-line"
                   >
                     开户行：{{ t.bankName }}
+                  </p>
+                  <p
+                    v-if="t.bankAccount"
+                    class="invoice-title-line"
+                  >
+                    银行账户：{{ t.bankAccount }}
+                  </p>
+                  <p
+                    v-if="t.bankCode"
+                    class="invoice-title-line"
+                  >
+                    行号：{{ t.bankCode }}
                   </p>
                   <p
                     v-if="t.email"

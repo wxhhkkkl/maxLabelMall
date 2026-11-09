@@ -21,6 +21,18 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
      * 下单用户信息
      */
     private MemberUserRespVO user;
+
+    @Schema(description = "代下单人昵称；客户自助订单为 null", example = "运营小王")
+    private String agentUserName;
+
+    /**
+     * 微信 / 支付宝等在线渠道的**第三方交易单号**（pay_order.channel_order_no）。
+     *
+     * 与 `payOrderId`（内部支付单号）不同；对公转账为 null（其流水号在 offlinePayment 里）。
+     */
+    @Schema(description = "第三方交易单号（微信/支付宝等在线渠道）", example = "4200001234202601011234567890")
+    private String payChannelOrderNo;
+
     /**
      * 推广用户信息
      */

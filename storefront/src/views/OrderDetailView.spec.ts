@@ -20,6 +20,11 @@ vi.mock('@/api/invoice', () => ({
   deleteInvoiceTitle: vi.fn(),
 }))
 const cancelOrder = vi.fn()
+const updateOrderAddress = vi.fn()
+const listAddress = vi.fn()
+vi.mock('@/api/address', () => ({
+  listAddress: (...a: unknown[]) => listAddress(...a),
+}))
 const getExpressTrackList = vi.fn()
 const getExpressMapUrl = vi.fn()
 const submitPay = vi.fn()
@@ -28,6 +33,7 @@ const listEnabledChannelCodes = vi.fn()
 vi.mock('@/api/order', () => ({
   getOrderDetail: (...a: unknown[]) => getOrderDetail(...a),
   cancelOrder: (...a: unknown[]) => cancelOrder(...a),
+  updateOrderAddress: (...a: unknown[]) => updateOrderAddress(...a),
   getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
   getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
   pageOrders: vi.fn(),
@@ -171,6 +177,10 @@ beforeEach(async () => {
   createOrderInvoice.mockResolvedValue(77)
   cancelOrder.mockReset()
   cancelOrder.mockResolvedValue(true)
+  updateOrderAddress.mockReset()
+  updateOrderAddress.mockResolvedValue(true)
+  listAddress.mockReset()
+  listAddress.mockResolvedValue([])
   getExpressTrackList.mockReset()
   getExpressTrackList.mockResolvedValue([])
   getExpressMapUrl.mockReset()
@@ -485,6 +495,13 @@ describe('OrderDetailView —— 取消订单（FR-036 / T112）', () => {
     expect(b.find('.cancel-order').exists()).toBe(false)
   })
 
+  it('代客订单显示「客服代下单」，且没有取消入口（017 / Q131）', async () => {
+    const w = await mountDetail(detail({ agentCreated: true }))
+    expect(w.text()).toContain('客服代下单')
+    expect(w.find('.od-agent-tag').exists()).toBe(true)
+    expect(w.find('.cancel-order').exists()).toBe(false)
+  })
+
   it('二次确认后取消，并以后端状态为准重新拉详情', async () => {
     const w = await mountDetail()
     await w.get('.cancel-order').trigger('click')
@@ -576,17 +593,17 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     expect(submitPay).not.toHaveBeenCalled() // 只是加载，不该自动提交
   })
 
-  it('待支付时展示渠道选择器：支付宝可选、微信置灰占位', async () => {
+  it('待支付时展示渠道选择器：微信置灰、支付宝可选', async () => {
     const w = await mountDetail()
     const opts = w.findAll('.pay-channel')
-    // 共两个入口、顺序固定：支付宝在前、微信在后
+    // 共两个入口、顺序固定：微信在前、支付宝在后
     expect(opts).toHaveLength(2)
-    expect(opts[0].text()).toContain('支付宝')
-    expect(opts[1].text()).toContain('微信支付')
-    expect(opts[0].classes()).not.toContain('is-disabled')
-    expect(opts[1].classes()).toContain('is-disabled')
+    expect(opts[0].text()).toContain('微信支付')
+    expect(opts[1].text()).toContain('支付宝')
+    expect(opts[0].classes()).toContain('is-disabled')
+    expect(opts[1].classes()).not.toContain('is-disabled')
     // 未开通的渠道要写明原因，不然用户会以为点了没反应
-    expect(opts[1].text()).toContain('即将上线')
+    expect(opts[0].text()).toContain('即将上线')
   })
 
   it('两个渠道都启用时，微信也可选', async () => {
@@ -603,7 +620,7 @@ describe('OrderDetailView —— 支付入口（FR-037 / FR-039 / FR-040，T116�
     await w.findAll('.pay-channel')[1].trigger('click')
     await w.get('#payOrder').trigger('click')
     await flushPromises()
-    expect(submitPay).toHaveBeenCalledWith(8899, 'wx_native', undefined, expect.any(String))
+    expect(submitPay).toHaveBeenCalledWith(8899, 'alipay_pc', undefined, expect.any(String))
   })
 
   it('**已付款的订单不拉渠道列表** —— 没有支付可言，别白发请求', async () => {
@@ -785,7 +802,7 @@ describe('OrderDetailView —— 微信公众号 JSAPI 支付（wx_pub）', () =
   it('授权回跳后自动换 openid 并**接着把这一笔付掉**', async () => {
     setUa(UA_WECHAT)
     const invoke = installBridge()
-    // 两个渠道都开着，且支付宝排在前面 —— 用来验证续跑时会切回微信渠道
+    // 两个渠道都开着，且微信排在前面 —— 用来验证续跑时会切回微信渠道
     listEnabledChannelCodes.mockResolvedValue(['alipay_pc', 'wx_pub'])
     bindSocialUser.mockResolvedValue('o-9')
     submitPay.mockResolvedValue({ status: 0, displayMode: 'app', displayContent: JSAPI_DISPLAY })
@@ -1115,6 +1132,11 @@ describe('OrderDetailView —— 申请退款', () => {
 
   it('**个人会员订阅订单没有退款入口**（2026-10-27，后端售后接口同样会拒）', async () => {
     const w = await mountDetail(paid({ subscription: true }))
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
+  it('**代客订单没有退款入口**（017 / Q126，后端会员售后接口会拒）', async () => {
+    const w = await mountDetail(paid({ agentCreated: true }))
     expect(w.find('.od-refund').exists()).toBe(false)
   })
 
@@ -1595,5 +1617,84 @@ describe('OrderDetailView —— 对公转账「待收款」（008 / FR-200 / FR
 
     expect(w.text()).toContain('无需支付')
     expect(w.find('#payOrder').exists()).toBe(false)
+  })
+})
+
+describe('015 发货前修改收货地址', () => {
+  it('待发货订单可选择地址并刷新详情', async () => {
+    listAddress.mockResolvedValue([
+      {
+        id: 7,
+        name: '李四',
+        mobile: '13900001111',
+        areaId: 310101,
+        areaName: '上海市 黄浦区',
+        detailAddress: '新地址 2 号',
+        defaultStatus: false,
+      },
+    ])
+    updateOrderAddress.mockResolvedValue(true)
+    const w = await mountDetail(detail({ status: OrderStatus.UNDELIVERED, payTime: PAID_AT }))
+    expect(getOrderDetail).toHaveBeenCalledTimes(1)
+
+    await w.get('[data-testid="order-address-edit"]').trigger('click')
+    await flushPromises()
+    expect(listAddress).toHaveBeenCalled()
+
+    await w.get('[data-testid="order-address-option-7"]').trigger('click')
+    await flushPromises()
+    expect(updateOrderAddress).toHaveBeenCalledWith({
+      id: 1,
+      receiverName: '李四',
+      receiverMobile: '13900001111',
+      receiverAreaId: 310101,
+      receiverDetailAddress: '新地址 2 号',
+    })
+    expect(getOrderDetail).toHaveBeenCalledTimes(2)
+  })
+
+  it('非待发货订单不显示修改入口', async () => {
+    const w = await mountDetail(detail({ status: OrderStatus.DELIVERED }))
+    expect(w.find('[data-testid="order-address-edit"]').exists()).toBe(false)
+  })
+})
+
+describe('再次购买', () => {
+  it('已完成普通订单显示入口，并按原 SKU + 数量进入结算', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.COMPLETED,
+      canReorder: true,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    const push = vi.spyOn(router, 'push')
+    const button = w.findAll('button').find((item) => item.text().includes('再次购买'))
+    expect(button).toBeTruthy()
+
+    await button!.trigger('click')
+    expect(push).toHaveBeenCalledWith({
+      path: '/checkout',
+      query: { source: 'reorder', skuIds: '501', counts: '2' },
+    })
+  })
+
+  it('待支付订单详情不显示再次购买', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.UNPAID,
+      canReorder: true,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    expect(w.findAll('button').some((item) => item.text().includes('再次购买'))).toBe(false)
+  })
+
+  it('订阅 / 企业 / 定制单没有再次购买入口', async () => {
+    const base = detail()
+    const w = await mountDetail(detail({
+      status: OrderStatus.COMPLETED,
+      canReorder: false,
+      items: [{ ...base.items[0], skuId: 501, count: 2 }],
+    }))
+    expect(w.findAll('button').some((item) => item.text().includes('再次购买'))).toBe(false)
   })
 })

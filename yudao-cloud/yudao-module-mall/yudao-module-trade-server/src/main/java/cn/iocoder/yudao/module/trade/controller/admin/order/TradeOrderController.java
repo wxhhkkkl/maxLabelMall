@@ -6,7 +6,12 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
+import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
 import cn.iocoder.yudao.module.trade.framework.delivery.config.TradeExpressProperties;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
@@ -16,6 +21,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
+import cn.iocoder.yudao.module.trade.service.order.AgentOrderService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
@@ -63,6 +69,12 @@ public class TradeOrderController {
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
     @Resource
     private TradeOrderInvoiceService tradeOrderInvoiceService;
+    @Resource
+    private AgentOrderService agentOrderService;
+    @Resource
+    private AdminUserApi adminUserApi;
+    @Resource
+    private PayOrderApi payOrderApi;
 
     @GetMapping("/page")
     @Operation(summary = "获得交易订单分页")
@@ -96,7 +108,55 @@ public class TradeOrderController {
         page.getList().forEach(item -> item.setOfflineWaiting(
                 waitingOrderIds.contains(item.getId())
                         && TradeOrderStatusEnum.isUnpaid(item.getStatus())));
+        // 代下单人昵称（017）：一次批量解析；账号不存在时为 null，前端显示 后台用户#{id}
+        fillAgentUserNames(page.getList());
         return success(page);
+    }
+
+    private void fillAgentUserNames(List<TradeOrderPageItemRespVO> list) {
+        Set<Long> agentUserIds = convertSet(list, TradeOrderPageItemRespVO::getAgentUserId, Objects::nonNull);
+        if (CollUtil.isEmpty(agentUserIds)) {
+            return;
+        }
+        Map<Long, AdminUserRespDTO> agentUserMap = adminUserApi.getUserMap(agentUserIds);
+        list.forEach(item -> {
+            AdminUserRespDTO user = agentUserMap.get(item.getAgentUserId());
+            item.setAgentUserName(user != null ? user.getNickname() : null);
+        });
+    }
+
+    // ==================== 代客下单（017） ====================
+
+    @PostMapping("/agent-settlement")
+    @Operation(summary = "代客下单 - 结算预览")
+    @PreAuthorize("@ss.hasPermission('trade:order:agent-create')")
+    public CommonResult<AppTradeOrderSettlementRespVO> agentSettlement(
+            @Valid @RequestBody AdminAgentOrderSettlementReqVO reqVO) {
+        return success(agentOrderService.settlement(reqVO));
+    }
+
+    @PostMapping("/agent-create")
+    @Operation(summary = "代客下单 - 创建订单")
+    @PreAuthorize("@ss.hasPermission('trade:order:agent-create')")
+    public CommonResult<TradeOrderCreateRespVO> agentCreate(
+            @Valid @RequestBody AdminAgentOrderCreateReqVO reqVO) {
+        return success(agentOrderService.create(getLoginUserId(), reqVO));
+    }
+
+    @PostMapping("/agent-pay")
+    @Operation(summary = "代客下单 - 发起在线支付")
+    @PreAuthorize("@ss.hasPermission('trade:order:agent-create')")
+    public CommonResult<AdminAgentOrderPayRespVO> agentPay(
+            @Valid @RequestBody AdminAgentOrderPayReqVO reqVO) {
+        return success(agentOrderService.pay(reqVO));
+    }
+
+    @GetMapping("/agent-pay-status")
+    @Operation(summary = "代客下单 - 查询支付状态")
+    @Parameter(name = "orderId", description = "订单编号", required = true)
+    @PreAuthorize("@ss.hasPermission('trade:order:agent-create')")
+    public CommonResult<AdminAgentOrderPayStatusRespVO> agentPayStatus(@RequestParam("orderId") Long orderId) {
+        return success(agentOrderService.getPayStatus(orderId));
     }
 
     @GetMapping("/summary")
@@ -125,6 +185,18 @@ public class TradeOrderController {
                 memberUserApi.getUser(order.getBrokerageUserId()).getCheckedData() : null;
         List<TradeOrderLogDO> orderLogs = tradeOrderLogService.getOrderLogListByOrderId(id);
         TradeOrderDetailRespVO respVO = TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser);
+        // 代下单人昵称（017）：账号不存在时为 null，前端显示 后台用户#{id}
+        if (order.getAgentUserId() != null) {
+            AdminUserRespDTO agentUser = adminUserApi.getUser(order.getAgentUserId()).getData();
+            respVO.setAgentUserName(agentUser != null ? agentUser.getNickname() : null);
+        }
+        // 微信/支付宝交易单号：详情页「付款方式」后展示（内部 payOrderId 之外，运营对账用）
+        if (order.getPayOrderId() != null && Boolean.TRUE.equals(order.getPayStatus())) {
+            PayOrderRespDTO payOrder = payOrderApi.getOrder(order.getPayOrderId()).getData();
+            if (payOrder != null) {
+                respVO.setPayChannelOrderNo(payOrder.getChannelOrderNo());
+            }
+        }
         // 对公转账信息（008）：待收款标记 + 确认痕迹（FR-205 的可追溯）
         buildOfflinePayment(respVO, order);
         // 印刷定制（014）：不是定制单时为 null

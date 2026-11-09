@@ -78,9 +78,17 @@ public class TradeInvoiceTitleDO extends BaseDO {
      */
     private String titlePhone;
     /**
-     * 开户行及账号
+     * 开户行（银行名称/支行）
      */
     private String bankName;
+    /**
+     * 银行账户（账号）
+     */
+    private String bankAccount;
+    /**
+     * 开户行行号（联行号 / CNAPS）
+     */
+    private String bankCode;
     /**
      * 接收发票 / 收据的邮箱（选填，选这条抬头时自动带出）
      */

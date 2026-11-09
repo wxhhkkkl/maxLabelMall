@@ -13,6 +13,13 @@ vi.mock('@/api/member/org', () => ({
   revokeOrgSeat: vi.fn()
 }))
 
+vi.mock('@/api/member/orgShareContent', () => ({
+  getOrgShareOverview: vi.fn(),
+  getOrgShareFolders: vi.fn(),
+  getOrgShareContentPage: vi.fn(),
+  getOrgShareContent: vi.fn()
+}))
+
 import {
   assignOrgSeat,
   getOrgLicensePage,

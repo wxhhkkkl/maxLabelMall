@@ -5,8 +5,12 @@ import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.org.MaxLabelOrgMemberDO;
 import cn.iocoder.yudao.module.member.dal.dataobject.user.MemberUserDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelShareFolderDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelShareFolderMemberDO;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.org.MaxLabelOrgMemberMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.share.MaxLabelShareFolderMapper;
+import cn.iocoder.yudao.module.member.dal.mysql.share.MaxLabelShareFolderMemberMapper;
 import cn.iocoder.yudao.module.member.dal.mysql.user.MemberUserMapper;
 import cn.iocoder.yudao.module.member.enums.org.MaxLabelOrgRoleEnum;
 import jakarta.annotation.Resource;
@@ -35,6 +39,10 @@ public class MaxLabelOrgMemberServiceImplTest extends BaseDbUnitTest {
     private MaxLabelOrgMemberMapper orgMemberMapper;
     @Resource
     private MemberUserMapper userMapper;
+    @Resource
+    private MaxLabelShareFolderMapper shareFolderMapper;
+    @Resource
+    private MaxLabelShareFolderMemberMapper shareFolderMemberMapper;
 
     private Long orgId;
     private Long ownerId;
@@ -71,6 +79,21 @@ public class MaxLabelOrgMemberServiceImplTest extends BaseDbUnitTest {
 
         assertThrows(Exception.class,
                 () -> memberService.addMember(orgId, "13900000000", OPERATOR_MEMBER, ownerId));
+    }
+
+    @Test
+    void leavingClearsFolderVisibilityAcl() {
+        Long memberId = addUser("13800138019");
+        memberService.addMember(orgId, "13800138019", OPERATOR_MEMBER, ownerId);
+        MaxLabelShareFolderDO folder = MaxLabelShareFolderDO.builder()
+                .orgId(orgId).name("财务").creatorMemberId(ownerId).build();
+        shareFolderMapper.insert(folder);
+        shareFolderMemberMapper.insert(MaxLabelShareFolderMemberDO.builder()
+                .folderId(folder.getId()).memberId(memberId).build());
+
+        memberService.leave(memberId);
+
+        assertTrue(shareFolderMemberMapper.selectMemberIdsByFolderId(folder.getId()).isEmpty());
     }
 
     @Test

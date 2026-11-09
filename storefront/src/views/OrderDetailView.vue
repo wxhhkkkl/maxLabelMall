@@ -2,10 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { cancelOrder, getExpressMapUrl, getExpressTrackList, getOrderDetail } from '@/api/order'
+import { listAddress } from '@/api/address'
+import { cancelOrder, getExpressMapUrl, getExpressTrackList, getOrderDetail, updateOrderAddress } from '@/api/order'
 import { getPayOrder, listEnabledChannelCodes, submitPay } from '@/api/pay'
 import { bindSocialUser, getSocialAuthRedirectUrl, getSocialUser } from '@/api/social'
 import AccountSidebar from '@/components/AccountSidebar.vue'
+import AddressFormDialog from '@/components/AddressFormDialog.vue'
 import CommentCreateDialog from '@/components/CommentCreateDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import InvoiceApplyDialog from '@/components/InvoiceApplyDialog.vue'
@@ -15,7 +17,7 @@ import MlModal from '@/components/base/MlModal.vue'
 import MlPill from '@/components/base/MlPill.vue'
 import QrPayDialog from '@/components/QrPayDialog.vue'
 import RefundApplyDialog from '@/components/RefundApplyDialog.vue'
-import type { ExpressTrack, OrderDetail } from '@/types'
+import type { Address, ExpressTrack, OrderDetail } from '@/types'
 import { InvoiceStatus, OrderStatus, PayOrderStatus } from '@/types'
 import { cancelAfterSale } from '@/api/afterSale'
 import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/utils/afterSale'
@@ -69,6 +71,13 @@ const error = ref(false)
 const message = ref('')
 const cancelOpen = ref(false)
 const paying = ref(false)
+
+/** 015：待发货订单修改收货地址（从地址簿选） */
+const addressPickerOpen = ref(false)
+const addressFormOpen = ref(false)
+const addresses = ref<Address[]>([])
+const addressSaving = ref(false)
+const addressError = ref('')
 
 /**
  * 物流轨迹（010）。进入详情后**自动加载**（Q58），失败只影响这一块（FR-258）。
@@ -158,6 +167,12 @@ const statusText = computed(() =>
     : '',
 )
 const isUnpaid = computed(() => order.value?.status === OrderStatus.UNPAID)
+/** 待支付时详情页不显示「再次购买」：此时用户该做的是付款，不是重新下单。 */
+const showReorder = computed(() => Boolean(order.value?.canReorder) && !isUnpaid.value)
+/** 015：仅待发货、且订单确实有收货信息（虚拟商品单没有）时允许修改地址 */
+const canEditAddress = computed(() =>
+  order.value?.status === OrderStatus.UNDELIVERED && Boolean(order.value?.receiverName),
+)
 
 /**
  * 补开票弹层（US20 / FR-163）。
@@ -327,6 +342,49 @@ async function load(sync = false) {
     order.value = null
   } finally {
     loading.value = false
+  }
+}
+
+/** 015：打开地址选择；地址簿读取失败不阻塞弹层，可在弹层里新增地址 */
+async function openAddressPicker() {
+  addressError.value = ''
+  try {
+    addresses.value = await listAddress()
+  } catch {
+    addresses.value = []
+  }
+  addressPickerOpen.value = true
+}
+
+/** 015：把选中地址写回订单（只改收货快照），成功后刷新详情 */
+async function pickOrderAddress(address: Address) {
+  if (!order.value || addressSaving.value) return
+  addressSaving.value = true
+  addressError.value = ''
+  try {
+    await updateOrderAddress({
+      id: order.value.id,
+      receiverName: address.name,
+      receiverMobile: address.mobile,
+      receiverAreaId: address.areaId,
+      receiverDetailAddress: address.detailAddress,
+    })
+    addressPickerOpen.value = false
+    await load()
+  } catch (e) {
+    addressError.value = e instanceof Error ? e.message : '修改收货地址失败'
+  } finally {
+    addressSaving.value = false
+  }
+}
+
+/** 015：新增地址保存后刷新列表；由客户再点一下选中 */
+async function onAddressSaved() {
+  addressFormOpen.value = false
+  try {
+    addresses.value = await listAddress()
+  } catch {
+    // 拉不到就保持原列表
   }
 }
 
@@ -522,6 +580,28 @@ function onQrClosed() {
 // ========== 评价（按订单项） ==========
 
 /** 该项现在能不能评价。判定要**同时**看订单状态与两个层级的 commentStatus —— 见 `canCommentItem` */
+/** 再次购买：按原 SKU + 数量直接进结算，不经购物车。 */
+function onReorder() {
+  const o = order.value
+  if (!o) return
+  const items = o.items.filter(
+    (it) => Number.isInteger(Number(it.skuId)) && Number(it.skuId) > 0,
+  )
+  if (!items.length) {
+    message.value = '该订单的商品信息不完整，无法再次购买'
+    return
+  }
+  message.value = ''
+  void router.push({
+    path: '/checkout',
+    query: {
+      source: 'reorder',
+      skuIds: items.map((i) => Number(i.skuId)).join(','),
+      counts: items.map((i) => i.count).join(','),
+    },
+  })
+}
+
 function canComment(it: OrderDetail['items'][number]): boolean {
   return order.value ? canCommentItem(order.value, it) : false
 }
@@ -574,7 +654,8 @@ function canRefund(it: OrderDetail['items'][number]): boolean {
   return order.value
     // 014 / Q96：定制单用户端不提供自助退款（与 012 的企业 / 订阅单同一口径）
     ? canApplyRefund(it, order.value.status,
-      order.value.enterprise || order.value.subscription || order.value.customization === true)
+      order.value.enterprise || order.value.subscription || order.value.customization === true
+        || order.value.agentCreated === true)
     : false
 }
 
@@ -697,6 +778,8 @@ onMounted(async () => {
         <div class="ml-card od-status">
           <div class="od-status-row">
             <span class="od-status-text">{{ statusText }}</span>
+            <!-- 客服代下单（017）：中性标识，不暴露运营身份 -->
+            <span v-if="order.agentCreated" class="od-agent-tag">客服代下单</span>
             <!-- 对公待收款单：底层仍是「未支付」，只是说辞不同（008 / FR-200） -->
             <MlPill
               :status="order.status"
@@ -708,7 +791,7 @@ onMounted(async () => {
               打在款前反悔走的就是它（008 spec 的 Edge Case）。
             -->
             <button
-              v-if="offlineWaiting"
+              v-if="offlineWaiting && !order.agentCreated"
               class="btn-cart cancel-order od-cancel-inline"
               type="button"
               @click="cancelOpen = true"
@@ -722,6 +805,13 @@ onMounted(async () => {
           <p v-if="isUnpaid && !offlineWaiting" class="od-deadline">
             支付截止 {{ formatDateTime(order.payExpireTime) }}，逾期订单将自动取消
           </p>
+        </div>
+
+        <!-- 再次购买：只普通商品单；定制 / 企业授权 / 订阅单服务端 canReorder=false -->
+        <div v-if="showReorder" class="od-actions od-reorder-actions">
+          <button class="btn-cart" type="button" @click="onReorder">
+            再次购买
+          </button>
         </div>
 
         <!-- 操作区：只有「待支付」有用户侧动作（FR-041b 不提供确认收货）。
@@ -751,7 +841,13 @@ onMounted(async () => {
                ⚠️ 对公待收款单**不落到这里**（`needsNoPay` 已排除它）—— 它要显示的是
                收款账户，不是"无需支付"（R47）。 -->
           <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
-          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
+          <!-- 代客订单不允许客户自行取消（017 / Q131）：后端也会拒绝 -->
+          <button
+            v-if="!order.agentCreated"
+            class="btn-cart cancel-order"
+            type="button"
+            @click="cancelOpen = true"
+          >
             取消订单
           </button>
           <!-- 对公待收款单**没有任何在线支付入口**（FR-201：防重复付款） -->
@@ -844,7 +940,18 @@ onMounted(async () => {
           整块会是一片空白。所以按"有没有收货人"决定渲不渲染（自提单有联系人，照常显示）。
         -->
         <div v-if="order.receiverName" class="ml-card">
-          <div class="ml-card-title">收货信息</div>
+          <div class="od-card-head">
+            <div class="ml-card-title">收货信息</div>
+            <button
+              v-if="canEditAddress"
+              type="button"
+              class="od-link-btn"
+              data-testid="order-address-edit"
+              @click="openAddressPicker"
+            >
+              修改地址
+            </button>
+          </div>
           <div class="addr-line">
             <b>{{ order.receiverName }}</b>
             <span>{{ order.receiverMobile }}</span>
@@ -1140,6 +1247,28 @@ onMounted(async () => {
     @paid="onQrPaid"
     @expired="onQrExpired"
   />
+
+  <!-- 015：待发货订单修改收货地址（从地址簿选，可新增） -->
+  <MlModal :open="addressPickerOpen" title="选择收货地址" @close="addressPickerOpen = false">
+    <div
+      v-for="a in addresses"
+      :key="a.id"
+      class="addr-option"
+      :data-testid="`order-address-option-${a.id}`"
+      @click="pickOrderAddress(a)"
+    >
+      <div class="addr-line"><b>{{ a.name }}</b><span>{{ a.mobile }}</span></div>
+      <p class="addr-text">{{ a.areaName }} {{ a.detailAddress }}</p>
+    </div>
+    <p v-if="!addresses.length" class="od-text">地址簿里还没有收货地址。</p>
+    <p v-if="addressError" class="od-text od-error">{{ addressError }}</p>
+    <template #foot>
+      <button class="btn-cart" type="button" :disabled="addressSaving" @click="addressFormOpen = true">
+        新增收货地址
+      </button>
+    </template>
+  </MlModal>
+  <AddressFormDialog :open="addressFormOpen" @close="addressFormOpen = false" @saved="onAddressSaved" />
   </div>
 </template>
 
@@ -1185,6 +1314,15 @@ onMounted(async () => {
   margin-bottom: 4px;
   flex-wrap: wrap;
 }
+/* 015：收货信息标题右侧的「修改地址」与地址选择弹层 */
+.od-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.od-card-head .ml-card-title { margin-bottom: 0; }
+.od-link-btn { border: none; background: none; color: #2e7cd6; font-size: 13px; cursor: pointer; padding: 4px 0; font-family: inherit; }
+.od-link-btn:hover { text-decoration: underline; }
+.addr-option { border: 1px solid var(--ml-border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; cursor: pointer; }
+.addr-option:hover { border-color: #2e7cd6; }
+.addr-text { font-size: 13px; color: var(--ml-text-sub); margin: 4px 0 0; line-height: 1.7; }
+.od-error { color: #ff5c22; }
 .od-text {
   font-size: 14px;
   color: var(--ml-text-sub);
@@ -1278,6 +1416,7 @@ onMounted(async () => {
 .dl-val { overflow-wrap: anywhere; line-height: 1.8; font-size: 13px; }
 .dl-name { font-size: 12px; }
 .account-order-detail .dl-table { border-radius: 10px; }
+.od-reorder-actions { margin-top: 16px; }
 .od-actions {
   display: flex;
   justify-content: flex-end;
@@ -1376,5 +1515,14 @@ onMounted(async () => {
   border-radius: 8px;
   margin-top: 12px;
   background: #F5F8FF;
+}
+/* 客服代下单（017）：中性标识，不暴露运营身份 */
+.od-agent-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eaf1ff;
+  color: #2e7cd6;
+  font-size: 12px;
 }
 </style>

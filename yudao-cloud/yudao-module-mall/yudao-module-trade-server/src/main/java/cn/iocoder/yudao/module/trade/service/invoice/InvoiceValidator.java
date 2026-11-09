@@ -45,6 +45,8 @@ public final class InvoiceValidator {
     private static final int TITLE_ADDRESS_MAX = 255;
     private static final int TITLE_PHONE_MAX = 64;
     private static final int BANK_NAME_MAX = 255;
+    private static final int BANK_ACCOUNT_MAX = 64;
+    private static final int BANK_CODE_MAX = 32;
     private static final int EMAIL_MAX = 128;
 
     /**
@@ -84,6 +86,8 @@ public final class InvoiceValidator {
         invoice.setTitleAddress(trim(invoice.getTitleAddress()));
         invoice.setTitlePhone(trim(invoice.getTitlePhone()));
         invoice.setBankName(trim(invoice.getBankName()));
+        invoice.setBankAccount(trim(invoice.getBankAccount()));
+        invoice.setBankCode(trim(invoice.getBankCode()));
         invoice.setEmail(trim(invoice.getEmail()));
 
         // 必填矩阵：地址 / 电话 / 开户行一律**选填**，专票也一样（客户手边未必有开户行账号，
@@ -94,14 +98,16 @@ public final class InvoiceValidator {
             requireText(invoice.getTaxNo(), "纳税人识别号");
         }
         checkFormats(invoice.getTitleName(), invoice.getTaxNo(),
-                invoice.getTitleAddress(), invoice.getTitlePhone(), invoice.getBankName(), invoice.getEmail());
+                invoice.getTitleAddress(), invoice.getTitlePhone(),
+                invoice.getBankName(), invoice.getBankAccount(), invoice.getBankCode(), invoice.getEmail());
     }
 
     // ==================== 内部 ====================
 
     /** 选填字段"填了就要合法"：税号格式 + 各列长度上限 */
     private static void checkFormats(String titleName, String taxNo, String titleAddress,
-                                     String titlePhone, String bankName, String email) {
+                                     String titlePhone, String bankName, String bankAccount,
+                                     String bankCode, String email) {
         checkLength("抬头名称", titleName, TITLE_NAME_MAX);
         if (!isBlank(taxNo) && !TAX_NO_PATTERN.matcher(taxNo).matches()) {
             throw exception(INVOICE_TAX_NO_INVALID);
@@ -109,7 +115,9 @@ public final class InvoiceValidator {
         checkLength("纳税人识别号", taxNo, TAX_NO_MAX);
         checkLength("注册地址", titleAddress, TITLE_ADDRESS_MAX);
         checkLength("注册电话", titlePhone, TITLE_PHONE_MAX);
-        checkLength("开户行及账号", bankName, BANK_NAME_MAX);
+        checkLength("开户行", bankName, BANK_NAME_MAX);
+        checkLength("银行账户", bankAccount, BANK_ACCOUNT_MAX);
+        checkLength("开户行行号", bankCode, BANK_CODE_MAX);
         if (!isBlank(email) && !EMAIL_PATTERN.matcher(email).matches()) {
             throw exception(INVOICE_EMAIL_INVALID);
         }

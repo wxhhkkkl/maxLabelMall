@@ -4,11 +4,12 @@ import type { InvoiceApplyForm } from '@/types/invoice'
 
 const get = vi.fn()
 const post = vi.fn()
+const put = vi.fn()
 const del = vi.fn()
 vi.mock('@/config/http', () => ({
   get: (...a: unknown[]) => get(...a),
   post: (...a: unknown[]) => post(...a),
-  put: vi.fn(),
+  put: (...a: unknown[]) => put(...a),
   del: (...a: unknown[]) => del(...a),
 }))
 
@@ -17,17 +18,35 @@ const {
   buildSettlementQuery,
   cancelOrder,
   createOrder,
+  deleteOrder,
   getExpressMapUrl,
   getExpressTrackList,
   getOrderDetail,
   pageOrders,
   settlement,
+  updateOrderAddress,
 } = await import('./order')
 
 beforeEach(() => {
   get.mockReset()
   post.mockReset()
+  put.mockReset()
   del.mockReset()
+})
+
+describe('修改订单收货地址', () => {
+  it('PUT /trade/order/update-address，原样提交收货字段', async () => {
+    put.mockResolvedValue(true)
+    const payload = {
+      id: 1,
+      receiverName: '李四',
+      receiverMobile: '13900001111',
+      receiverAreaId: 310101,
+      receiverDetailAddress: '上海市黄浦区新地址 2 号',
+    }
+    await expect(updateOrderAddress(payload)).resolves.toBe(true)
+    expect(put).toHaveBeenCalledWith('/trade/order/update-address', payload)
+  })
 })
 
 /**
@@ -198,6 +217,13 @@ describe('订单查询与取消', () => {
     del.mockResolvedValue(true)
     await cancelOrder(9)
     expect(del.mock.calls[0]?.[0]).toBe('/trade/order/cancel')
+    expect(del.mock.calls[0]?.[1]).toEqual({ id: 9 })
+  })
+
+  it('**删除订单用 DELETE**，id 作为 query 参数', async () => {
+    del.mockResolvedValue(true)
+    await deleteOrder(9)
+    expect(del.mock.calls[0]?.[0]).toBe('/trade/order/delete')
     expect(del.mock.calls[0]?.[1]).toEqual({ id: 9 })
   })
 })

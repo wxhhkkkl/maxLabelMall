@@ -60,6 +60,17 @@ public interface AfterSaleService {
     Long createAfterSale(Long userId, AppAfterSaleCreateReqVO createReqVO);
 
     /**
+     * 【管理员】代客发起售后（017）
+     *
+     * 仅允许代客订单；复用现有售后校验与状态机，跳过「用户端不允许退款」的三类守卫。
+     *
+     * @param operatorUserId 后台操作人编号（用于留痕）
+     * @param createReqVO    售后创建请求
+     * @return 售后编号
+     */
+    Long createAfterSaleByAdmin(Long operatorUserId, AppAfterSaleCreateReqVO createReqVO);
+
+    /**
      * 【管理员】同意售后订单
      *
      * @param userId 管理员用户编号

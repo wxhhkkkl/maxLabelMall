@@ -162,6 +162,20 @@ describe('后台订单列表 —— 各列的信息落位', () => {
     expect(w.findAll('.order-amount-origin')[0].text()).toBe('300.00元')
   })
 
+  it('代客订单在会员列下方显示代下单人；自助单不显示（017）', async () => {
+    const w = mountTable([
+      order({ agentUserId: 9, agentUserName: '运营小王' }),
+      order({ id: 2, agentUserId: 10, agentUserName: null }),
+      order({ id: 3 })
+    ])
+    await flushPromises()
+
+    const text = w.text()
+    expect(text).toContain('代下单：运营小王')
+    expect(text).toContain('代下单：后台用户#10')
+    expect(text.match(/代下单：/g)?.length).toBe(2)
+  })
+
   it('会员：昵称 + 用户编号', async () => {
     const w = mountTable([order({ user: { id: 5595975, nickname: '杨锋' } })])
     await flushPromises()
@@ -231,5 +245,22 @@ describe('后台订单列表 —— 各列的信息落位', () => {
     await flushPromises()
 
     expect(w.find('.order-after-sale').exists()).toBe(false)
+  })
+})
+
+describe('后台订单列表 —— 用户已删除标记', () => {
+  it('买家删除了订单 → 运营仍能看到该单，并标记「用户已删除」', async () => {
+    const w = mountTable([order({ userDeleted: true })])
+    await flushPromises()
+
+    expect(w.text()).toContain('NO-20261023-0001')
+    expect(w.text()).toContain('用户已删除')
+  })
+
+  it('普通订单没有该标记', async () => {
+    const w = mountTable([order()])
+    await flushPromises()
+
+    expect(w.text()).not.toContain('用户已删除')
   })
 })

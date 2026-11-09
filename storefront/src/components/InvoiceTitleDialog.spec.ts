@@ -70,6 +70,8 @@ describe('发票抬头弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      bankAccount: '',
+      bankCode: '',
       email: '',
       defaultStatus: false,
     })
@@ -101,6 +103,8 @@ describe('发票抬头弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      bankAccount: '',
+      bankCode: '',
       email: '',
       defaultStatus: false,
     })
@@ -120,6 +124,8 @@ describe('发票抬头弹层', () => {
       titleAddress: '',
       titlePhone: '',
       bankName: '',
+      bankAccount: '',
+      bankCode: '',
     }))
   })
 

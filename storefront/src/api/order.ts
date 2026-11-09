@@ -1,6 +1,7 @@
-import { del, get, post } from '@/config/http'
+import { del, get, post, put } from '@/config/http'
 import type {
   ExpressTrack,
+  OrderAddressUpdateReq,
   OrderCreateReq,
   OrderCreateResp,
   OrderDetail,
@@ -167,9 +168,23 @@ export function getExpressMapUrl(id: number): Promise<string> {
   return get<string>('/trade/order/get-express-map-url', { id })
 }
 
+/** 015：修改待发货订单的收货地址（只更新收货快照，不重算金额）。 */
+export function updateOrderAddress(req: OrderAddressUpdateReq): Promise<boolean> {
+  return put<boolean>('/trade/order/update-address', req)
+}
+
 /** 取消订单。**DELETE，且 id 走 query**（仅待支付可用） */
 export function cancelOrder(id: number): Promise<boolean> {
   return del<boolean>('/trade/order/cancel', { id })
+}
+
+/**
+ * 删除订单。**DELETE，且 id 走 query**（仅「已取消 / 已完成」可用）。
+ *
+ * 后端是**假删除**：只置 `user_deleted`，让买家自己看不到；运营后台仍可见。
+ */
+export function deleteOrder(id: number): Promise<boolean> {
+  return del<boolean>('/trade/order/delete', { id })
 }
 
 /** 各状态的订单数量（订单列表的分类标签） */

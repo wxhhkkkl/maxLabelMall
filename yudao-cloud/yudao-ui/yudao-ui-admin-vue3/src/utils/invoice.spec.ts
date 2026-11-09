@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { INVOICE_STATUS, INVOICE_STATUS_OPTIONS, canIssue, hasRefund, invoiceFileName } from './invoice'
+import {
+  INVOICE_STATUS,
+  INVOICE_STATUS_OPTIONS,
+  canIssue,
+  hasRefund,
+  invoiceFileName,
+  orderInvoiceAction
+} from './invoice'
 
 /**
  * 开票申请的状态映射与两个判定（006 管理端 / T400）。
@@ -44,5 +51,15 @@ describe('管理端 · 开票申请状态', () => {
     expect(canIssue(INVOICE_STATUS.CANCELED)).toBe(false)
     expect(canIssue(INVOICE_STATUS.WAITING)).toBe(true)
     expect(canIssue(INVOICE_STATUS.ISSUED)).toBe(true)
+  })
+
+  it('订单列表的开票入口：只有客户已申请的订单才出现', () => {
+    // 待开票 → 开票；已开票 → 重新上传（Q31 的补救入口）
+    expect(orderInvoiceAction(INVOICE_STATUS.WAITING)).toBe('开票')
+    expect(orderInvoiceAction(INVOICE_STATUS.ISSUED)).toBe('重新上传发票')
+    // 没申请（null）与已作废（退款 / 取消）都不给入口
+    expect(orderInvoiceAction(null)).toBeNull()
+    expect(orderInvoiceAction(undefined)).toBeNull()
+    expect(orderInvoiceAction(INVOICE_STATUS.CANCELED)).toBeNull()
   })
 })

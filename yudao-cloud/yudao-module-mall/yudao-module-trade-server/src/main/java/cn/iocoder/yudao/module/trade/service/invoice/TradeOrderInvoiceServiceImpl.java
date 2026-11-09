@@ -81,9 +81,10 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
      */
     @Override
     public Long createInvoiceByMember(Long userId, AppTradeOrderInvoiceCreateReqVO reqVO) {
-        // 1. 订单存在、且属于当前会员
+        // 1. 订单存在、且属于当前会员；买家已删除（假删除）的单据同样视为不存在
         TradeOrderDO order = orderMapper.selectById(reqVO.getOrderId());
-        if (order == null || !ObjectUtil.equal(order.getUserId(), userId)) {
+        if (order == null || !ObjectUtil.equal(order.getUserId(), userId)
+                || Boolean.TRUE.equals(order.getUserDeleted())) {
             throw exception(ORDER_NOT_FOUND);
         }
         // 2. 已支付

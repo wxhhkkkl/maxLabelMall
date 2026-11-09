@@ -166,13 +166,25 @@ public interface TradeOrderConvert {
 
     MemberUserRespVO convert(MemberUserRespDTO bean);
 
+    /** 再次购买：仅普通商品单；定制 / 企业授权 / 订阅单都走各自流程。 */
+    default boolean canReorder(TradeOrderDO order) {
+        return order.getMaxlabelOrgId() == null
+                && !Boolean.TRUE.equals(order.getMaxlabelSubscription())
+                && !Boolean.TRUE.equals(order.getCustomization());
+    }
+
     default PageResult<AppTradeOrderPageItemRespVO> convertPage02(PageResult<TradeOrderDO> pageResult,
                                                                   List<TradeOrderItemDO> orderItems) {
         Map<Long, List<TradeOrderItemDO>> orderItemMap = convertMultiMap(orderItems, TradeOrderItemDO::getOrderId);
         // 转化 List
         List<AppTradeOrderPageItemRespVO> orderVOs = CollectionUtils.convertList(pageResult.getList(), order -> {
             List<TradeOrderItemDO> xOrderItems = orderItemMap.get(order.getId());
-            return convert02(order, xOrderItems);
+            AppTradeOrderPageItemRespVO orderVO = convert02(order, xOrderItems);
+            // 「再次购买」只给普通商品单：定制 / 企业授权 / 个人订阅都走各自流程（见 VO 注释）
+            orderVO.setCanReorder(canReorder(order));
+            // 客服代下单：只给标识，不暴露运营身份（017 / FR-459）
+            orderVO.setAgentCreated(order.getAgentUserId() != null);
+            return orderVO;
         });
         return new PageResult<>(orderVOs, pageResult.getTotal());
     }
@@ -189,6 +201,8 @@ public interface TradeOrderConvert {
         // 企业授权 / 个人会员订阅订单：前端据此隐藏「申请退款」入口（Q79 / 2026-10-27）
         orderVO.setEnterprise(order.getMaxlabelOrgId() != null);
         orderVO.setSubscription(Boolean.TRUE.equals(order.getMaxlabelSubscription()));
+        orderVO.setAgentCreated(order.getAgentUserId() != null);
+        orderVO.setCanReorder(canReorder(order));
         if (StrUtil.isNotEmpty(order.getPayChannelCode())) {
             orderVO.setPayChannelName(DictFrameworkUtils.parseDictDataLabel(DictTypeConstants.CHANNEL_CODE, order.getPayChannelCode()));
         }

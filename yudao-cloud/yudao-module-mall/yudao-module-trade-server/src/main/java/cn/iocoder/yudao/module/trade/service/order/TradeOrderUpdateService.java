@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateP
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
+import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderUpdateAddressReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.item.AppTradeOrderItemCommentCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import jakarta.validation.constraints.NotNull;
@@ -42,6 +43,18 @@ public interface TradeOrderUpdateService {
      * @return 交易订单的
      */
     TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO);
+
+    /**
+     * 【管理员】代客创建交易订单（017）
+     *
+     * 与会员下单共用同一段计价/落库逻辑，额外写 `agent_user_id` 与来源「后台代客」。
+     *
+     * @param operatorUserId 代下单的后台用户编号
+     * @param customerUserId 目标客户编号
+     * @param createReqVO    创建请求（券/积分已由调用方关闭）
+     * @return 交易订单
+     */
+    TradeOrderDO createOrderByAdmin(Long operatorUserId, Long customerUserId, AppTradeOrderCreateReqVO createReqVO);
 
     /**
      * 更新交易订单已支付
@@ -155,6 +168,14 @@ public interface TradeOrderUpdateService {
      * @param reqVO 请求
      */
     void updateOrderAddress(TradeOrderUpdateAddressReqVO reqVO);
+
+    /**
+     * 【会员】修改待发货订单的收货地址
+     *
+     * @param userId 会员编号
+     * @param reqVO  请求
+     */
+    void updateOrderAddress(Long userId, AppTradeOrderUpdateAddressReqVO reqVO);
 
     /**
      * 【管理员】核销订单

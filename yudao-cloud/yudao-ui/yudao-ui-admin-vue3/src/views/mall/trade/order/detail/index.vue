@@ -4,6 +4,10 @@
     <el-descriptions title="订单信息">
       <el-descriptions-item label="订单号: ">{{ formData.no }}</el-descriptions-item>
       <el-descriptions-item label="买家: ">{{ formData?.user?.nickname }}</el-descriptions-item>
+      <el-descriptions-item v-if="formData.agentUserId" label="代下单人: ">
+        {{ formData.agentUserName || `后台用户#${formData.agentUserId}` }}
+        <span class="text-gray-500">（{{ formatDate(formData.createTime) }}）</span>
+      </el-descriptions-item>
       <el-descriptions-item label="订单类型: ">
         <dict-tag :type="DICT_TYPE.TRADE_ORDER_TYPE" :value="formData.type!" />
       </el-descriptions-item>
@@ -15,6 +19,9 @@
       <el-descriptions-item label="支付单号: ">{{ formData.payOrderId }}</el-descriptions-item>
       <el-descriptions-item label="付款方式: ">
         <dict-tag :type="DICT_TYPE.PAY_CHANNEL_CODE" :value="formData.payChannelCode!" />
+      </el-descriptions-item>
+      <el-descriptions-item v-if="showPayChannelOrderNo" label="交易单号: ">
+        {{ formData.payChannelOrderNo }}
       </el-descriptions-item>
       <el-descriptions-item v-if="formData.brokerageUser" label="推广用户: ">
         {{ formData.brokerageUser?.nickname }}
@@ -74,6 +81,8 @@
     <el-descriptions :column="1" title="订单状态">
       <el-descriptions-item label="订单状态: ">
         <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
+        <!-- 买家已删除（假删除）：C 端不可见，运营后台仍可见并在此标记 -->
+        <el-tag v-if="formData.userDeleted" class="ml-8px" type="info">用户已删除</el-tag>
       </el-descriptions-item>
       <!--
         确认对公转账收款（008 / FR-203）。**独立权限点、独立一行** ——
@@ -83,6 +92,15 @@
       <el-descriptions-item v-hasPermi="['trade:order:confirm-paid']" label-class-name="no-colon">
         <el-button v-if="formData.offlineWaiting" type="primary" @click="confirmOfflinePaid">
           确认收款
+        </el-button>
+      </el-descriptions-item>
+      <!-- 代客发起售后（017）：独立权限点，与同意/退款权限分离 -->
+      <el-descriptions-item
+        v-hasPermi="['trade:after-sale:agent-create']"
+        label-class-name="no-colon"
+      >
+        <el-button v-if="canAgentAfterSale" type="warning" @click="agentAfterSale">
+          代客发起售后
         </el-button>
       </el-descriptions-item>
       <el-descriptions-item v-hasPermi="['trade:order:update']" label-class-name="no-colon">
@@ -359,6 +377,7 @@
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getDetail" />
   <OrderUpdateAddressForm ref="updateAddressFormRef" @success="getDetail" />
   <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getDetail" />
+  <OrderAgentAfterSaleForm ref="agentAfterSaleFormRef" @success="getDetail" />
 </template>
 <script lang="ts" setup>
 import * as TradeOrderApi from '@/api/mall/trade/order'
@@ -370,6 +389,7 @@ import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.v
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateAddressForm from '@/views/mall/trade/order/form/OrderUpdateAddressForm.vue'
 import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
+import OrderAgentAfterSaleForm from '@/views/mall/trade/order/form/OrderAgentAfterSaleForm.vue'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { DeliveryTypeEnum, TradeOrderStatusEnum } from '@/utils/constants'
@@ -400,6 +420,13 @@ const getUserTypeColor = (type: number) => {
 const formData = ref<TradeOrderApi.OrderVO>({
   items: [],
   logs: []
+})
+
+/** 微信 / 支付宝在线渠道才展示第三方交易单号；对公转账走 offlinePayment 的银行流水 */
+const showPayChannelOrderNo = computed(() => {
+  const code = formData.value.payChannelCode || ''
+  return !!formData.value.payChannelOrderNo
+    && (code.startsWith('wx_') || code.startsWith('alipay_'))
 })
 
 /** 定制工艺摘要（014）：打印是基础项，其余按需出现 */
@@ -439,6 +466,17 @@ const updatePrice = () => {
 const offlineConfirmFormRef = ref()
 const confirmOfflinePaid = () => {
   offlineConfirmFormRef.value?.open(formData.value)
+}
+
+/** 代客发起售后（017） */
+const agentAfterSaleFormRef = ref()
+const canAgentAfterSale = computed(() =>
+  !!formData.value.agentUserId
+  && !!formData.value.payStatus
+  && formData.value.status !== TradeOrderStatusEnum.CANCELED.status
+)
+const agentAfterSale = () => {
+  agentAfterSaleFormRef.value?.open(formData.value)
 }
 
 /**

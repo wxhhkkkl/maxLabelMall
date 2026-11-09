@@ -36,6 +36,8 @@ const emptyForm = (over: Partial<InvoiceApplyForm> = {}): InvoiceApplyForm => ({
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  bankAccount: '',
+  bankCode: '',
   ...over,
 })
 
@@ -95,7 +97,7 @@ describe('结算页发票卡片', () => {
     expect(w.find('#invoiceBankName').exists()).toBe(false)
   })
 
-  it('专票：多出地址 / 电话 / 开户行三项', async () => {
+  it('专票：多出地址 / 电话 / 开户行 / 银行账户 / 行号', async () => {
     const { w, model } = mountCard(true)
     await w.findAll('.invoice-type')[1]!.trigger('click')
 
@@ -103,6 +105,8 @@ describe('结算页发票卡片', () => {
     expect(w.find('#invoiceTitleAddress').exists()).toBe(true)
     expect(w.find('#invoiceTitlePhone').exists()).toBe(true)
     expect(w.find('#invoiceBankName').exists()).toBe(true)
+    expect(w.find('#invoiceBankAccount').exists()).toBe(true)
+    expect(w.find('#invoiceBankCode').exists()).toBe(true)
   })
 
   it('必填不全时给出**点名缺哪一项**的提示（FR-156）', async () => {

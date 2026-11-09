@@ -17,7 +17,7 @@ import ProductCard from '@/components/ProductCard.vue'
 import MallHome from '@/components/MallHome.vue'
 import type { Banner, Category, CategoryNode, ProductSpu, ProductSortField } from '@/types'
 import { deriveBadges } from '@/utils/badge'
-import { getLastSearchKeyword, saveLastSearchKeyword } from '@/utils/last-search'
+import { clearSearchHistory, getLastSearchKeyword, getSearchHistory, saveLastSearchKeyword } from '@/utils/last-search'
 import '@/styles/mall.css'
 
 // 分类、搜索、排序及分页均由后端处理；展示方式只改变当前商品的布局。
@@ -35,6 +35,10 @@ const searchInput = ref('')
 /** 上一次搜索的词（本地存储）。输入框为空时作为灰色提示显示，点「搜索」直接复用它 */
 const lastKeyword = ref(getLastSearchKeyword())
 const searchPlaceholder = computed(() => lastKeyword.value || '搜索商品名称、型号或规格')
+/** 最近搜索记忆词（最新在前，最多 8 条） */
+const searchHistory = ref<string[]>(getSearchHistory())
+/** 历史搜索下拉：聚焦搜索框时展开，点击外部/搜索/选择后收起 */
+const historyOpen = ref(false)
 const categoryId = ref<number | undefined>(Number.isSafeInteger(initialCategoryId) && initialCategoryId > 0 ? initialCategoryId : undefined)
 const sortKey = ref<'default' | 'sales' | 'priceAsc' | 'priceDesc'>('default')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -129,13 +133,44 @@ function runSearch(term: string) {
   if (term) {
     saveLastSearchKeyword(term)
     lastKeyword.value = term
+    searchHistory.value = getSearchHistory()
   }
   load()
+}
+
+function openHistory() {
+  if (searchHistory.value.length) historyOpen.value = true
+}
+
+function closeHistory() {
+  historyOpen.value = false
+}
+
+/** 焦点仍在下拉内部（输入框 / 记忆词 / 清空按钮）时保持展开 */
+function onSearchFocusOut(event: FocusEvent) {
+  const wrap = event.currentTarget as HTMLElement | null
+  const next = event.relatedTarget as Node | null
+  if (wrap && next && wrap.contains(next)) return
+  closeHistory()
+}
+
+function pickHistory(term: string) {
+  searchInput.value = term
+  closeHistory()
+  runSearch(term)
+}
+
+function clearHistory() {
+  clearSearchHistory()
+  searchHistory.value = []
+  lastKeyword.value = ''
+  closeHistory()
 }
 
 function onSearch() {
   // 输入框为空 → 复用上次搜索的词：客户想再搜一次同一个词，不该逼他重打一遍。
   // 填了内容就按填的搜（`||` 的左边优先），并把它变成新的「上次搜索」。
+  closeHistory()
   runSearch(searchInput.value.trim() || lastKeyword.value)
 }
 
@@ -293,12 +328,13 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
   <div class="mall-page">
     <div class="mall-container mall-topline">
       <div><h1>标签商城</h1><p>打印设备与标签耗材，按需挑选。</p></div>
-      <form
-        id="mallSearchBox"
-        class="mall-search"
-        role="search"
-        @submit.prevent="onSearch"
-      >
+      <div class="mall-search-wrap" @focusout="onSearchFocusOut">
+        <form
+          id="mallSearchBox"
+          class="mall-search"
+          role="search"
+          @submit.prevent="onSearch"
+        >
         <svg
           width="20"
           height="20"
@@ -319,6 +355,8 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
           aria-label="搜索商品"
           :placeholder="searchPlaceholder"
           autocomplete="off"
+          @focus="openHistory"
+          @keydown.esc="closeHistory"
         >
         <button
           v-if="searchInput || keyword"
@@ -337,7 +375,45 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
         >
           搜索
         </button>
-      </form>
+        </form>
+        <div
+          v-if="historyOpen && searchHistory.length"
+          class="mall-search-history"
+          aria-label="历史搜索"
+        >
+          <div class="msh-head">
+            <span class="msh-label">历史搜索</span>
+            <button
+              class="msh-clear"
+              type="button"
+              aria-label="清空历史搜索"
+              @click="clearHistory"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                aria-hidden="true"
+              >
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+              </svg>
+            </button>
+          </div>
+          <div class="msh-items">
+            <button
+              v-for="term in searchHistory"
+              :key="term"
+              type="button"
+              @click="pickHistory(term)"
+            >
+              {{ term }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <LoadingState

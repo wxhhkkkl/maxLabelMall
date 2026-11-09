@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getLastSearchKeyword, LAST_SEARCH_KEY, saveLastSearchKeyword } from './last-search'
+import {
+  clearSearchHistory,
+  getLastSearchKeyword,
+  getSearchHistory,
+  LAST_SEARCH_KEY,
+  SEARCH_HISTORY_KEY,
+  SEARCH_HISTORY_LIMIT,
+  saveLastSearchKeyword
+} from './last-search'
 
 /**
  * 「上次搜索的关键词」的本地存取。
@@ -33,6 +41,44 @@ describe('last-search —— 上次搜索关键词的本地存取', () => {
 
   it('从没搜过时返回空串（调用方据此显示默认提示）', () => {
     expect(getLastSearchKeyword()).toBe('')
+  })
+
+  it('清空历史搜索时，列表与「上次搜索」一起清 —— 否则历史会从旧 key 里冒回来', () => {
+    saveLastSearchKeyword('碳带')
+    saveLastSearchKeyword('热敏纸')
+    expect(getSearchHistory()).toEqual(['热敏纸', '碳带'])
+
+    clearSearchHistory()
+
+    expect(window.localStorage.getItem(SEARCH_HISTORY_KEY)).toBeNull()
+    expect(window.localStorage.getItem(LAST_SEARCH_KEY)).toBeNull()
+    expect(getSearchHistory()).toEqual([])
+    expect(getLastSearchKeyword()).toBe('')
+  })
+
+  it('多次搜索按最新在前保存，重复词去重', () => {
+    saveLastSearchKeyword('碳带')
+    saveLastSearchKeyword('热敏纸')
+    saveLastSearchKeyword('碳带')
+    expect(getSearchHistory()).toEqual(['碳带', '热敏纸'])
+  })
+
+  it('最近搜索最多保留固定条数', () => {
+    for (let i = 0; i < SEARCH_HISTORY_LIMIT + 3; i++) saveLastSearchKeyword(`词${i}`)
+    const history = getSearchHistory()
+    expect(history).toHaveLength(SEARCH_HISTORY_LIMIT)
+    expect(history[0]).toBe(`词${SEARCH_HISTORY_LIMIT + 2}`)
+  })
+
+  it('旧版单条记录可以迁移成一条最近搜索', () => {
+    window.localStorage.setItem(LAST_SEARCH_KEY, '碳带')
+    expect(getSearchHistory()).toEqual(['碳带'])
+  })
+
+  it('历史 JSON 损坏时退回旧版单条记录，不抛错', () => {
+    window.localStorage.setItem(LAST_SEARCH_KEY, '碳带')
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, '{bad json')
+    expect(getSearchHistory()).toEqual(['碳带'])
   })
 
   it('localStorage 抛错时静默降级，不把异常抛给搜索流程', () => {

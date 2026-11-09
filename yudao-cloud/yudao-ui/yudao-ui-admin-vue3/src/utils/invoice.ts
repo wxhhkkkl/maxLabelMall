@@ -32,6 +32,22 @@ export function canIssue(status?: number | null): boolean {
 }
 
 /**
+ * 订单列表「更多」里的开票入口文案；`null` = 不显示入口。
+ *
+ * 客户**已经在订单详情提交过申请**才给入口（没申请就没有可开的申请；
+ * 已作废的按 Q30 不能再开）。已开票的给「重新上传发票」—— 开错时的补救（Q31）。
+ */
+export function orderInvoiceAction(status?: number | null): string | null {
+  if (status === INVOICE_STATUS.WAITING) {
+    return '开票'
+  }
+  if (status === INVOICE_STATUS.ISSUED) {
+    return '重新上传发票'
+  }
+  return null
+}
+
+/**
  * 订单是否退过款
  *
  * 申请的 `amount` 是**提交那一刻**的实付快照，部分退款**不会**改它（Q33）——

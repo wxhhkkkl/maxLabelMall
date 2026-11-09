@@ -4,9 +4,9 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/012-enterprise-seat-licensing/plan.md
+specs/016-shared-content-space/plan.md
 
-Supporting artifacts for the active feature:
+企业席位（012）相关产物：
 - specs/012-enterprise-seat-licensing/spec.md — 功能规格（Q65~Q74：企业 / 席位 / 有效期 / 可见性）
 - specs/012-enterprise-seat-licensing/plan.md — 4 表 + 3 列 + 权益解析 + 企业中心
 - specs/012-enterprise-seat-licensing/data-model.md — 企业 / 企业成员 / 授权批次 / 席位
@@ -21,7 +21,34 @@ Supporting artifacts for the active feature:
   📌 2026-10-27：**个人会员订阅订单用户端同样不允许退款**（后台保留人工通道）；纯虚拟订阅订单
   支付成功后直接置为「已完成」，历史已支付待发货订阅单由 `024` 迁移补成已完成（Q82）
 
-当前特性（014 印刷定制：选材质 / 尺寸 / 工艺 → 报价 → 支付，后台可查定制要求）：
+当前特性（016 共享内容空间：个人 / 企业 / 平台）：
+- specs/016-shared-content-space/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/016-shared-content-space/contracts/{app-api,admin-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/033-shared-content-space.sql`（5 张新表 + 两张旧表迁移 +
+  平台内容菜单）、`034-platform-content-menu-category.sql`（菜单归入「软件管理」+ 分类表），
+  再发后端，最后发管理端 / 桌面端
+  📌 口径：免费 10 MB / 专业 100 MB / 企业 300 MB 共享池；企业空间仅持席成员可用（管理员不豁免）；
+  平台共享只允许后台管理人员上传（会员投稿关闭）；个人空间不可分享；存量模板全部计入配额
+
+📌 **2026-11-05 订单分页 500 事故**：032「买家删除订单」的 `trade_order.user_deleted` 列必须先执行
+`sql/mysql/032-order-user-delete.sql`；本次发版漏跑该脚本，导致 `/app-api/trade/order/page` 报
+`Unknown column` → 500，已补跑。以后凡是后端引用了新列，必须把对应 ALTER 脚本纳入发版顺序。
+
+当前特性（017 代客下单：管理端运营以客户名义下单）：
+- specs/017-agent-order/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/017-agent-order/contracts/{admin-api,app-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/036-agent-order.sql`（`trade_order.agent_user_id` + 来源字典
+  「后台代客/40」+ 两个权限点 `trade:order:agent-create` / `trade:after-sale:agent-create`），
+  再发后端，最后发管理端 / 门面站；漏跑 SQL 会导致订单列表 500（Unknown column）。
+  📌 口径：微信扫码/支付宝扫码走真实在线支付 + 对公转账；排除印刷定制/门店自提；不用券不抵积分；
+  所有代客订单禁客户自助取消/退款，运营后台可代发起售后；C 端显示「客服代下单」标识
+
+上一个特性（015 发货前修改收货地址：仅待发货，从地址簿选）：
+- specs/015-order-address-edit/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/015-order-address-edit/contracts/app-api.md
+  ⚠️ 无数据库变更；服务端新增 C 端 `PUT /trade/order/update-address`，门面站订单详情加入口
+
+上一个特性（014 印刷定制：选材质 / 尺寸 / 工艺 → 报价 → 支付，后台可查定制要求）：
 - specs/014-print-customization/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/014-print-customization/contracts/{app-api,admin-api}.md
   ⚠️ **上线顺序**：先执行 `sql/mysql/027-print-customization.sql`（4 表 + `trade_order.customization`
@@ -57,6 +84,9 @@ Supporting artifacts for the active feature:
   **部分退款不作废也不改金额**（FR-184，plan R2）、**下载失败只做到"不静默 + 求助路径"**（Edge Cases，plan R10）
   📌 之后又叠加了 **Q35~Q39**：退款撤回**已开票**的申请、抬头加**个人**类型、抬头按**票种**分开管理、
   必填收敛为「**名称 + 税号**」—— 以 spec 的 Clarifications 为准（原文保留，只作来龙去脉）
+  📌 **2026-11-05 专票字段拆分**：`trade_invoice_title` / `trade_order_invoice` 新增
+  `bank_account`（银行账户）与 `bank_code`（行号）；`bank_name` 现在只表示开户行。
+  上线必须先执行 `sql/mysql/035-invoice-bank-fields.sql`；历史 `bank_name` 中的合并文本不自动拆分。
 
 更早的特性（微信扫码登录与首次登录补全资料）：
 - specs/005-wechat-scan-login/{spec,plan,research,data-model,quickstart,tasks}.md

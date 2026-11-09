@@ -95,4 +95,23 @@ public class AppTradeOrderPageItemRespVO {
     @Schema(description = "是否待收款（对公转账单且未确认收款）", example = "false")
     private Boolean offlineWaiting;
 
+    /**
+     * 是否可以在用户端「再次购买」
+     *
+     * 只有**普通商品单**为 true：定制单（隐藏 SPU/SKU，不能直接加购/结算）、
+     * 企业授权单（走企业中心与席位流程）、个人会员订阅单（走会员订阅流程）都不提供该入口。
+     *
+     * ⚠️ 判定由服务端给出，前端不自己拼 —— 列表 VO 里没有 `customization` /
+     * `enterprise` / `subscription` 这些字段，前端也拼不出来。
+     */
+    @Schema(description = "是否可以再次购买（仅普通商品单）", example = "true")
+    private Boolean canReorder;
+
+    /**
+     * 是否客服代下单（2026-11-06）。为 true 时列表显示「客服代下单」标签；
+     * 不暴露代下单的运营身份。
+     */
+    @Schema(description = "是否客服代下单", example = "false")
+    private Boolean agentCreated;
+
 }

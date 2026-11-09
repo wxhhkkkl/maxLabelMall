@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 public enum AfterSaleOperateTypeEnum {
 
     MEMBER_CREATE(10, "会员申请退款"),
+    ADMIN_AGENT_CREATE(13, "运营代客发起售后"),
     ADMIN_AGREE_APPLY(11, "商家同意退款"),
     ADMIN_DISAGREE_APPLY(12, "商家拒绝退款"),
     MEMBER_DELIVERY(20, "会员填写退货物流信息，快递公司：{deliveryName}，快递单号：{logisticsNo}"),

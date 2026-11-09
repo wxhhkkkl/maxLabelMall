@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.pay.api.order;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderSubmitReqDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderSubmitRespDTO;
 import cn.iocoder.yudao.module.pay.enums.ApiConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,6 +45,17 @@ public interface PayOrderApi {
     @PostMapping(PREFIX + "/create-paid-offline")
     @Operation(summary = "创建已支付的对公转账支付单")
     CommonResult<Long> createPaidOfflineOrder(@Valid @RequestBody PayOrderCreateReqDTO reqDTO);
+
+    /**
+     * 提交支付订单（017 代客下单）
+     *
+     * 用于管理端代客下单页：只允许真实扫码渠道（`wx_native` / `alipay_pc`），
+     * 具体白名单由 trade 模块的 AgentOrderService 校验。
+     */
+    @PostMapping(PREFIX + "/submit")
+    @Operation(summary = "提交支付订单")
+    CommonResult<PayOrderSubmitRespDTO> submitOrder(@Valid @RequestBody PayOrderSubmitReqDTO reqDTO,
+                                                    @RequestParam("userIp") String userIp);
 
     @PutMapping(PREFIX + "/update-price")
     @Operation(summary = "更新支付订单价格")

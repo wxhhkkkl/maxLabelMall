@@ -68,6 +68,10 @@ describe('canApplyRefund —— 订单项上该不该出现「申请退款」', 
       expect(canApplyRefund(item(), status, true)).toBe(false)
     }
   })
+
+  it('**代客订单同样不给入口**（017 / Q126，后端会员售后接口会拒）', () => {
+    expect(canApplyRefund(item(), OrderStatus.UNDELIVERED, true)).toBe(false)
+  })
 })
 
 describe('allowsReturnRefund —— 「退货退款」只在已发货之后可选', () => {

@@ -25,6 +25,7 @@ import { useUserStore } from '@/store/user'
 import type { Address, CartItem, InvoiceApplyForm, SettlementCoupon, SettlementResp } from '@/types'
 import { InvoiceTitleKind, InvoiceType } from '@/types'
 import { invoiceFieldError } from '@/utils/invoice'
+import { getLastInvoiceChoice, saveLastInvoiceChoice } from '@/utils/last-invoice'
 import { reconcile } from '@/utils/money'
 
 /**
@@ -45,8 +46,15 @@ import { reconcile } from '@/utils/money'
  * 4. **防重复提交**（FR-032）：提交中禁用按钮 + 幂等保护，连点只产生一笔订单。
  */
 const props = withDefaults(
-  defineProps<{ source?: 'product' | 'cart'; skuId?: number; count?: number; cartIds?: number[] }>(),
-  { source: 'product', count: 1 },
+  defineProps<{
+    source?: 'product' | 'cart' | 'reorder'
+    skuId?: number
+    count?: number
+    cartIds?: number[]
+    /** 「再次购买」的条目（`source=reorder` 时使用），见 utils/reorder.ts */
+    reorderItems?: Array<{ skuId: number; count: number }>
+  }>(),
+  { source: 'product', count: 1, reorderItems: () => [] },
 )
 
 const route = useRoute()
@@ -109,15 +117,18 @@ const remark = ref('')
  * 客户要复用，得在自己的抬头簿里存一条（US23）。
  */
 const invoiceEnabled = ref(false)
+const lastInvoiceChoice = getLastInvoiceChoice()
 const invoiceForm = ref<InvoiceApplyForm>({
-  type: InvoiceType.NORMAL,
+  type: lastInvoiceChoice?.type ?? InvoiceType.NORMAL,
   // 默认「企业」—— 与后端枚举的默认档一致；客户是个人就在卡片上改成「个人」（Q38）
-  titleKind: InvoiceTitleKind.COMPANY,
+  titleKind: lastInvoiceChoice?.titleKind ?? InvoiceTitleKind.COMPANY,
   titleName: '',
   taxNo: '',
   titleAddress: '',
   titlePhone: '',
   bankName: '',
+  bankAccount: '',
+  bankCode: '',
   email: '',
 })
 
@@ -162,7 +173,10 @@ function buildInput(): TradeOrderInput {
   const items =
     props.source === 'cart'
       ? cartRows.value.map((i) => ({ cartId: i.id, skuId: i.sku.id, count: i.count }))
-      : [{ skuId: props.skuId ?? 0, count: props.count }]
+      : props.source === 'reorder'
+        // 再次购买：订单列表把历史订单项的 skuId + count 带过来，不经购物车
+        ? (props.reorderItems ?? []).map((i) => ({ skuId: i.skuId, count: i.count }))
+        : [{ skuId: props.skuId ?? 0, count: props.count }]
 
   return { items, addressId: addressId.value ?? undefined, couponId: couponId.value }
 }
@@ -267,6 +281,12 @@ async function onSubmit() {
     await cartStore.onOrderPlaced()
 
     priceChangePending.value = false
+    if (invoiceEnabled.value) {
+      saveLastInvoiceChoice({
+        type: invoiceForm.value.type,
+        titleKind: invoiceForm.value.titleKind,
+      })
+    }
     router.push(`/order/${res.id}`)
   } catch (e) {
     const msg = (e as { message?: string })?.message ?? ''
@@ -407,7 +427,7 @@ watch(
             @click="offlinePayChosen = false"
           >
             <b>在线支付</b>
-            <span>提交后选择支付宝等方式完成付款</span>
+            <span>提交后选择微信支付或支付宝完成付款</span>
           </div>
           <div
             id="payMethodOffline"

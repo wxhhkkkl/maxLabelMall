@@ -4,6 +4,10 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.AdminCustomizationDetailRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDetailRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationOrderDO;
@@ -50,6 +54,10 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
     private CustomizationOrderService customizationOrderService;
     @Mock
     private MemberUserApi memberUserApi;
+    @Mock
+    private AdminUserApi adminUserApi;
+    @Mock
+    private PayOrderApi payOrderApi;
 
     private void mockOrder(TradeOrderDO order) {
         when(tradeOrderQueryService.getOrder(order.getId())).thenReturn(order);
@@ -67,6 +75,34 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
                 .couponId(0L).couponPrice(0).pointPrice(0)
                 .customization(customization)
                 .build();
+    }
+
+    @Test
+    public void testGetOrderDetail_agentUserNameResolved() {
+        TradeOrderDO order = order(false);
+        order.setAgentUserId(9L);
+        mockOrder(order);
+        AdminUserRespDTO agent = new AdminUserRespDTO();
+        agent.setId(9L);
+        agent.setNickname("运营小王");
+        when(adminUserApi.getUser(9L)).thenReturn(CommonResult.success(agent));
+
+        TradeOrderDetailRespVO result = controller.getOrderDetail(1001L).getData();
+        assertEquals(9L, result.getAgentUserId());
+        assertEquals("运营小王", result.getAgentUserName());
+    }
+
+    @Test
+    public void testGetOrderDetail_payChannelOrderNo() {
+        TradeOrderDO order = order(false);
+        order.setPayOrderId(8899L);
+        mockOrder(order);
+        PayOrderRespDTO payOrder = new PayOrderRespDTO();
+        payOrder.setChannelOrderNo("4200001234202601011234567890");
+        when(payOrderApi.getOrder(8899L)).thenReturn(CommonResult.success(payOrder));
+
+        TradeOrderDetailRespVO result = controller.getOrderDetail(1001L).getData();
+        assertEquals("4200001234202601011234567890", result.getPayChannelOrderNo());
     }
 
     @Test

@@ -32,6 +32,9 @@ public class TradeOrderBaseVO {
     @Schema(description = "用户编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "2048")
     private Long userId;
 
+    @Schema(description = "代客下单的后台用户编号；NULL = 客户自助", example = "1")
+    private Long agentUserId;
+
     @Schema(description = "用户 IP", requiredMode = Schema.RequiredMode.REQUIRED, example = "127.0.0.1")
     private String userIp;
 
@@ -40,6 +43,9 @@ public class TradeOrderBaseVO {
 
     @Schema(description = "订单状态", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
+
+    @Schema(description = "买家是否已在用户端删除该订单（仅对 C 端隐藏，运营后台仍可见）", example = "false")
+    private Boolean userDeleted;
 
     @Schema(description = "购买的商品数量", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")
     private Integer productCount;

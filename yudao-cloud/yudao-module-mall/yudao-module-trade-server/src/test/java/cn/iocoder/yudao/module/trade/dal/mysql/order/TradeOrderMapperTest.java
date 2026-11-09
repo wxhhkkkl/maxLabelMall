@@ -63,6 +63,20 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
         return page.getList().stream().map(TradeOrderDO::getId).toList();
     }
 
+    private List<Long> selectIdsByAgentCreated(Boolean agentCreated) {
+        TradeOrderPageReqVO reqVO = new TradeOrderPageReqVO();
+        reqVO.setAgentCreated(agentCreated);
+        PageResult<TradeOrderDO> page = tradeOrderMapper.selectPage(reqVO, (java.util.Set<Long>) null);
+        return page.getList().stream().map(TradeOrderDO::getId).toList();
+    }
+
+    private void markAgent(Long orderId) {
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(orderId);
+        update.setAgentUserId(1L);
+        tradeOrderMapper.updateById(update);
+    }
+
     @Test
     public void testSelectPage_payChannelCodeOffline_foundBySubTable() {
         // 对公**待收款**单：子表有行，而 `pay_channel_code` **还是空的**（确认收款前都这样）
@@ -104,6 +118,18 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
                 TradeOrderStatusEnum.UNDELIVERED.getStatus());
 
         assertEquals(List.of(online.getId()), selectIdsByPayChannel(PayChannelEnum.WX_LITE.getCode(), null));
+    }
+
+    @Test
+    public void testSelectPage_agentCreated_filter() {
+        // 自助单：agent_user_id = NULL；代客单：非空
+        TradeOrderDO self = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        TradeOrderDO agent = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        markAgent(agent.getId());
+
+        assertEquals(List.of(agent.getId()), selectIdsByAgentCreated(true));
+        assertEquals(List.of(self.getId()), selectIdsByAgentCreated(false));
+        assertEquals(2, selectIdsByAgentCreated(null).size()); // 不传 = 不筛
     }
 
     @Test

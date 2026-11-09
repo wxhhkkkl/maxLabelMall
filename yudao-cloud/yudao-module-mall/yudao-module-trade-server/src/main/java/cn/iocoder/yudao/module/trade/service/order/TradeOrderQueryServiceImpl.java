@@ -80,7 +80,9 @@ public class TradeOrderQueryServiceImpl implements TradeOrderQueryService {
     public TradeOrderDO getOrder(Long userId, Long id) {
         TradeOrderDO order = tradeOrderMapper.selectById(id);
         if (order != null
-                && ObjectUtil.notEqual(order.getUserId(), userId)) {
+                && (ObjectUtil.notEqual(order.getUserId(), userId)
+                    // 买家删除（假删除）后，详情对 C 端不可见；运营后台走单参 getOrder(id)
+                    || Boolean.TRUE.equals(order.getUserDeleted()))) {
             return null;
         }
         return order;

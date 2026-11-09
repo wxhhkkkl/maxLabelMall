@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { cancelOrder, pageOrders } from '@/api/order'
+import { cancelOrder, deleteOrder, pageOrders } from '@/api/order'
 import AccountSidebar from '@/components/AccountSidebar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
@@ -45,7 +45,43 @@ const message = ref('')
 /** 待取消的订单；非空时二次确认弹层打开 */
 const cancelTarget = ref<OrderPageItem | null>(null)
 
+/** 待删除的订单；非空时二次确认弹层打开 */
+const deleteTarget = ref<OrderPageItem | null>(null)
+
 const filters = orderStatusFilters()
+
+/**
+ * 能否删除订单：只允许终态（已取消 / 已完成）。
+ * 后端是**假删除** —— 只对买家隐藏，运营后台仍可见，不是物理删除。
+ */
+function canDeleteOrder(o: OrderPageItem): boolean {
+  return o.status === OrderStatus.CANCELED || o.status === OrderStatus.COMPLETED
+}
+
+/**
+ * 再次购买：把订单项按原 SKU + 数量**直接带到结算页**（不经购物车，所有者 2026-11-04 拍板）。
+ *
+ * 入口只对服务端标记 `canReorder` 的普通商品单显示 —— 定制 / 企业授权 / 订阅单
+ * 在列表 VO 上根本分不出来，判定由服务端给（见 `OrderPageItem.canReorder`）。
+ */
+function onReorder(o: OrderPageItem) {
+  const items = o.items.filter(
+    (it) => Number.isInteger(Number(it.skuId)) && Number(it.skuId) > 0,
+  )
+  if (!items.length) {
+    message.value = '该订单的商品信息不完整，无法再次购买'
+    return
+  }
+  message.value = ''
+  void router.push({
+    path: '/checkout',
+    query: {
+      source: 'reorder',
+      skuIds: items.map((i) => Number(i.skuId)).join(','),
+      counts: items.map((i) => i.count).join(','),
+    },
+  })
+}
 
 async function load() {
   loading.value = true
@@ -95,6 +131,24 @@ async function confirmCancel() {
     await load()
   } catch (e) {
     message.value = (e as { message?: string })?.message || '取消订单失败，请稍后重试'
+  }
+}
+
+function askDelete(o: OrderPageItem) {
+  message.value = ''
+  deleteTarget.value = o
+}
+
+async function confirmDelete() {
+  const target = deleteTarget.value
+  if (!target) return
+  deleteTarget.value = null
+  try {
+    await deleteOrder(target.id)
+    // 删除是后端的假删除，重新拉一次列表即可（本页不再显示这笔订单）
+    await load()
+  } catch (e) {
+    message.value = (e as { message?: string })?.message || '删除订单失败，请稍后重试'
   }
 }
 
@@ -157,6 +211,8 @@ onMounted(load)
         <div v-for="o in list" :key="o.id" class="p-card order-card">
           <div class="oc-head">
             <span class="oc-no">订单号 {{ o.no }}</span>
+            <!-- 客服代下单（017）：中性标识，不暴露运营身份 -->
+            <span v-if="o.agentCreated" class="oc-agent-tag">客服代下单</span>
             <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
             <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null）；
                  票种（011）显示在状态下面 -->
@@ -188,6 +244,18 @@ onMounted(load)
             <span class="oc-total">{{ formatYuan(o.payPrice) }}</span>
             <div class="oc-actions">
             <!--
+              再次购买（2026-11-04）：只普通商品单有入口（服务端 `canReorder`）。
+              按订单项的原 SKU + 数量直接进结算，不经购物车。
+            -->
+            <button
+              v-if="o.canReorder"
+              class="btn-cart reorder"
+              type="button"
+              @click="onReorder(o)"
+            >
+              再次购买
+            </button>
+            <!--
               评价入口（FR-073）。与支付同理：**表单只在详情页有一份**，列表这里只把人送过去。
               列表页拿得到"整单还有没有项待评价"，但逐项入口在详情页更合适（卡片不至于太长）。
             -->
@@ -196,7 +264,7 @@ onMounted(load)
               class="btn-cart oc-comment"
               :to="`/order/${o.id}`"
             >
-              去评价
+              评价
             </RouterLink>
             <!--
               支付入口在订单详情页（T117）—— 全站只有一处实现支付调用，
@@ -212,8 +280,9 @@ onMounted(load)
             >
               立即支付
             </button>
+            <!-- 代客订单不允许客户自行取消（017 / Q131）：后端也会拒绝 -->
             <button
-              v-if="o.status === OrderStatus.UNPAID"
+              v-if="o.status === OrderStatus.UNPAID && !o.agentCreated"
               class="btn-cart cancel-order"
               type="button"
               @click="askCancel(o)"
@@ -232,6 +301,18 @@ onMounted(load)
             >
               查看物流
             </RouterLink>
+            <!--
+              删除订单：仅终态（已取消 / 已完成）。后端是**假删除** ——
+              只对买家自己隐藏，运营后台仍可见，不是物理删除。
+            -->
+            <button
+              v-if="canDeleteOrder(o)"
+              class="btn-cart delete-order"
+              type="button"
+              @click="askDelete(o)"
+            >
+              删除订单
+            </button>
             <RouterLink class="btn-cart" :to="`/order/${o.id}`">查看详情</RouterLink>
             </div>
           </div>
@@ -255,6 +336,21 @@ onMounted(load)
       </button>
       <button id="confirmCancel" class="btn-buy" type="button" @click="confirmCancel">
         确认取消
+      </button>
+    </template>
+  </MlModal>
+
+  <!-- 删除订单：只从「我的订单」里隐藏，运营后台仍可见，不是物理删除 -->
+  <MlModal :open="deleteTarget !== null" title="删除订单" @close="deleteTarget = null">
+    <p class="ml-hint">
+      确认删除订单 {{ deleteTarget?.no }}？删除后本页不再显示该订单，记录仍会保留。
+    </p>
+    <template #foot>
+      <button id="dismissDelete" class="btn-cart" type="button" @click="deleteTarget = null">
+        再想想
+      </button>
+      <button id="confirmDelete" class="btn-buy" type="button" @click="confirmDelete">
+        确认删除
       </button>
     </template>
   </MlModal>
@@ -405,5 +501,14 @@ onMounted(load)
   .oc-total-label { flex: 1; }
   .oc-foot .btn-cart { font-size: 12px; padding: 8px 12px; }
   .oc-actions { flex-basis: 100%; }
+}
+/* 客服代下单（017）：中性标识，不暴露运营身份 */
+.oc-agent-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eaf1ff;
+  color: #2e7cd6;
+  font-size: 12px;
 }
 </style>

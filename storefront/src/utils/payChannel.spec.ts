@@ -12,9 +12,9 @@ import { buildChannelOptions } from './payChannel'
 describe('buildChannelOptions —— 渠道编码映射为展示项', () => {
   it('已知渠道即使后端没启用也占位（微信未开通时界面要留入口）', () => {
     const opts = buildChannelOptions(['alipay_pc'])
-    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_native'])
-    expect(opts[0]).toMatchObject({ label: '支付宝', enabled: true, comingSoon: false })
-    expect(opts[1]).toMatchObject({ label: '微信支付', enabled: false, comingSoon: true })
+    expect(opts.map((o) => o.code)).toEqual(['wx_native', 'alipay_pc'])
+    expect(opts[0]).toMatchObject({ label: '微信支付', enabled: false, comingSoon: true })
+    expect(opts[1]).toMatchObject({ label: '支付宝', enabled: true, comingSoon: false })
   })
 
   it('两个都启用时都可选', () => {
@@ -34,9 +34,9 @@ describe('buildChannelOptions —— 渠道编码映射为展示项', () => {
     })
   })
 
-  it('顺序固定：支付宝在前、微信在后，未知的后置', () => {
+  it('顺序固定：微信在前、支付宝在后，未知的后置', () => {
     const opts = buildChannelOptions(['wx_lite', 'alipay_pc'])
-    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_native', 'wx_lite'])
+    expect(opts.map((o) => o.code)).toEqual(['wx_native', 'alipay_pc', 'wx_lite'])
   })
 
   it('后端一个都没返回时，仍然给出两个占位项、都不可选', () => {
@@ -62,13 +62,13 @@ describe('buildChannelOptions —— 渠道编码映射为展示项', () => {
 describe('buildChannelOptions —— 按运行环境过滤', () => {
   it('微信外不渲染 wx_pub（后端启用了也不行）', () => {
     const opts = buildChannelOptions(['alipay_pc', 'wx_pub'], false)
-    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_native'])
+    expect(opts.map((o) => o.code)).toEqual(['wx_native', 'alipay_pc'])
     expect(opts.find((o) => o.code === 'wx_pub')).toBeUndefined()
   })
 
   it('微信内渲染 wx_pub，且不给扫码渠道留占位', () => {
     const opts = buildChannelOptions(['alipay_pc', 'wx_pub'], true)
-    expect(opts.map((o) => o.code)).toEqual(['alipay_pc', 'wx_pub'])
+    expect(opts.map((o) => o.code)).toEqual(['wx_pub', 'alipay_pc'])
     expect(opts.find((o) => o.code === 'wx_native')).toBeUndefined()
   })
 

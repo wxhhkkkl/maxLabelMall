@@ -2,14 +2,13 @@ package cn.iocoder.yudao.module.member.controller.admin.template;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.member.controller.admin.template.vo.AdminLabelTemplatePageReqVO;
+import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppLabelTemplateContentRespVO;
 import cn.iocoder.yudao.module.member.controller.app.template.vo.AppLabelTemplateRespVO;
-import cn.iocoder.yudao.module.member.dal.dataobject.template.MaxLabelLabelTemplateDO;
-import cn.iocoder.yudao.module.member.dal.dataobject.template.MaxLabelSharedTemplateDO;
-import cn.iocoder.yudao.module.member.dal.mysql.template.MaxLabelSharedTemplateMapper;
-import cn.iocoder.yudao.module.member.service.template.LabelTemplateService;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelShareContentDO;
+import cn.iocoder.yudao.module.member.dal.mysql.share.MaxLabelShareContentMapper;
+import cn.iocoder.yudao.module.member.service.share.ShareContentService;
 import cn.iocoder.yudao.module.member.service.template.MaxLabelTemplateSketch;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,11 +23,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.MEMBER_TEMPLATE_NOT_FOUND;
 
 @Tag(name = "管理后台 - MaxLabel 会员模板")
 @RestController
@@ -37,20 +36,22 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class AdminLabelTemplateController {
 
     @Resource
-    private LabelTemplateService templateService;
+    private ShareContentService contentService;
     @Resource
-    private MaxLabelSharedTemplateMapper sharedTemplateMapper;
+    private MaxLabelShareContentMapper contentMapper;
 
     @GetMapping("/page")
     @Operation(summary = "获得会员云端模板分页")
     @PreAuthorize("@ss.hasPermission('member:cloud-template:query')")
     public CommonResult<PageResult<AppLabelTemplateRespVO>> getPage(@Valid AdminLabelTemplatePageReqVO reqVO) {
-        PageResult<MaxLabelLabelTemplateDO> page = templateService.getPage(reqVO.getUserId(), reqVO.getKeyword(), reqVO);
-        Map<Long, MaxLabelSharedTemplateDO> shared = sharedMap(page.getList().stream()
-                .map(MaxLabelLabelTemplateDO::getId).toList());
-        List<AppLabelTemplateRespVO> list = page.getList().stream()
-                .map(template -> toRespVO(template, shared.get(template.getId())))
-                .toList();
+        AppShareContentPageReqVO pageReq = new AppShareContentPageReqVO();
+        pageReq.setScope(1);
+        pageReq.setContentType(1);
+        pageReq.setKeyword(reqVO.getKeyword());
+        pageReq.setPageNo(reqVO.getPageNo());
+        pageReq.setPageSize(reqVO.getPageSize());
+        PageResult<MaxLabelShareContentDO> page = contentService.getPage(reqVO.getUserId(), pageReq);
+        List<AppLabelTemplateRespVO> list = page.getList().stream().map(this::toRespVO).toList();
         return success(new PageResult<>(list, page.getTotal()));
     }
 
@@ -59,25 +60,36 @@ public class AdminLabelTemplateController {
     @Parameter(name = "id", required = true)
     @PreAuthorize("@ss.hasPermission('member:cloud-template:query')")
     public CommonResult<AppLabelTemplateContentRespVO> get(@RequestParam("id") Long id) {
-        MaxLabelLabelTemplateDO template = templateService.getById(id);
-        MaxLabelSharedTemplateDO shared = sharedTemplateMapper.selectBySourceTemplateId(id);
-        AppLabelTemplateContentRespVO resp = BeanUtils.toBean(template, AppLabelTemplateContentRespVO.class);
-        resp.setShareStatus(shared == null ? null : shared.getAuditStatus());
-        resp.setThumb(MaxLabelTemplateSketch.dataUrl(template.getContent(), template.getWidthMm(), template.getHeightMm()));
+        MaxLabelShareContentDO content = contentMapper.selectById(id);
+        if (content == null || !Objects.equals(content.getScope(), 1)
+                || !Objects.equals(content.getContentType(), 1)) {
+            throw exception(MEMBER_TEMPLATE_NOT_FOUND);
+        }
+        AppLabelTemplateContentRespVO resp = new AppLabelTemplateContentRespVO();
+        copy(resp, content);
+        resp.setContent(content.getContent());
         return success(resp);
     }
 
-    private Map<Long, MaxLabelSharedTemplateDO> sharedMap(List<Long> ids) {
-        if (ids.isEmpty()) return Map.of();
-        return sharedTemplateMapper.selectListBySourceTemplateIds(ids).stream()
-                .collect(Collectors.toMap(MaxLabelSharedTemplateDO::getSourceTemplateId, Function.identity()));
+    private AppLabelTemplateRespVO toRespVO(MaxLabelShareContentDO content) {
+        AppLabelTemplateRespVO resp = new AppLabelTemplateRespVO();
+        copy(resp, content);
+        return resp;
     }
 
-    private AppLabelTemplateRespVO toRespVO(MaxLabelLabelTemplateDO template, MaxLabelSharedTemplateDO shared) {
-        AppLabelTemplateRespVO resp = BeanUtils.toBean(template, AppLabelTemplateRespVO.class);
-        resp.setShareStatus(shared == null ? null : shared.getAuditStatus());
-        resp.setThumb(MaxLabelTemplateSketch.dataUrl(template.getContent(), template.getWidthMm(), template.getHeightMm()));
-        return resp;
+    private void copy(AppLabelTemplateRespVO resp, MaxLabelShareContentDO content) {
+        resp.setId(content.getId());
+        resp.setName(content.getName());
+        resp.setSizeBytes(content.getSizeBytes() == null ? null : content.getSizeBytes().intValue());
+        resp.setWidthMm(content.getWidthMm());
+        resp.setHeightMm(content.getHeightMm());
+        resp.setCategory(content.getCategory());
+        resp.setKeywords(content.getKeywords());
+        resp.setShareStatus(null);
+        resp.setThumb(MaxLabelTemplateSketch.dataUrl(content.getContent(),
+                content.getWidthMm(), content.getHeightMm()));
+        resp.setCreateTime(content.getCreateTime());
+        resp.setUpdateTime(content.getUpdateTime());
     }
 
 }

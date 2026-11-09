@@ -29,4 +29,38 @@ public interface LogRecordConstants {
     String MEMBER_ORG_SEAT_REVOKE_SUB_TYPE = "撤销企业席位";
     String MEMBER_ORG_SEAT_REVOKE_SUCCESS = "撤销了成员【{{#memberId}}】在企业【{{#orgId}}】的席位";
 
+    // ======================= 共享内容空间 =======================
+
+    String MEMBER_SHARE_TYPE = "共享内容空间";
+
+    String MEMBER_SHARE_CONTENT_CREATE_SUB_TYPE = "上传共享内容";
+    String MEMBER_SHARE_CONTENT_CREATE_SUCCESS = "上传了共享内容【{{#name}}】";
+
+    String MEMBER_SHARE_CONTENT_DELETE_SUB_TYPE = "删除共享内容";
+    String MEMBER_SHARE_CONTENT_DELETE_SUCCESS = "删除了共享内容【{{#id}}】";
+
+    String MEMBER_SHARE_FOLDER_CREATE_SUB_TYPE = "创建共享文件夹";
+    String MEMBER_SHARE_FOLDER_CREATE_SUCCESS = "创建了企业共享文件夹【{{#name}}】";
+
+    String MEMBER_SHARE_FOLDER_UPDATE_SUB_TYPE = "修改共享文件夹";
+    String MEMBER_SHARE_FOLDER_UPDATE_SUCCESS = "修改了企业共享文件夹【{{#id}}】";
+
+    String MEMBER_SHARE_FOLDER_DELETE_SUB_TYPE = "删除共享文件夹";
+    String MEMBER_SHARE_FOLDER_DELETE_SUCCESS = "删除了企业共享文件夹【{{#id}}】";
+
+    String MEMBER_SHARE_FOLDER_MEMBERS_SUB_TYPE = "调整共享文件夹可见成员";
+    String MEMBER_SHARE_FOLDER_MEMBERS_SUCCESS = "调整了企业共享文件夹【{{#id}}】的可见成员";
+
+    String MEMBER_PLATFORM_CONTENT_CREATE_SUB_TYPE = "上传平台共享内容";
+    String MEMBER_PLATFORM_CONTENT_CREATE_SUCCESS = "上传了平台共享内容【{{#name}}】";
+
+    String MEMBER_PLATFORM_CONTENT_UPDATE_SUB_TYPE = "编辑平台共享内容";
+    String MEMBER_PLATFORM_CONTENT_UPDATE_SUCCESS = "编辑了平台共享内容【{{#id}}】";
+
+    String MEMBER_PLATFORM_CONTENT_STATUS_SUB_TYPE = "平台共享内容上下架";
+    String MEMBER_PLATFORM_CONTENT_STATUS_SUCCESS = "将平台共享内容【{{#reqVO.id}}】的状态改为【{{#reqVO.status}}】";
+
+    String MEMBER_PLATFORM_CONTENT_DELETE_SUB_TYPE = "删除平台共享内容";
+    String MEMBER_PLATFORM_CONTENT_DELETE_SUCCESS = "删除了平台共享内容【{{#id}}】";
+
 }

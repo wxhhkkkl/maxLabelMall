@@ -65,7 +65,14 @@ export function canPay(status: number): boolean {
   return status === OrderStatus.UNPAID
 }
 
-export function canCancel(status: number): boolean {
+/**
+ * 能否取消订单。
+ *
+ * `noUserCancel` 来自订单详情的 `agentCreated`：代客订单客户端不提供取消入口（017 / Q131），
+ * 后端 `cancelOrderByMember` 同样会拒绝。
+ */
+export function canCancel(status: number, noUserCancel = false): boolean {
+  if (noUserCancel) return false
   return status === OrderStatus.UNPAID
 }
 

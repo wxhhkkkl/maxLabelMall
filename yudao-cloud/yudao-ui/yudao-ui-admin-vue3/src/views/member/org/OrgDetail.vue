@@ -125,7 +125,65 @@
           @pagination="loadLicenses"
         />
       </el-tab-pane>
+
+      <el-tab-pane label="共享内容" name="share">
+        <div v-if="shareOverview" class="mb-10px" style="font-size: 13px; color: #606266">
+          容量占用：{{ sizeText(shareOverview.usedBytes) }} / {{ sizeText(shareOverview.quotaBytes) }}
+          · 剩余 {{ sizeText(shareOverview.remainingBytes) }}
+        </div>
+        <el-form inline class="mb-10px">
+          <el-form-item label="文件夹">
+            <el-select v-model="shareQuery.folderId" clearable placeholder="全部" class="!w-160px">
+              <el-option v-for="folder in shareFolders" :key="folder.id" :label="folder.name" :value="folder.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="类型">
+            <el-select v-model="shareQuery.contentType" clearable placeholder="全部" class="!w-120px">
+              <el-option label="模板" :value="1" />
+              <el-option label="纯文本" :value="2" />
+              <el-option label="Excel" :value="3" />
+              <el-option label="CSV" :value="4" />
+              <el-option label="图片" :value="5" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="关键词">
+            <el-input v-model="shareQuery.keyword" clearable placeholder="名称/分类/关键词" class="!w-200px" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchShareContent">搜索</el-button>
+          </el-form-item>
+        </el-form>
+        <el-table v-loading="shareLoading" :data="shareItems" stripe>
+          <el-table-column label="文件夹" prop="folderName" width="140" />
+          <el-table-column label="名称" prop="name" min-width="190" />
+          <el-table-column label="类型" width="90">
+            <template #default="{ row }">{{ contentTypeText(row.contentType) }}</template>
+          </el-table-column>
+          <el-table-column label="大小" width="100">
+            <template #default="{ row }">{{ sizeText(row.sizeBytes) }}</template>
+          </el-table-column>
+          <el-table-column label="上传者" width="130">
+            <template #default="{ row }">{{ row.uploaderNickname || row.uploaderMemberId }}</template>
+          </el-table-column>
+          <el-table-column label="上传时间" prop="createTime" width="180" :formatter="dateFormatter" />
+          <el-table-column label="操作" width="120" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="previewShareContent(row)">预览/下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <Pagination
+          v-model:limit="shareQuery.pageSize"
+          v-model:page="shareQuery.pageNo"
+          :total="shareTotal"
+          @pagination="loadShareContent"
+        />
+      </el-tab-pane>
     </el-tabs>
+
+    <Dialog v-model="sharePreviewVisible" title="共享内容预览" width="720px">
+      <el-input v-model="sharePreviewContent" :rows="14" readonly type="textarea" />
+    </Dialog>
   </div>
 </template>
 
@@ -142,6 +200,16 @@ import {
   type OrgLicenseVO,
   type OrgMemberVO
 } from '@/api/member/org'
+import {
+  getOrgShareContent,
+  getOrgShareContentPage,
+  getOrgShareFolders,
+  getOrgShareOverview,
+  type OrgShareContentVO,
+  type OrgShareFolderVO,
+  type OrgShareOverviewVO
+} from '@/api/member/orgShareContent'
+import { dateFormatter } from '@/utils/formatTime'
 
 defineOptions({ name: 'MemberOrgDetail' })
 
@@ -159,6 +227,21 @@ const licenses = ref<OrgLicenseVO[]>([])
 const licenseTotal = ref(0)
 const licenseLoading = ref(false)
 const licenseQuery = reactive({ pageNo: 1, pageSize: 10 })
+
+const shareLoading = ref(false)
+const shareOverview = ref<OrgShareOverviewVO>()
+const shareFolders = ref<OrgShareFolderVO[]>([])
+const shareItems = ref<OrgShareContentVO[]>([])
+const shareTotal = ref(0)
+const shareQuery = reactive<{
+  pageNo: number
+  pageSize: number
+  folderId?: number
+  contentType?: number
+  keyword?: string
+}>({ pageNo: 1, pageSize: 10 })
+const sharePreviewVisible = ref(false)
+const sharePreviewContent = ref('')
 
 const roleLabel = (role: number) => (role === 1 ? 'OWNER' : role === 2 ? '管理员' : '成员')
 const periodLabel = (months: number) =>
@@ -186,8 +269,51 @@ const loadLicenses = async () => {
   }
 }
 
+const contentTypeText = (type: number) =>
+  ({ 1: '模板', 2: '纯文本', 3: 'Excel', 4: 'CSV', 5: '图片' } as Record<number, string>)[type] ?? '未知'
+
+const sizeText = (bytes?: number) => {
+  if (!bytes) return '0 B'
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
+
+const loadShareContent = async () => {
+  shareLoading.value = true
+  try {
+    const [overview, folders, page] = await Promise.all([
+      getOrgShareOverview(props.orgId),
+      getOrgShareFolders(props.orgId),
+      getOrgShareContentPage({ ...shareQuery, orgId: props.orgId })
+    ])
+    shareOverview.value = overview
+    shareFolders.value = folders ?? []
+    shareItems.value = page.list
+    shareTotal.value = page.total
+  } finally {
+    shareLoading.value = false
+  }
+}
+
+const searchShareContent = () => {
+  shareQuery.pageNo = 1
+  void loadShareContent()
+}
+
+const previewShareContent = async (row: OrgShareContentVO) => {
+  const detail = await getOrgShareContent(row.id)
+  if (detail.storageType === 1 && detail.content) {
+    sharePreviewContent.value = detail.content
+    sharePreviewVisible.value = true
+  } else if (detail.downloadUrl) {
+    window.open(detail.downloadUrl, '_blank')
+  }
+}
+
 const onTabChange = async (name: string) => {
   if (name === 'members') await loadMembers()
+  else if (name === 'share') await loadShareContent()
   else await loadLicenses()
 }
 

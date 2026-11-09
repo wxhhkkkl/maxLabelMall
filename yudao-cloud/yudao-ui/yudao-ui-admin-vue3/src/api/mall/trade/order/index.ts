@@ -8,9 +8,12 @@ export interface OrderVO {
   type?: number | null // 订单类型
   terminal?: number | null // 订单来源
   userId?: number | null // 用户编号
+  agentUserId?: number | null // 代客下单的后台用户编号；null=客户自助
+  agentUserName?: string | null // 代下单人昵称
   userIp?: string // 用户 IP
   userRemark?: string // 用户备注
   status?: number | null // 订单状态
+  userDeleted?: boolean // 买家是否已在用户端删除（仅对 C 端隐藏，运营后台仍可见）
   productCount?: number | null // 购买的商品数量
   finishTime?: Date | null // 订单完成时间
   cancelTime?: Date | null // 订单取消时间
@@ -22,6 +25,7 @@ export interface OrderVO {
   payStatus?: boolean // 是否已支付
   payTime?: Date | null // 付款时间
   payChannelCode?: string // 支付渠道
+  payChannelOrderNo?: string | null // 微信/支付宝等第三方交易单号
   totalPrice?: number | null // 商品原价（总）
   discountPrice?: number | null // 订单优惠（总）
   deliveryPrice?: number | null // 运费金额
@@ -327,4 +331,109 @@ export const confirmOfflinePaid = async (data: OfflineConfirmVO) => {
  */
 export const cancelOrder = async (data: { id: number; reason?: string }) => {
   return await request.put({ url: `/trade/order/cancel`, data })
+}
+
+// ==================== 017 代客下单 ====================
+
+export interface AgentOrderItem {
+  skuId: number
+  count: number
+}
+
+export interface AgentSettlementReq {
+  userId: number
+  items: AgentOrderItem[]
+  addressId?: number
+}
+
+export interface AgentSettlementResp {
+  deliveryType: number
+  items: Array<{
+    skuId: number
+    spuId?: number
+    spuName?: string
+    picUrl?: string
+    price?: number
+    count?: number
+    properties?: Array<{ propertyName: string; valueName: string }>
+  }>
+  price: {
+    totalPrice: number
+    discountPrice: number
+    deliveryPrice: number
+    couponPrice: number
+    pointPrice: number
+    vipPrice: number
+    payPrice: number
+  }
+  address?: {
+    id: number
+    name: string
+    mobile: string
+    areaId?: number
+    areaName?: string
+    detailAddress?: string
+  } | null
+  coupons?: unknown[]
+  usePoint?: number
+  totalPoint?: number
+  promotions?: unknown[]
+  enterprise?: boolean
+  offlinePayEnabled?: boolean
+  offlinePayTip?: string
+}
+
+export interface AgentCreateReq extends AgentSettlementReq {
+  userRemark?: string
+  /** 不传 = 在线支付；offline = 对公转账 */
+  payChannelCode?: string | null
+}
+
+export interface AgentCreateResp {
+  orderId: number
+  payOrderId?: number | null
+  payPrice: number
+  orderStatus: number
+}
+
+export interface AgentPayReq {
+  orderId: number
+  /** wx_native / alipay_pc */
+  channelCode: string
+}
+
+export interface AgentPayResp {
+  status: number
+  displayMode: string
+  displayContent: string
+}
+
+export interface AgentPayStatusResp {
+  orderId: number
+  orderStatus: number
+  payStatus: boolean
+  payOrderId?: number | null
+}
+
+/** 代客下单：结算预览（服务端按目标客户算价） */
+export const agentSettlement = async (data: AgentSettlementReq) => {
+  return await request.post<AgentSettlementResp>({ url: '/trade/order/agent-settlement', data })
+}
+
+/** 代客下单：创建订单 */
+export const agentCreate = async (data: AgentCreateReq) => {
+  return await request.post<AgentCreateResp>({ url: '/trade/order/agent-create', data })
+}
+
+/** 代客下单：发起在线支付（服务端白名单 wx_native / alipay_pc） */
+export const agentPay = async (data: AgentPayReq) => {
+  return await request.post<AgentPayResp>({ url: '/trade/order/agent-pay', data })
+}
+
+/** 代客下单：查询支付状态（页面轮询） */
+export const getAgentPayStatus = async (orderId: number) => {
+  return await request.get<AgentPayStatusResp>({
+    url: '/trade/order/agent-pay-status',
+    params: { orderId }
+  })
 }

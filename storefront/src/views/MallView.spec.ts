@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { Category, ProductSpu } from '@/types'
-import { LAST_SEARCH_KEY } from '@/utils/last-search'
+import { LAST_SEARCH_KEY, SEARCH_HISTORY_KEY } from '@/utils/last-search'
 
 const addToCartMock = vi.fn()
 vi.mock('@/api/cart', () => ({
@@ -689,6 +689,43 @@ describe('MallView —— 记住上次搜索（本地存储）', () => {
   it('从没搜过时仍是默认提示', async () => {
     const w = await mountMall()
     expect(placeholder(w)).toBe('搜索商品名称、型号或规格')
+  })
+
+  it('聚焦搜索框才展开历史搜索，点击记忆词直接搜索', async () => {
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(['碳带', '热敏纸']))
+    const w = await mountMall([spu(1)], 1)
+
+    // 默认收起：历史不再占着搜索框下方的一行
+    expect(w.find('.mall-search-history').exists()).toBe(false)
+
+    await w.get('#mallSearch').trigger('focus')
+    const chips = w.findAll('.msh-items button')
+    expect(chips.map((chip) => chip.text())).toEqual(['碳带', '热敏纸'])
+
+    await chips[1].trigger('click')
+    await flushPromises()
+    expect(lastParams().keyword).toBe('热敏纸')
+    expect((w.get('#mallSearch').element as HTMLInputElement).value).toBe('热敏纸')
+    // 选中后收起下拉
+    expect(w.find('.mall-search-history').exists()).toBe(false)
+  })
+
+  it('点垃圾桶清空历史搜索（列表 + 上次搜索），并收起下拉', async () => {
+    window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(['碳带', '热敏纸']))
+    window.localStorage.setItem(LAST_SEARCH_KEY, '碳带')
+    const w = await mountMall()
+
+    await w.get('#mallSearch').trigger('focus')
+    expect(w.find('.mall-search-history').exists()).toBe(true)
+
+    await w.get('.msh-clear').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem(SEARCH_HISTORY_KEY)).toBeNull()
+    expect(window.localStorage.getItem(LAST_SEARCH_KEY)).toBeNull()
+    expect(w.find('.mall-search-history').exists()).toBe(false)
+    expect((w.get('#mallSearch').element as HTMLInputElement).placeholder)
+      .toBe('搜索商品名称、型号或规格')
   })
 
   it('提交搜索后把关键词记在本地，输入框清空时以灰色提示直接显示它', async () => {

@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InvoiceTitleKind, InvoiceType, type InvoiceTitle, type InvoiceTitleKindValue, type InvoiceTypeValue } from '@/types'
+import { saveLastInvoiceTitleId } from '@/utils/last-invoice'
 
 const listInvoiceTitles = vi.fn()
 const createInvoiceTitle = vi.fn()
@@ -45,6 +46,7 @@ function mountPicker(type: InvoiceTypeValue = InvoiceType.NORMAL, titles: Invoic
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
   listInvoiceTitles.mockReset()
   createInvoiceTitle.mockReset()
   createInvoiceTitle.mockResolvedValue(7)
@@ -75,6 +77,16 @@ describe('发票抬头选择器', () => {
 
     expect(w.find('.invoice-picker-item.is-active').text()).toContain('普票公司')
     expect(w.emitted('picked')?.[0]).toEqual([NORMAL_TITLE])
+  })
+
+  it('**上次选过的抬头优先于默认抬头**（记住上次选择）', async () => {
+    const other: InvoiceTitle = { id: 9, type: InvoiceType.NORMAL, titleKind: InvoiceTitleKind.COMPANY, titleName: '上次那家', defaultStatus: false }
+    saveLastInvoiceTitleId(9)
+    const w = mountPicker(InvoiceType.NORMAL, [NORMAL_TITLE, other])
+    await flushPromises()
+
+    expect(w.find('.invoice-picker-item.is-active').text()).toContain('上次那家')
+    expect(w.emitted('picked')?.[0]).toEqual([other])
   })
 
   it('换选另一条 → 抛出那一条', async () => {

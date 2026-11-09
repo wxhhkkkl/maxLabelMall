@@ -72,6 +72,12 @@ public class TradeOrderDO extends BaseDO {
      */
     private Long userId;
     /**
+     * 代客下单的后台用户编号；NULL = 客户自助下单
+     *
+     * 关联 AdminUserDO 的 id；由管理端代客下单写入，后台不提供修改入口。
+     */
+    private Long agentUserId;
+    /**
      * 用户 IP
      */
     private String userIp;
@@ -94,6 +100,13 @@ public class TradeOrderDO extends BaseDO {
      * 定制要求放在 `trade_customization_order`，这里只用于筛选与详情联查。
      */
     private Boolean customization;
+    /**
+     * 用户端是否已删除（假删除）
+     *
+     * ⚠️ 与 {@link BaseDO#deleted} 不同：置 true 只对 C 端隐藏，运营后台仍然可见。
+     * C 端所有查询都要带 `user_deleted = 0`。
+     */
+    private Boolean userDeleted;
     /**
      * 订单状态
      *

@@ -67,7 +67,12 @@ export interface InvoiceTitleFields {
   taxNo?: string | null
   titleAddress?: string | null
   titlePhone?: string | null
+  /** 开户行（银行名称/支行） */
   bankName?: string | null
+  /** 银行账户（账号） */
+  bankAccount?: string | null
+  /** 开户行行号（联行号 / CNAPS） */
+  bankCode?: string | null
   /** 接收发票 / 收据的邮箱（选填；Q62/Q63：申请与抬头簿都存） */
   email?: string | null
 }

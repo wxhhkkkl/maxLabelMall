@@ -52,10 +52,21 @@
       />
     </el-form-item>
     <el-form-item label="商品封面图" prop="picUrl">
-      <UploadImg v-model="formData.picUrl" :disabled="isDetail" height="80px" />
+      <UploadImg
+        v-model="formData.picUrl"
+        :disabled="isDetail"
+        :file-size="16"
+        :file-type="PRODUCT_IMAGE_TYPES"
+        height="80px"
+      />
     </el-form-item>
     <el-form-item label="商品轮播图" prop="sliderPicUrls">
-      <UploadImgs v-model="sliderPicUrls" :disabled="isDetail" />
+      <UploadImgs
+        v-model="sliderPicUrls"
+        :disabled="isDetail"
+        :file-size="16"
+        :file-type="PRODUCT_IMAGE_TYPES"
+      />
     </el-form-item>
   </el-form>
 </template>
@@ -72,6 +83,15 @@ import { BrandVO } from '@/api/mall/product/brand'
 import { RefreshRight } from '@element-plus/icons-vue'
 
 defineOptions({ name: 'ProductSpuInfoForm' })
+
+/**
+ * 商品图允许的类型与大小。
+ *
+ * 后端 `spring.servlet.multipart.max-file-size` 上限是 16MB；组件默认只给 5MB 且不含 WebP，
+ * 会让手机原图 / 网页另存的 WebP 在上传前就被拦下。这里与后端对齐，避免「图片没坏却传不上」。
+ */
+const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
 const props = defineProps({
   propFormData: {
     type: Object as PropType<Spu>,

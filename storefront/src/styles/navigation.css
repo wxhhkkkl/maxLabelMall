@@ -1,6 +1,27 @@
 .header .nav { gap: 42px; align-self: stretch; }
 .header-member, .mobile-member { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .header-member .login { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+.header-member-center { position: relative; display: flex; align-items: center; }
+/* 个人中心入口与企业中心的胶囊保持同一套视觉（颜色/内边距/圆角/字号） */
+.header-center-link { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: none; padding: 4px 8px; border-radius: 4px; background: #edf4fd; color: #6483a7; font-size: 11px; white-space: nowrap; }
+.header-center-link:hover,
+.header-member-center:focus-within .header-center-link { background: #e3eefc; color: #2e7cd6; }
+.header-center-caret { color: #93a4bb; font-size: 10px; line-height: 1; }
+.header-member-menu {
+  position: absolute; top: 100%; right: 0; z-index: 60;
+  min-width: 132px; padding: 6px 0;
+  background: #fff; border: 1px solid #e5ebf3; border-radius: 8px;
+  box-shadow: 0 12px 24px #132d521a;
+  opacity: 0; visibility: hidden; transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease, visibility .15s ease;
+}
+.header-member-center:hover .header-member-menu,
+.header-member-center:focus-within .header-member-menu {
+  opacity: 1; visibility: visible; transform: none;
+}
+.header-member-menu a { display: block; padding: 8px 14px; color: #3d4a66; font-size: 12px; white-space: nowrap; }
+.header-member-menu a:hover,
+.header-member-menu a:focus-visible { background: #f2f7fe; color: #2e7cd6; }
 .header-member-level { display: inline-block; flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6483a7; background: #edf4fd; padding: 4px 8px; border-radius: 4px; }
 .header-logout { flex: none; padding: 4px 0; background: none; border: 0; color: #8292a7; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .header-logout:hover { color: #2e7cd6; }

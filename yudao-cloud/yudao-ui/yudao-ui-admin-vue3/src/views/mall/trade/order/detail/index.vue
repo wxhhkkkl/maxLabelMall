@@ -4,6 +4,9 @@
     <el-descriptions title="订单信息">
       <el-descriptions-item label="订单号: ">{{ formData.no }}</el-descriptions-item>
       <el-descriptions-item label="买家: ">{{ formData?.user?.nickname }}</el-descriptions-item>
+      <el-descriptions-item label="用户手机号: ">
+        {{ formData?.user?.mobile || '—' }}
+      </el-descriptions-item>
       <el-descriptions-item v-if="formData.agentUserId" label="代下单人: ">
         {{ formData.agentUserName || `后台用户#${formData.agentUserId}` }}
         <span class="text-gray-500">（{{ formatDate(formData.createTime) }}）</span>
@@ -29,7 +32,7 @@
     </el-descriptions>
 
     <!-- 印刷定制（014）：不是定制单时不渲染；这里给的是**下单时的参数快照** -->
-    <el-descriptions v-if="formData.customizationDetail" :column="2" title="定制要求">
+    <el-descriptions v-if="formData.customizationDetail" class="od-section" :column="2" title="定制要求">
       <el-descriptions-item label="材质: ">
         {{ formData.customizationDetail.materialName }}
       </el-descriptions-item>
@@ -78,7 +81,7 @@
     </el-descriptions>
 
     <!-- 订单状态 -->
-    <el-descriptions :column="1" title="订单状态">
+    <el-descriptions class="od-section" :column="1" title="订单状态">
       <el-descriptions-item label="订单状态: ">
         <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
         <!-- 买家已删除（假删除）：C 端不可见，运营后台仍可见并在此标记 -->
@@ -101,6 +104,12 @@
       >
         <el-button v-if="canAgentAfterSale" type="warning" @click="agentAfterSale">
           代客发起售后
+        </el-button>
+      </el-descriptions-item>
+      <!-- 开票（006）：客户已在订单详情申请过才有入口；已开票给「重新上传发票」 -->
+      <el-descriptions-item v-hasPermi="['trade:order-invoice:issue']" label-class-name="no-colon">
+        <el-button v-if="invoiceAction" type="primary" @click="openInvoiceIssue">
+          {{ invoiceAction }}
         </el-button>
       </el-descriptions-item>
       <el-descriptions-item v-hasPermi="['trade:order:update']" label-class-name="no-colon">
@@ -167,7 +176,7 @@
       "凭哪笔流水、谁确认的、什么时候"，事后对账全靠这几行。
       ⚠️ `offlinePayment` 为 null 时整块不渲染（不是对公单）。
     -->
-    <el-descriptions v-if="formData.offlinePayment" :column="2" title="对公转账">
+    <el-descriptions v-if="formData.offlinePayment" class="od-section" :column="2" title="对公转账">
       <el-descriptions-item label="收款状态: ">
         <el-tag v-if="formData.offlineWaiting" type="warning">待收款</el-tag>
         <el-tag v-else type="success">已确认收款</el-tag>
@@ -191,7 +200,7 @@
     </el-descriptions>
 
     <!-- 商品信息 -->
-    <el-descriptions title="商品信息">
+    <el-descriptions class="od-section" title="商品信息">
       <el-descriptions-item labelClassName="no-colon">
         <el-row :gutter="20">
           <el-col :span="15">
@@ -262,7 +271,7 @@
     </el-descriptions>
 
     <!-- 物流信息 -->
-    <el-descriptions :column="4" title="收货信息">
+    <el-descriptions class="od-section" :column="4" title="收货信息">
       <el-descriptions-item label="配送方式: ">
         <dict-tag :type="DICT_TYPE.TRADE_DELIVERY_TYPE" :value="formData.deliveryType!" />
       </el-descriptions-item>
@@ -345,7 +354,7 @@
     </div>
 
     <!-- 订单日志 -->
-    <el-descriptions title="订单操作日志">
+    <el-descriptions class="od-section" title="订单操作日志">
       <el-descriptions-item labelClassName="no-colon">
         <el-timeline>
           <el-timeline-item
@@ -378,6 +387,7 @@
   <OrderUpdateAddressForm ref="updateAddressFormRef" @success="getDetail" />
   <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getDetail" />
   <OrderAgentAfterSaleForm ref="agentAfterSaleFormRef" @success="getDetail" />
+  <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getDetail" />
 </template>
 <script lang="ts" setup>
 import * as TradeOrderApi from '@/api/mall/trade/order'
@@ -390,6 +400,9 @@ import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineC
 import OrderUpdateAddressForm from '@/views/mall/trade/order/form/OrderUpdateAddressForm.vue'
 import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
 import OrderAgentAfterSaleForm from '@/views/mall/trade/order/form/OrderAgentAfterSaleForm.vue'
+import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
+import * as InvoiceApi from '@/api/mall/trade/invoice/index'
+import { orderInvoiceAction } from '@/utils/invoice'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { DeliveryTypeEnum, TradeOrderStatusEnum } from '@/utils/constants'
@@ -466,6 +479,23 @@ const updatePrice = () => {
 const offlineConfirmFormRef = ref()
 const confirmOfflinePaid = () => {
   offlineConfirmFormRef.value?.open(formData.value)
+}
+
+/** 开票（006）：客户已申请过发票时，详情页直接给「开票 / 重新上传发票」 */
+const invoiceIssueFormRef = ref()
+const invoiceAction = computed(() => orderInvoiceAction(formData.value.invoiceStatus))
+const openInvoiceIssue = async () => {
+  const page = await InvoiceApi.getInvoicePage({
+    pageNo: 1,
+    pageSize: 1,
+    orderNo: formData.value.no
+  })
+  const invoice = page.list?.find((item) => item.orderId === formData.value.id)
+  if (!invoice) {
+    message.warning('没有找到这笔订单的开票申请，请到「开票申请」页查看')
+    return
+  }
+  invoiceIssueFormRef.value?.open(invoice)
 }
 
 /** 代客发起售后（017） */
@@ -669,6 +699,12 @@ onMounted(async () => {
 :deep(.el-descriptions) {
   &:not(:nth-child(1)) {
     margin-top: 20px;
+  }
+
+  /* 模块之间加一条浅色分隔线（.od-section 只加在带标题的模块上） */
+  &.od-section {
+    padding-top: 20px;
+    border-top: 1px solid var(--el-border-color-lighter);
   }
 
   .el-descriptions__title {

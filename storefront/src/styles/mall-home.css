@@ -70,12 +70,14 @@
 .p-purchase-row { width: 100%; }
 .mall-floor-card .p-purchase-row { display: flex; gap: 8px; align-items: center; }
 .p-quantity { display: flex; flex: 0 0 76px; align-items: center; height: 30px; border: 1px solid #dce5f0; border-radius: 3px; overflow: hidden; }
-.p-quantity button { width: 22px; height: 100%; padding: 0; background: #fff; color: #6b809b; border: 0; cursor: pointer; }
+.p-quantity button { width: 22px; height: 100%; padding: 0; background: #fff; color: #6b809b; border: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .p-quantity button:disabled { color: #c2cbd7; cursor: default; }
 .p-quantity input { width: 30px; min-width: 0; height: 100%; padding: 0; text-align: center; border: 0; border-inline: 1px solid #edf1f7; color: #344d6a; font-size: 11px; appearance: textfield; -moz-appearance: textfield; }
 .p-quantity input::-webkit-inner-spin-button, .p-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
-.mall-page .mall-home .mall-floor-card .p-btn { flex: 1; min-width: 0; padding: 7px 2px; height: 30px; border-radius: 3px; font-size: 11px; background: white; border-color: #b7d4fa; white-space: nowrap; }
+.mall-page .mall-home .mall-floor-card .p-btn { display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 0; padding: 7px 2px; height: 30px; border-radius: 3px; font-size: 11px; background: white; border-color: #b7d4fa; white-space: nowrap; line-height: 1; }
 .mall-page .mall-home .mall-floor-card .p-btn:hover { color: #fff; background: #2e7cd6; }
+.mall-page .mall-home .mall-floor-card .p-btn-buy { background: #ed7443; border-color: #ed7443; color: #fff; }
+.mall-page .mall-home .mall-floor-card .p-btn-buy:hover { background: #d96536; border-color: #d96536; color: #fff; }
 .mall-consult-icon { width: 36px; height: 36px; color: #2e7cd6; }
 .mall-home-consult { display: flex; align-items: center; gap: 28px; padding: 24px 28px; margin-top: 28px; background: #eaf3ff; border-radius: 5px; }
 .mall-home-consult h2 { font-size: 16px; margin: 0 0 8px; }

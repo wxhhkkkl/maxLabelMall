@@ -96,6 +96,31 @@
 .mall-page .catalog-card .p-btn { margin: 0; width: 100%; border: 1px solid #dfebfb; border-radius: 7px; padding: 10px; background: #f2f7fe; color: #2e7cd6; font-size: 12px; cursor: pointer; }
 .mall-page .catalog-card .p-btn:hover { background: #2e7cd6; color: white; border-color: #2e7cd6; }
 .mall-page .catalog-card .p-btn:disabled { color: #a4adba; background: #f5f6f8; border-color: #edf0f4; cursor: default; }
+/* 商品卡片：数量选择 + 加入购物车 + 立即购买 */
+.mall-page .catalog-card .p-purchase-row { display: flex; gap: 8px; align-items: center; width: 100%; }
+.mall-page .catalog-card .p-quantity { display: flex; flex: 0 0 76px; align-items: center; height: 34px; border: 1px solid #dce5f0; border-radius: 4px; overflow: hidden; }
+.mall-page .catalog-card .p-quantity button { width: 22px; height: 100%; padding: 0; background: #fff; color: #6b809b; border: 0; cursor: pointer; }
+.mall-page .catalog-card .p-quantity button:disabled { color: #c2cbd7; cursor: default; }
+.mall-page .catalog-card .p-quantity input { width: 30px; min-width: 0; height: 100%; padding: 0; text-align: center; border: 0; border-inline: 1px solid #edf1f7; color: #344d6a; font-size: 11px; appearance: textfield; -moz-appearance: textfield; }
+.mall-page .catalog-card .p-quantity input::-webkit-inner-spin-button, .mall-page .catalog-card .p-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.mall-page .catalog-card .p-quantity button { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.mall-page .catalog-card .p-purchase-row .p-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 2px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.mall-page .catalog-card .p-btn-buy { background: #ed7443; border-color: #ed7443; color: #fff; }
+.mall-page .catalog-card .p-btn-buy:hover { background: #d96536; border-color: #d96536; color: #fff; }
+.mall-page .is-list .catalog-card .p-purchase-row { grid-column: 3; grid-row: 3; flex-wrap: wrap; gap: 6px; }
+.mall-page .is-list .catalog-card .p-purchase-row .p-quantity { flex: 0 0 100%; }
+.mall-page .is-list .catalog-card .p-purchase-row .p-btn { flex: 1 1 100%; }
 .mall-page .mall-grid.is-list { grid-template-columns: minmax(0, 1fr); }
 .mall-page .is-list .catalog-card { display: grid; grid-template-columns: 150px minmax(0, 1fr) 145px; gap: 0 24px; align-items: start; padding: 22px; }
 .mall-page .is-list .catalog-card .p-img-wrap, .mall-page .is-list .catalog-card .p-img { grid-column: 1; grid-row: 1 / 5; margin: 0; }
@@ -125,6 +150,7 @@
   .mall-page .is-list .catalog-card .p-img-wrap, .mall-page .is-list .catalog-card .p-img { grid-row: 1 / 6; }
   .mall-page .is-list .catalog-card .p-price-row { grid-column: 2; grid-row: 4; margin-top: 12px; }
   .mall-page .is-list .catalog-card .p-btn { grid-column: 2; grid-row: 5; max-width: 160px; }
+  .mall-page .is-list .catalog-card .p-purchase-row { grid-column: 2; grid-row: 5; }
 }
 @media (max-width: 768px) {
   .mall-page .mall-container { width: calc(100% - 32px); }

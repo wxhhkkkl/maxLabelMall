@@ -63,6 +63,13 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
         return page.getList().stream().map(TradeOrderDO::getId).toList();
     }
 
+    private List<Long> selectIdsByReceiverMobile(String receiverMobile) {
+        TradeOrderPageReqVO reqVO = new TradeOrderPageReqVO();
+        reqVO.setReceiverMobile(receiverMobile);
+        PageResult<TradeOrderDO> page = tradeOrderMapper.selectPage(reqVO, (java.util.Set<Long>) null);
+        return page.getList().stream().map(TradeOrderDO::getId).toList();
+    }
+
     private List<Long> selectIdsByAgentCreated(Boolean agentCreated) {
         TradeOrderPageReqVO reqVO = new TradeOrderPageReqVO();
         reqVO.setAgentCreated(agentCreated);
@@ -118,6 +125,21 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
                 TradeOrderStatusEnum.UNDELIVERED.getStatus());
 
         assertEquals(List.of(online.getId()), selectIdsByPayChannel(PayChannelEnum.WX_LITE.getCode(), null));
+    }
+
+    @Test
+    public void testSelectPage_receiverMobile_filter() {
+        TradeOrderDO target = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        TradeOrderDO other = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        // createOrder 的收件人手机固定为 13800008888；把 target 改成另一个号码
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(target.getId());
+        update.setReceiverMobile("13912345678");
+        tradeOrderMapper.updateById(update);
+
+        assertEquals(List.of(target.getId()), selectIdsByReceiverMobile("13912345678"));
+        assertEquals(List.of(other.getId()), selectIdsByReceiverMobile("13800008888"));
+        assertEquals(2, selectIdsByReceiverMobile("1380000").size() + selectIdsByReceiverMobile("1391234").size());
     }
 
     @Test

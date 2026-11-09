@@ -14,8 +14,8 @@
       </el-form-item>
       <el-form-item label="售后方式" prop="way">
         <el-radio-group v-model="form.way">
-          <el-radio :value="1">仅退款</el-radio>
-          <el-radio :value="2">退货退款</el-radio>
+          <el-radio :value="10">仅退款</el-radio>
+          <el-radio :value="20">退货退款</el-radio>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="退款金额" prop="refundPriceYuan">
@@ -69,7 +69,7 @@ const orderId = ref<number>()
 const items = ref<Array<{ id: number; spuName: string; payPrice?: number; afterSaleStatus?: number }>>([])
 const form = reactive({
   orderItemId: undefined as number | undefined,
-  way: 1,
+  way: 10, // AfterSaleWayEnum.REFUND：仅退款（退货退款 = 20）
   refundPriceYuan: 0,
   applyReason: '',
   applyDescription: '',
@@ -91,7 +91,7 @@ const open = (order: { id: number; items?: any[] }) => {
   orderId.value = order.id
   items.value = order.items || []
   form.orderItemId = items.value.find((item) => item.afterSaleStatus === 0)?.id
-  form.way = 1
+  form.way = 10
   form.refundPriceYuan = (items.value.find((item) => item.id === form.orderItemId)?.payPrice || 0) / 100
   form.applyReason = ''
   form.applyDescription = ''

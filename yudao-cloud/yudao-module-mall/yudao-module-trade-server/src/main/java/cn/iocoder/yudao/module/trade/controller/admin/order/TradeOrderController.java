@@ -197,6 +197,9 @@ public class TradeOrderController {
                 respVO.setPayChannelOrderNo(payOrder.getChannelOrderNo());
             }
         }
+        // 开票状态（006）：详情页据此显示「开票 / 重新上传发票」按钮
+        Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(Set.of(id));
+        respVO.setInvoiceStatus(invoiceStatusMap != null ? invoiceStatusMap.get(id) : null);
         // 对公转账信息（008）：待收款标记 + 确认痕迹（FR-205 的可追溯）
         buildOfflinePayment(respVO, order);
         // 印刷定制（014）：不是定制单时为 null

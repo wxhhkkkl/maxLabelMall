@@ -31,6 +31,9 @@ public class TradeOrderPageReqVO extends PageParam {
     @Mobile
     private String userMobile;
 
+    @Schema(description = "收货人手机号", example = "13800138000")
+    private String receiverMobile;
+
     @Schema(description = "配送方式", example = "1")
     private Integer deliveryType;
 

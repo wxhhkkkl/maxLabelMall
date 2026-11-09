@@ -114,7 +114,7 @@ async function onAdd(e: MouseEvent) {
     // 暂存意图 + 打开登录弹层（沿用全站唯一的入口）。
     // cartStore.add 在未登录时**不发请求**，只把意图记下来；登录成功后由
     // LoginDialog 调 flushPendingIntent() 自动补上（FR-015）。
-    await cartStore.add(skuId, props.floor ? quantity.value : 1)
+    await cartStore.add(skuId, props.floor || props.catalog ? quantity.value : 1)
     toast.warn('登录后将自动加入购物车')
     // 显式带 path：只给 query 时 router 会去匹配"当前位置"，在未匹配的页面上会抛错。
     // 另外导航失败（重复导航、被守卫中止）不该变成未处理的拒绝。
@@ -126,13 +126,59 @@ async function onAdd(e: MouseEvent) {
 
   // 已登录：真正加购，并刷新顶栏角标（角标数量来自后端 get-count，不是本地累加）
   try {
-    await cartStore.add(skuId, props.floor ? quantity.value : 1)
+    await cartStore.add(skuId, props.floor || props.catalog ? quantity.value : 1)
     toast.success('已加入购物车')
   } catch (e) {
     toast.error((e as { message?: string })?.message || '加入购物车失败，请重试')
     return
   }
   emit('add', props.spu)
+}
+
+/**
+ * 立即购买（FR-024）：只结算这一件商品与卡片上选择的数量，**不经过购物车**。
+ * 未登录时交给 `/checkout` 的 requiresAuth 守卫打开登录弹层（与商品详情页一致）。
+ */
+async function onBuyNow(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  if (!props.floor && !props.catalog) return
+  if (props.spu.stock <= 0) return
+  normalizeQuantity()
+
+  // 多规格商品：卡片上选不了规格，先去详情页
+  if (props.catalog && props.spu.specType) {
+    await router.push(`/product/${props.spu.id}`)
+    return
+  }
+
+  let skus = props.spu.skus ?? []
+  let specType = props.spu.specType
+  if (skus.length === 0) {
+    try {
+      const detail = await getProductDetail(props.spu.id)
+      skus = detail.skus ?? []
+      specType = detail.specType
+    } catch {
+      toast.error('立即购买失败，请重试')
+      return
+    }
+  }
+  if (specType && skus.length > 1) {
+    toast.warn('请先选择规格')
+    await router.push(`/product/${props.spu.id}`)
+    return
+  }
+  const skuId = skus[0]?.id
+  if (!skuId) {
+    toast.warn('请先选择规格')
+    await router.push(`/product/${props.spu.id}`)
+    return
+  }
+  await router.push({
+    path: '/checkout',
+    query: { source: 'product', skuId: String(skuId), count: String(quantity.value) },
+  })
 }
 </script>
 
@@ -204,12 +250,12 @@ async function onAdd(e: MouseEvent) {
 
     <div
       class="p-purchase-row"
-      :style="{ display: floor ? 'flex' : 'contents' }"
+      :style="{ display: floor || catalog ? 'flex' : 'contents' }"
     >
       <div
-        v-if="floor && !spu.specType && spu.stock > 0"
+        v-if="(floor || catalog) && !spu.specType && spu.stock > 0"
         class="p-quantity"
-        @click.stop
+        @click.stop.prevent
         @keydown.stop
       >
         <button
@@ -245,6 +291,14 @@ async function onAdd(e: MouseEvent) {
         @click="onAdd"
       >
         {{ catalog && spu.stock <= 0 ? '暂时缺货' : catalog && spu.specType ? '选择规格' : '加入购物车' }}
+      </button>
+      <button
+        v-if="(floor || catalog) && !spu.specType && spu.stock > 0"
+        class="p-btn p-btn-buy"
+        type="button"
+        @click="onBuyNow"
+      >
+        立即购买
       </button>
     </div>
   </RouterLink>

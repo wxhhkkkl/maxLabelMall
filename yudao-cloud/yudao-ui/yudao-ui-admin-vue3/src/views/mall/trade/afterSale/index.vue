@@ -199,7 +199,8 @@ const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   no: null,
-  status: '0',
+  // 默认进「申请售后」（10）：运营打开菜单先处理待审核的申请，而不是全部状态
+  status: '10',
   orderNo: null,
   spuName: null,
   createTime: [],

@@ -16,4 +16,7 @@ public class MemberUserRespVO {
     @Schema(description = "用户头像", example = "https://www.iocoder.cn/xxx.png")
     private String avatar;
 
+    @Schema(description = "用户手机号", example = "13800138000")
+    private String mobile;
+
 }

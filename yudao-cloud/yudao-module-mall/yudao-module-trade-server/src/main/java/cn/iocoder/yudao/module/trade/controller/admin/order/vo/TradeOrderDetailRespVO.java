@@ -34,6 +34,14 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
     private String payChannelOrderNo;
 
     /**
+     * 开票状态（006）：0 待开票 / 10 已开票 / 20 已作废；**未申请为 null**。
+     *
+     * 详情页据此显示「开票 / 重新上传发票」按钮。
+     */
+    @Schema(description = "开票状态：0 待开票，10 已开票，20 已作废；未申请为 null", example = "0")
+    private Integer invoiceStatus;
+
+    /**
      * 推广用户信息
      */
     private MemberUserRespVO brokerageUser;

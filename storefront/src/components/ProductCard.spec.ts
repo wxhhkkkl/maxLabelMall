@@ -28,6 +28,7 @@ const router = createRouter({
     { path: '/', component: { template: '<div/>' } },
     { path: '/mall', component: { template: '<div/>' } },
     { path: '/product/:id', component: { template: '<div/>' } },
+    { path: '/checkout', component: { template: '<div/>' } },
   ],
 })
 
@@ -180,6 +181,39 @@ describe('FR-026h —— 卡片上不得出现促销活动标签', () => {
 })
 
 describe('加购入口（随 US3 接线）', () => {
+  it('目录卡片支持数量选择与立即购买，不经购物车', async () => {
+    const w = mountCard({
+      spu: spu({ specType: false, stock: 5, skus: [sku(100)] }),
+      catalog: true
+    })
+    await w.get('[aria-label="增加购买数量"]').trigger('click')
+    const buy = w.findAll('.p-btn').find((button) => button.text().includes('立即购买'))
+    expect(buy).toBeTruthy()
+    await buy!.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/checkout')
+    expect(router.currentRoute.value.query).toMatchObject({
+      source: 'product',
+      skuId: '100',
+      count: '2'
+    })
+    expect(addToCart).not.toHaveBeenCalled()
+  })
+
+  it('点击数量输入框不会触发整卡跳转详情页', () => {
+    const w = mountCard({
+      spu: spu({ specType: false, stock: 5, skus: [sku(100)] }),
+      catalog: true,
+      floor: true
+    })
+    const input = w.get('.p-quantity input').element as HTMLInputElement
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    input.dispatchEvent(event)
+    // 卡片外层是 RouterLink；只 stop 不 prevent 时，<a> 的默认导航仍会发生
+    expect(event.defaultPrevented).toBe(true)
+  })
+
   it('楼层商品按选择数量加购，输入超库存数量时限制在现有库存内', async () => {
     const { setTokens } = await import('@/utils/auth')
     setTokens('at-1', 'rt-1')

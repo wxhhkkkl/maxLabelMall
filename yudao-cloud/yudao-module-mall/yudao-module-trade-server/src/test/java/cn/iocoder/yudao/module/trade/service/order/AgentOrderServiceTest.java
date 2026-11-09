@@ -155,6 +155,19 @@ public class AgentOrderServiceTest extends BaseMockitoUnitTest {
     }
 
     @Test
+    void settlementAllowsMissingAddressForPreview() {
+        when(memberUserApi.getUser(1L)).thenReturn(CommonResult.success(user(1L, CommonStatusEnum.ENABLE.getStatus())));
+        when(productSkuApi.getSkuMap(any())).thenReturn(Map.of(11L, sku(11L, 5L)));
+        when(productSpuApi.getSpuMap(any())).thenReturn(Map.of(5L, spu(5L, List.of(1))));
+        when(tradeOrderUpdateService.settlementOrder(anyLong(), any())).thenReturn(settlement(1, null));
+
+        // 预览没有地址也要返回，页面才能渲染地址选择卡片
+        AppTradeOrderSettlementRespVO resp = agentOrderService.settlement(settlementReq(1L, 11L, 1));
+        assertEquals(1, resp.getDeliveryType());
+        assertNull(resp.getAddress());
+    }
+
+    @Test
     void createExpressOrderWithoutAddressRejected() {
         when(memberUserApi.getUser(1L)).thenReturn(CommonResult.success(user(1L, CommonStatusEnum.ENABLE.getStatus())));
         when(productSkuApi.getSkuMap(any())).thenReturn(Map.of(11L, sku(11L, 5L)));

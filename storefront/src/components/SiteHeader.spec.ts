@@ -46,6 +46,9 @@ const router = createRouter({
     { path: '/solutions', component: { template: '<div/>' } },
     { path: '/support', component: { template: '<div/>' } },
     { path: '/account', component: { template: '<div/>' } },
+    { path: '/order', component: { template: '<div/>' } },
+    { path: '/account/address', component: { template: '<div/>' } },
+    { path: '/account/invoice', component: { template: '<div/>' } },
   ],
 })
 
@@ -226,6 +229,17 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     expect(w.get('.login').text()).toContain('138****8888')
     expect(w.get('.login').text()).not.toContain('张三')
     expect(w.get('.login').attributes('href')).toBe('/account')
+  })
+
+  it('个人中心下拉包含我的订单 / 收货地址 / 发票抬头', async () => {
+    const w = await mountLoggedIn()
+    const links = w.findAll('.header-member-menu a')
+    expect(links.map((link) => link.text())).toEqual(['我的订单', '收货地址', '发票抬头'])
+    expect(links.map((link) => link.attributes('href'))).toEqual([
+      '/order',
+      '/account/address',
+      '/account/invoice',
+    ])
   })
 
   it('**冷启动只带令牌也要渲染出用户名**（FR-013）—— 不能是空白入口', async () => {

@@ -63,6 +63,7 @@ export interface OrderVO {
     id?: number | null
     nickname?: string
     avatar?: string
+    mobile?: string | null
   }
   // 推广用户信息
   brokerageUser?: {

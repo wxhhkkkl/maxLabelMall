@@ -268,6 +268,16 @@ function isActive(name: string): boolean {
         >
           {{ userStore.headerLabel || '个人中心' }}
         </RouterLink>
+        <div class="header-member-center">
+          <RouterLink class="header-center-link" to="/account" title="个人中心">
+            个人中心<span class="header-center-caret" aria-hidden="true">▾</span>
+          </RouterLink>
+          <div class="header-member-menu" role="menu" aria-label="个人中心菜单">
+            <RouterLink to="/order" role="menuitem">我的订单</RouterLink>
+            <RouterLink to="/account/address" role="menuitem">收货地址</RouterLink>
+            <RouterLink to="/account/invoice" role="menuitem">发票抬头</RouterLink>
+          </div>
+        </div>
         <RouterLink
           class="header-member-level"
           to="/account/points"

@@ -56,6 +56,7 @@ vi.mock('@/utils/dict', () => ({
   getDictLabel: () => '',
   getDictObj: () => undefined
 }))
+vi.mock('@/utils/permission', () => ({ checkPermi: () => true }))
 // 字典标签会去后端拉字典；单测里不要真发请求
 vi.mock('@/config/axios', () => ({
   default: {
@@ -250,6 +251,16 @@ describe('后台订单详情 —— 用户已删除标记（假删除）', () =>
     const w = await mountDetail()
 
     expect(w.text()).not.toContain('用户已删除')
+  })
+})
+
+describe('后台订单详情 —— 买家信息', () => {
+  it('买家之后展示用户手机号', async () => {
+    const w = await mountDetail(
+      order({ user: { id: 1, nickname: '张三', mobile: '13800008888' } })
+    )
+    expect(w.text()).toContain('用户手机号')
+    expect(w.text()).toContain('13800008888')
   })
 })
 

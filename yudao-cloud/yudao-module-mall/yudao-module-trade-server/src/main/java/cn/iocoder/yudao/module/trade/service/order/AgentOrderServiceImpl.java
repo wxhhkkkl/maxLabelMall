@@ -66,10 +66,10 @@ public class AgentOrderServiceImpl implements AgentOrderService {
         validateCustomer(reqVO.getUserId());
         validateProducts(reqVO.getItems().stream().map(AdminAgentOrderSettlementReqVO.Item::getSkuId)
                 .collect(Collectors.toList()));
-        AppTradeOrderSettlementRespVO respVO = tradeOrderUpdateService.settlementOrder(
-                reqVO.getUserId(), buildSettlementReq(reqVO));
-        validateAddress(respVO);
-        return respVO;
+        // ⚠️ 预览**不校验地址**：没有默认地址时仍要返回 deliveryType/价格，
+        //    否则页面拿不到 settlement，就永远不渲染「收货地址」卡片，运营无处可选。
+        //    地址校验放到 create（真正提交）时做。
+        return tradeOrderUpdateService.settlementOrder(reqVO.getUserId(), buildSettlementReq(reqVO));
     }
 
     @Override

@@ -375,4 +375,9 @@ const openDetail = (id?: number | null) => {
 .order-table-col .cell {
   padding: 0 !important;
 }
+
+/* 两个订单之间留 10px 空隙（最后一个订单也会留，视觉上不贴底部） */
+.order-table-col .order-block {
+  margin-bottom: 10px;
+}
 </style>

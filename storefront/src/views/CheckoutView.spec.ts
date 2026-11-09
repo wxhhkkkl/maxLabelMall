@@ -317,6 +317,28 @@ describe('CheckoutView —— 券选择（FR-026a / FR-026b）', () => {
  * 早先这里从**结算响应**里按 cartId 反查 skuId —— 可第一次请求时响应还不存在，
  * 于是发出去的就是 `skuId=0`，后端直接拒。正确做法是先从购物车列表拿 skuId。
  */
+describe('CheckoutView —— 商品清单可改数量', () => {
+  it('改数量后重新结算，提交订单也带新数量', async () => {
+    const w = await mountCheckout(settlementResp(), { source: 'product', skuId: 100, count: 1 })
+
+    await w.get('[aria-label="增加购买数量"]').trigger('click')
+    await flushPromises()
+
+    const lastInput = settlement.mock.calls.at(-1)?.[0] as {
+      items: Array<{ skuId: number; count: number }>
+    }
+    expect(lastInput.items).toEqual([{ skuId: 100, count: 2 }])
+
+    await w.get('#submitOrder').trigger('click')
+    await flushPromises()
+
+    const order = createOrder.mock.calls[0]?.[0] as {
+      items: Array<{ skuId: number; count: number }>
+    }
+    expect(order.items).toEqual([{ skuId: 100, count: 2 }])
+  })
+})
+
 describe('CheckoutView —— 购物车来源的入参（FR-025 / FR-031）', () => {
   const CART_ITEM = {
     id: 5,

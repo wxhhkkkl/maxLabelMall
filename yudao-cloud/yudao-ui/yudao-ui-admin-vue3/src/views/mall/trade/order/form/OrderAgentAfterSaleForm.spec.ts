@@ -76,7 +76,7 @@ describe('OrderAgentAfterSaleForm（017）', () => {
     expect(agentCreate).toHaveBeenCalledTimes(1)
     expect(agentCreate).toHaveBeenCalledWith({
       orderItemId: 12,
-      way: 1,
+      way: 10,
       refundPrice: 7000,
       applyReason: '不想要了',
       applyDescription: undefined,

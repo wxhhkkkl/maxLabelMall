@@ -93,6 +93,14 @@ const couponId = ref<number | undefined>(undefined)
 /** 购物车来源下、被勾选的那几条（提供 skuId 与数量给结算请求） */
 const cartRows = ref<CartItem[]>([])
 
+/**
+ * 结算页上调整过的数量：按 skuId 覆盖来源数量。
+ *
+ * 购物车来源**不写回购物车** —— 下单后整条购物车项会被后端删除；
+ * 这里只影响本次结算/下单的数量。
+ */
+const editableCounts = ref<Record<number, number>>({})
+
 const couponPickerOpen = ref(false)
 const addressPickerOpen = ref(false)
 /** 「新增收货地址」弹层 —— **不跳转**，就地新增。跳走会让本页填的东西全丢 */
@@ -169,16 +177,82 @@ const itemCount = computed(() =>
  * skuId/count 来自**先从后端拉一次购物车**（见 bootstrap）——不能从结算响应里
  * 反查，因为**第一次请求时响应还不存在**，那样只会发出 `skuId=0`。
  */
+const countOf = (skuId: number, fallback: number) => editableCounts.value[skuId] ?? fallback
+
 function buildInput(): TradeOrderInput {
   const items =
     props.source === 'cart'
-      ? cartRows.value.map((i) => ({ cartId: i.id, skuId: i.sku.id, count: i.count }))
+      ? cartRows.value.map((i) => ({ cartId: i.id, skuId: i.sku.id, count: countOf(i.sku.id, i.count) }))
       : props.source === 'reorder'
         // 再次购买：订单列表把历史订单项的 skuId + count 带过来，不经购物车
-        ? (props.reorderItems ?? []).map((i) => ({ skuId: i.skuId, count: i.count }))
-        : [{ skuId: props.skuId ?? 0, count: props.count }]
+        ? (props.reorderItems ?? []).map((i) => ({ skuId: i.skuId, count: countOf(i.skuId, i.count) }))
+        : [{ skuId: props.skuId ?? 0, count: countOf(props.skuId ?? 0, props.count) }]
 
   return { items, addressId: addressId.value ?? undefined, couponId: couponId.value }
+}
+
+/** 先把「来源」的数量记下来（购物车 / 再次购买 / 立即购买），再交给 +/- 覆盖 */
+function seedCountsFromSource() {
+  const next = { ...editableCounts.value }
+  if (props.source === 'cart') {
+    for (const row of cartRows.value) {
+      next[row.sku.id] = next[row.sku.id] ?? row.count
+    }
+  } else if (props.source === 'reorder') {
+    for (const item of props.reorderItems ?? []) {
+      next[item.skuId] = next[item.skuId] ?? item.count
+    }
+  } else if (props.skuId) {
+    next[props.skuId] = next[props.skuId] ?? props.count
+  }
+  editableCounts.value = next
+}
+
+/** 首次结算响应回来后，把每个 skuId 的初始数量记下来，供 +/- 使用 */
+function ensureCounts() {
+  const next = { ...editableCounts.value }
+  let changed = false
+  for (const item of data.value?.items ?? []) {
+    if (next[item.skuId] === undefined) {
+      next[item.skuId] = item.count
+      changed = true
+    }
+  }
+  if (changed) editableCounts.value = next
+}
+
+const currentCount = (item: { skuId: number; count: number }) =>
+  countOf(item.skuId, item.count)
+
+/** 改数量并重新结算；失败时回滚，页面保持可编辑，不切到整页错误态 */
+async function changeCount(item: { skuId: number; count: number }, delta: number): Promise<boolean> {
+  const previous = { ...editableCounts.value }
+  const current = currentCount(item)
+  const next = Math.max(1, current + delta)
+  if (next === current) return true
+  editableCounts.value = { ...previous, [item.skuId]: next }
+  priceChangePending.value = false
+  try {
+    data.value = await settlement(buildInput())
+    ensureCounts()
+    return true
+  } catch (e) {
+    editableCounts.value = previous
+    toast.error((e as { message?: string })?.message || '该数量暂不可用，请调整')
+    return false
+  }
+}
+
+function onCountInput(item: { skuId: number; count: number }, event: Event) {
+  const input = event.target as HTMLInputElement
+  const parsed = Number(input.value)
+  const next = Math.max(1, Number.isFinite(parsed) ? Math.trunc(parsed) : 1)
+  input.value = String(next)
+  const diff = next - currentCount(item)
+  if (diff === 0) return
+  void changeCount(item, diff).then((ok) => {
+    if (!ok) input.value = String(currentCount(item))
+  })
 }
 
 /**
@@ -207,6 +281,7 @@ async function load() {
   } catch {
     error.value = true
   } finally {
+    ensureCounts()
     loading.value = false
   }
 }
@@ -332,6 +407,7 @@ async function bootstrap() {
   } catch {
     addresses.value = []
   }
+  seedCountsFromSource()
   await load()
 }
 
@@ -391,7 +467,7 @@ watch(
           </div>
         </div>
 
-        <!-- 商品清单（只读，不可改量） -->
+        <!-- 商品清单（可调整数量；数量变化会重新结算） -->
         <div class="ml-card">
           <div class="ml-card-title">商品清单（{{ itemCount }} 件）</div>
           <div v-for="item in data.items" :key="item.skuId" class="co-item">
@@ -408,7 +484,38 @@ watch(
               </div>
             </div>
             <div class="co-price">¥{{ (item.price / 100).toFixed(2) }}</div>
-            <div class="co-count">×{{ item.count }}</div>
+            <div class="co-count">
+              <template v-if="!submitting">
+                <button
+                  class="co-qty-btn"
+                  type="button"
+                  aria-label="减少购买数量"
+                  :disabled="currentCount(item) <= 1 || loading"
+                  @click.prevent="changeCount(item, -1)"
+                >
+                  −
+                </button>
+                <input
+                  class="co-qty-input"
+                  type="number"
+                  min="1"
+                  :value="currentCount(item)"
+                  :disabled="loading"
+                  :aria-label="`${item.spuName}购买数量`"
+                  @change="onCountInput(item, $event)"
+                >
+                <button
+                  class="co-qty-btn"
+                  type="button"
+                  aria-label="增加购买数量"
+                  :disabled="loading"
+                  @click.prevent="changeCount(item, 1)"
+                >
+                  ＋
+                </button>
+              </template>
+              <template v-else>×{{ item.count }}</template>
+            </div>
           </div>
         </div>
 
@@ -624,6 +731,36 @@ watch(
 .co-count {
   font-size: 14px;
   color: var(--ml-text-sub);
+  font-variant-numeric: tabular-nums;
+}
+.co-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.co-qty-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--ml-border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ml-text-sub);
+  cursor: pointer;
+}
+.co-qty-btn:disabled {
+  color: var(--ml-text-ph);
+  cursor: default;
+}
+.co-qty-input {
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  text-align: center;
+  border: 1px solid var(--ml-border);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--ml-text);
   font-variant-numeric: tabular-nums;
 }
 .addr-current .addr-line,

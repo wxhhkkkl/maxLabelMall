@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationO
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.customization.CustomizationOrderService;
+import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +53,8 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
     @Mock
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
     @Mock
+    private TradeOrderInvoiceService tradeOrderInvoiceService;
+    @Mock
     private CustomizationOrderService customizationOrderService;
     @Mock
     private MemberUserApi memberUserApi;
@@ -63,6 +67,7 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
         when(tradeOrderQueryService.getOrder(order.getId())).thenReturn(order);
         when(tradeOrderQueryService.getOrderItemListByOrderId(order.getId())).thenReturn(Collections.emptyList());
         when(memberUserApi.getUser(anyLong())).thenReturn(CommonResult.success(new MemberUserRespDTO()));
+        when(tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(any())).thenReturn(Collections.emptyMap());
     }
 
     private TradeOrderDO order(boolean customization) {
@@ -90,6 +95,16 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
         TradeOrderDetailRespVO result = controller.getOrderDetail(1001L).getData();
         assertEquals(9L, result.getAgentUserId());
         assertEquals("运营小王", result.getAgentUserName());
+    }
+
+    @Test
+    public void testGetOrderDetail_invoiceStatus() {
+        TradeOrderDO order = order(false);
+        mockOrder(order);
+        when(tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(any())).thenReturn(Map.of(1001L, 0));
+
+        TradeOrderDetailRespVO result = controller.getOrderDetail(1001L).getData();
+        assertEquals(0, result.getInvoiceStatus());
     }
 
     @Test

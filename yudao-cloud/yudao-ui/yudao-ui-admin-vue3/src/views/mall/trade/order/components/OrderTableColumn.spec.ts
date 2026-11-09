@@ -162,6 +162,20 @@ describe('后台订单列表 —— 各列的信息落位', () => {
     expect(w.findAll('.order-amount-origin')[0].text()).toBe('300.00元')
   })
 
+  it('代客订单在会员列下方显示代下单人；自助单不显示（017）', async () => {
+    const w = mountTable([
+      order({ agentUserId: 9, agentUserName: '运营小王' }),
+      order({ id: 2, agentUserId: 10, agentUserName: null }),
+      order({ id: 3 })
+    ])
+    await flushPromises()
+
+    const text = w.text()
+    expect(text).toContain('代下单：运营小王')
+    expect(text).toContain('代下单：后台用户#10')
+    expect(text.match(/代下单：/g)?.length).toBe(2)
+  })
+
   it('会员：昵称 + 用户编号', async () => {
     const w = mountTable([order({ user: { id: 5595975, nickname: '杨锋' } })])
     await flushPromises()

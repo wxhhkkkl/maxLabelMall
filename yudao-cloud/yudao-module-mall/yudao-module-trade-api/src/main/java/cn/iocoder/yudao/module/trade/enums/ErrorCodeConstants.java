@@ -169,4 +169,17 @@ public interface ErrorCodeConstants {
     ErrorCode CUSTOMIZATION_PRICE_CHANGED = new ErrorCode(1_011_011_005, "价格已更新，请确认后重新提交");
     ErrorCode CUSTOMIZATION_ORDER_SUBMIT_TOO_FAST = new ErrorCode(1_011_011_006, "请勿重复提交，请稍后再试");
 
+    // ========== 代客下单 1-011-012-000 ==========
+    ErrorCode AGENT_ORDER_CUSTOMER_NOT_FOUND = new ErrorCode(1_011_012_000, "目标客户不存在");
+    ErrorCode AGENT_ORDER_CUSTOMER_DISABLED = new ErrorCode(1_011_012_001, "目标客户已被禁用，无法代客下单");
+    ErrorCode AGENT_ORDER_PICKUP_NOT_SUPPORTED = new ErrorCode(1_011_012_002, "该商品仅支持门店自提，暂不支持代客下单");
+    ErrorCode AGENT_ORDER_CHANNEL_NOT_SUPPORTED = new ErrorCode(1_011_012_003, "代客下单仅支持微信扫码、支付宝扫码与对公转账");
+    ErrorCode AGENT_ORDER_PAY_FAIL_NOT_AGENT_ORDER = new ErrorCode(1_011_012_004, "该订单不是代客订单，无法在后台发起支付");
+    ErrorCode AGENT_ORDER_PAY_FAIL_STATUS = new ErrorCode(1_011_012_005, "订单当前状态不可发起支付");
+    ErrorCode AGENT_ORDER_CANCEL_NOT_SUPPORTED = new ErrorCode(1_011_012_006, "代客订单不支持客户自行取消，请联系客服");
+    ErrorCode AGENT_ORDER_AFTER_SALE_NOT_SUPPORTED = new ErrorCode(1_011_012_007, "代客订单不支持客户自助退款，请联系客服处理");
+    ErrorCode AGENT_AFTER_SALE_FAIL_NOT_AGENT_ORDER = new ErrorCode(1_011_012_008, "仅代客订单可由运营代客户发起售后");
+    ErrorCode AGENT_ORDER_CUSTOMIZATION_NOT_SUPPORTED = new ErrorCode(1_011_012_009, "印刷定制商品不支持代客下单，请让客户在 C 端使用定制向导");
+    ErrorCode AGENT_ORDER_ADDRESS_REQUIRED = new ErrorCode(1_011_012_010, "请选择客户的收货地址；客户没有地址时，请先在 C 端添加");
+
 }

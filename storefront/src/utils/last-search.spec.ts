@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  clearSearchHistory,
   getLastSearchKeyword,
   getSearchHistory,
   LAST_SEARCH_KEY,
@@ -39,6 +40,19 @@ describe('last-search —— 上次搜索关键词的本地存取', () => {
   })
 
   it('从没搜过时返回空串（调用方据此显示默认提示）', () => {
+    expect(getLastSearchKeyword()).toBe('')
+  })
+
+  it('清空历史搜索时，列表与「上次搜索」一起清 —— 否则历史会从旧 key 里冒回来', () => {
+    saveLastSearchKeyword('碳带')
+    saveLastSearchKeyword('热敏纸')
+    expect(getSearchHistory()).toEqual(['热敏纸', '碳带'])
+
+    clearSearchHistory()
+
+    expect(window.localStorage.getItem(SEARCH_HISTORY_KEY)).toBeNull()
+    expect(window.localStorage.getItem(LAST_SEARCH_KEY)).toBeNull()
+    expect(getSearchHistory()).toEqual([])
     expect(getLastSearchKeyword()).toBe('')
   })
 

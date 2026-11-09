@@ -109,26 +109,61 @@ public class AfterSaleServiceImpl implements AfterSaleService {
     @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.MEMBER_CREATE)
     public Long createAfterSale(Long userId, AppAfterSaleCreateReqVO createReqVO) {
         // 第一步，前置校验
-        TradeOrderItemDO tradeOrderItem = validateOrderItemApplicable(userId, createReqVO);
+        TradeOrderItemDO tradeOrderItem = validateOrderItemApplicable(userId, createReqVO, false);
 
         // 第二步，存储售后订单
         AfterSaleDO afterSale = createAfterSale(createReqVO, tradeOrderItem);
         return afterSale.getId();
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AfterSaleLog(operateType = AfterSaleOperateTypeEnum.ADMIN_AGENT_CREATE)
+    public Long createAfterSaleByAdmin(Long operatorUserId, AppAfterSaleCreateReqVO createReqVO) {
+        // 1. 后台入口：先按 id 取订单项与订单（不按会员过滤）
+        TradeOrderItemDO orderItem = tradeOrderQueryService.getOrderItem(createReqVO.getOrderItemId());
+        if (orderItem == null) {
+            throw exception(ORDER_ITEM_NOT_FOUND);
+        }
+        TradeOrderDO order = tradeOrderQueryService.getOrder(orderItem.getOrderId());
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        // 2. 只允许代客订单
+        if (order.getAgentUserId() == null) {
+            throw exception(AGENT_AFTER_SALE_FAIL_NOT_AGENT_ORDER);
+        }
+        // 3. 复用其余校验；allowAgentOrder=true 跳过用户端三类退款守卫
+        validateOrderItemApplicable(orderItem, order, createReqVO, true);
+        return createAfterSale(createReqVO, orderItem).getId();
+    }
+
     /**
-     * 校验交易订单项是否可以申请售后
-     *
-     * @param userId      用户编号
-     * @param createReqVO 售后创建信息
-     * @return 交易订单项
+     * 校验交易订单项是否可以申请售后（会员入口）
      */
-    private TradeOrderItemDO validateOrderItemApplicable(Long userId, AppAfterSaleCreateReqVO createReqVO) {
+    private TradeOrderItemDO validateOrderItemApplicable(Long userId, AppAfterSaleCreateReqVO createReqVO,
+                                                         boolean allowAgentOrder) {
         // 校验订单项存在
         TradeOrderItemDO orderItem = tradeOrderQueryService.getOrderItem(userId, createReqVO.getOrderItemId());
         if (orderItem == null) {
             throw exception(ORDER_ITEM_NOT_FOUND);
         }
+        // 校验订单存在
+        TradeOrderDO order = tradeOrderQueryService.getOrder(userId, orderItem.getOrderId());
+        if (order == null) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        return validateOrderItemApplicable(orderItem, order, createReqVO, allowAgentOrder);
+    }
+
+    /**
+     * 校验交易订单项是否可以申请售后（共享逻辑）
+     *
+     * `allowAgentOrder=true` 仅用于后台代客售后：跳过「用户端不允许退款」的三类守卫；
+     * 其余校验（重复申请、金额上限、已支付、退货需已发货、拼团）一律保留。
+     */
+    private TradeOrderItemDO validateOrderItemApplicable(TradeOrderItemDO orderItem, TradeOrderDO order,
+                                                         AppAfterSaleCreateReqVO createReqVO, boolean allowAgentOrder) {
         // 已申请售后，不允许再发起售后申请
         if (!TradeOrderItemAfterSaleStatusEnum.isNone(orderItem.getAfterSaleStatus())) {
             throw exception(AFTER_SALE_CREATE_FAIL_ORDER_ITEM_APPLIED);
@@ -137,18 +172,16 @@ public class AfterSaleServiceImpl implements AfterSaleService {
         if (createReqVO.getRefundPrice() > orderItem.getPayPrice()) {
             throw exception(AFTER_SALE_CREATE_FAIL_REFUND_PRICE_ERROR);
         }
-
-        // 校验订单存在
-        TradeOrderDO order = tradeOrderQueryService.getOrder(userId, orderItem.getOrderId());
-        if (order == null) {
-            throw exception(ORDER_NOT_FOUND);
+        // 代客订单：会员侧不允许退款（Q126/Q131）；后台代客入口放行
+        if (order.getAgentUserId() != null && !allowAgentOrder) {
+            throw exception(AGENT_ORDER_AFTER_SALE_NOT_SUPPORTED);
         }
-        // 企业授权订单：用户端不允许退款（Q79）。运营后台的人工退款不经过本方法，仍然保留。
-        if (order.getMaxlabelOrgId() != null) {
+        // 企业授权订单：用户端不允许退款（Q79）。后台代客入口放行。
+        if (!allowAgentOrder && order.getMaxlabelOrgId() != null) {
             throw exception(ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED);
         }
-        // 个人会员订阅订单：同样不允许用户端退款（2026-10-27）。后台人工退款保留。
-        if (Boolean.TRUE.equals(order.getMaxlabelSubscription())) {
+        // 个人会员订阅订单：同样不允许用户端退款（2026-10-27）。后台代客入口放行。
+        if (!allowAgentOrder && Boolean.TRUE.equals(order.getMaxlabelSubscription())) {
             throw exception(SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED);
         }
         // TODO 芋艿：超过一定时间，不允许售后

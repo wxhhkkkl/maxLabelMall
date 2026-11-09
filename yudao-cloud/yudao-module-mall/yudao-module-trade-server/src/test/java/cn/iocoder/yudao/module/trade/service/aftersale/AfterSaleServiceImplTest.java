@@ -20,10 +20,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.AGENT_AFTER_SALE_FAIL_NOT_AGENT_ORDER;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.AGENT_ORDER_AFTER_SALE_NOT_SUPPORTED;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -80,6 +83,49 @@ public class AfterSaleServiceImplTest extends BaseDbUnitTest {
         ServiceException exception = assertThrows(ServiceException.class,
                 () -> afterSaleService.createAfterSale(3L, request()));
         assertEquals(SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED.getCode(), exception.getCode());
+    }
+
+    @Test
+    void agentOrderRefundRejectedForMember() {
+        when(tradeOrderQueryService.getOrderItem(3L, 1L)).thenReturn(
+                item(1L, 2L, 1000, TradeOrderItemAfterSaleStatusEnum.NONE.getStatus()));
+        // 订单：代客下单快照 → 会员侧退款拒绝（017 / Q126）
+        when(tradeOrderQueryService.getOrder(3L, 2L)).thenReturn(
+                TradeOrderDO.builder().id(2L).userId(3L).agentUserId(1L).build());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> afterSaleService.createAfterSale(3L, request()));
+        assertEquals(AGENT_ORDER_AFTER_SALE_NOT_SUPPORTED.getCode(), exception.getCode());
+    }
+
+    @Test
+    void agentAfterSaleRejectsSelfOrder() {
+        when(tradeOrderQueryService.getOrderItem(1L)).thenReturn(
+                item(1L, 2L, 1000, TradeOrderItemAfterSaleStatusEnum.NONE.getStatus()));
+        // 客户自助订单：不能走后台代客售后入口
+        when(tradeOrderQueryService.getOrder(2L)).thenReturn(
+                TradeOrderDO.builder().id(2L).userId(3L).build());
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> afterSaleService.createAfterSaleByAdmin(9L, request()));
+        assertEquals(AGENT_AFTER_SALE_FAIL_NOT_AGENT_ORDER.getCode(), exception.getCode());
+    }
+
+    @Test
+    void agentAfterSaleAllowsAgentOrder() {
+        TradeOrderItemDO item = item(1L, 2L, 1000, TradeOrderItemAfterSaleStatusEnum.NONE.getStatus());
+        item.setUserId(3L);
+        when(tradeOrderQueryService.getOrderItem(1L)).thenReturn(item);
+        TradeOrderDO order = TradeOrderDO.builder().id(2L).userId(3L).agentUserId(9L)
+                .status(cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum.UNDELIVERED.getStatus())
+                .payStatus(true).build();
+        when(tradeOrderQueryService.getOrder(2L)).thenReturn(order);
+        when(tradeOrderQueryService.getOrder(3L, 2L)).thenReturn(order);
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-AGENT-AS");
+
+        // 后台代客入口跳过用户端守卫，不应抛「代客订单不支持退款」
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                () -> afterSaleService.createAfterSaleByAdmin(9L, request()));
     }
 
     private static TradeOrderItemDO item(Long id, Long orderId, Integer payPrice, Integer afterSaleStatus) {

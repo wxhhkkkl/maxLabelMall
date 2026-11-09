@@ -42,6 +42,12 @@
           <el-option label="仅看普通单" :value="false" />
         </el-select>
       </el-form-item>
+      <el-form-item label="下单方式" prop="agentCreated">
+        <el-select v-model="queryParams.agentCreated" class="!w-280px" clearable placeholder="全部">
+          <el-option label="仅代客下单" :value="true" />
+          <el-option label="仅客户自助" :value="false" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="创建时间" prop="createTime">
         <el-date-picker
           v-model="queryParams.createTime"
@@ -167,6 +173,14 @@
           <Icon class="mr-5px" icon="ep:refresh" />
           重置
         </el-button>
+        <el-button
+          v-hasPermi="['trade:order:agent-create']"
+          type="success"
+          @click="openAgentCreate"
+        >
+          <Icon class="mr-5px" icon="ep:plus" />
+          代客下单
+        </el-button>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -233,6 +247,15 @@
                     确认收款
                   </el-dropdown-item>
                   <!--
+                    开票（006 / 2026-11-05）：只对**客户已在订单详情申请过**的订单出现
+                    （待开票 → 开票；已开票 → 重新上传）。
+                    点开是弹层，**不离开列表页**；上传成功后刷新列表，状态由后端改为已开票。
+                  -->
+                  <el-dropdown-item v-if="canIssueOrderInvoice(row)" command="invoice">
+                    <Icon icon="ep:tickets" />
+                    {{ orderInvoiceAction(row.invoiceStatus) }}
+                  </el-dropdown-item>
+                  <!--
                     取消订单（008 / FR-213）：只能取消**未支付**订单；
                     已支付（含已确认收款）的要走**退款**，取消不改金额、账对不上。
                   -->
@@ -267,6 +290,7 @@
   <OrderDeliveryForm ref="deliveryFormRef" @success="getList" />
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getList" />
   <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getList" />
+  <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getList" />
 </template>
 
 <script lang="ts" setup>
@@ -274,7 +298,10 @@ import type { FormInstance } from 'element-plus'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
+import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
 import * as TradeOrderApi from '@/api/mall/trade/order'
+import * as InvoiceApi from '@/api/mall/trade/invoice/index'
+import { orderInvoiceAction } from '@/utils/invoice'
 import * as PickUpStoreApi from '@/api/mall/trade/delivery/pickUpStore'
 import { DICT_TYPE, getIntDictOptions, getStrDictOptions } from '@/utils/dict'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
@@ -329,6 +356,7 @@ const queryParams = ref({
   statuses: tabStatuses(DEFAULT_TAB), // 订单状态（标签页多选）
   payChannelCode: undefined, // 支付方式
   customization: undefined, // 是否定制订单（014）
+  agentCreated: undefined, // 是否代客下单（017）
   createTime: undefined, // 创建时间
   terminal: undefined, // 订单来源
   type: undefined, // 订单类型
@@ -421,6 +449,7 @@ const resetQuery = () => {
     statuses: tabStatuses(activeTab.value), // 订单状态（标签页多选）
     payChannelCode: undefined, // 支付方式
     customization: undefined, // 是否定制订单（014）
+    agentCreated: undefined, // 是否代客下单（017）
     createTime: undefined, // 创建时间
     terminal: undefined, // 订单来源
     type: undefined, // 订单类型
@@ -437,10 +466,39 @@ const openDetail = (id: number) => {
   push({ name: 'TradeOrderDetail', params: { id } })
 }
 
+/** 代客下单（017） */
+const openAgentCreate = () => {
+  push({ name: 'TradeOrderAgentCreate' })
+}
+
 /** 操作分发 */
 const deliveryFormRef = ref()
 const updateRemarkForm = ref()
 const offlineConfirmFormRef = ref() // 确认收款弹层（008）
+const invoiceIssueFormRef = ref() // 开票上传弹层（006）
+
+/**
+ * 能不能在这行上「开票」（006）
+ *
+ * 只对**客户已经提交过申请**的订单出现：待开票 → 开票，已开票 → 重新上传（Q31）。
+ * 没申请（null）和已作废（退款 / 取消，Q30）都不出现。
+ * ⚠️ 上传弹层自身的权限由 `trade:order-invoice:issue` 把关（接口也有 @PreAuthorize），
+ * 这里先挡一道，避免把"点了必被拒"的入口给没有权限的人。
+ */
+const canIssueOrderInvoice = (row: TradeOrderApi.OrderVO) =>
+  orderInvoiceAction(row.invoiceStatus) !== null && checkPermi(['trade:order-invoice:issue'])
+
+/** 打开开票上传弹层：先按订单号把申请取回来，**不离开列表页** */
+const openInvoiceIssue = async (row: TradeOrderApi.OrderVO) => {
+  const page = await InvoiceApi.getInvoicePage({ pageNo: 1, pageSize: 1, orderNo: row.no })
+  const invoice = page.list?.find((item) => item.orderId === row.id)
+  if (!invoice) {
+    // 列表状态与申请不一致时（极少见）给个去处，别让人点了没反应
+    message.warning('没有找到这笔订单的开票申请，请到「开票申请」页查看')
+    return
+  }
+  invoiceIssueFormRef.value?.open(invoice)
+}
 
 /**
  * 能不能在这行上「确认收款」（008 / FR-203）
@@ -484,6 +542,9 @@ const handleCommand = (command: string, row: TradeOrderApi.OrderVO) => {
       break
     case 'confirmOfflinePaid':
       offlineConfirmFormRef.value?.open(row)
+      break
+    case 'invoice':
+      openInvoiceIssue(row)
       break
     case 'cancel':
       cancelOrder(row)

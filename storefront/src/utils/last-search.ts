@@ -77,6 +77,23 @@ export function saveLastSearchKeyword(keyword: string): void {
   }
 }
 
+/**
+ * 清空历史搜索（列表 + 上一次搜索）。下拉里的垃圾桶按钮调用。
+ *
+ * ⚠️ 两个 key 都要清：`getSearchHistory()` 在没有列表时会回退到
+ * `LAST_SEARCH_KEY`，只清列表会让「历史」立刻又冒出来一条。
+ */
+export function clearSearchHistory(): void {
+  const storage = store()
+  if (!storage) return
+  try {
+    storage.removeItem(SEARCH_HISTORY_KEY)
+    storage.removeItem(LAST_SEARCH_KEY)
+  } catch {
+    // 隐私模式 / 被禁用：清不掉也不影响搜索
+  }
+}
+
 function dedupe(values: string[]): string[] {
   const seen = new Set<string>()
   return values.filter((value) => {

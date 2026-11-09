@@ -107,4 +107,11 @@ public class AppTradeOrderPageItemRespVO {
     @Schema(description = "是否可以再次购买（仅普通商品单）", example = "true")
     private Boolean canReorder;
 
+    /**
+     * 是否客服代下单（2026-11-06）。为 true 时列表显示「客服代下单」标签；
+     * 不暴露代下单的运营身份。
+     */
+    @Schema(description = "是否客服代下单", example = "false")
+    private Boolean agentCreated;
+
 }

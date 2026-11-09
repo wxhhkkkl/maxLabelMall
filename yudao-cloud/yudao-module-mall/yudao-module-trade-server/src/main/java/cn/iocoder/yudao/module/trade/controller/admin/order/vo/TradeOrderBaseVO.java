@@ -32,6 +32,9 @@ public class TradeOrderBaseVO {
     @Schema(description = "用户编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "2048")
     private Long userId;
 
+    @Schema(description = "代客下单的后台用户编号；NULL = 客户自助", example = "1")
+    private Long agentUserId;
+
     @Schema(description = "用户 IP", requiredMode = Schema.RequiredMode.REQUIRED, example = "127.0.0.1")
     private String userIp;
 

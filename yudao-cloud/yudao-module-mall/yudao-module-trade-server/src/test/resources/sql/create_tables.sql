@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "type"                    int      NOT NULL,
     "terminal"                int      NOT NULL,
     "user_id"                 bigint   NOT NULL,
+    "agent_user_id"           bigint   NULL,
     "user_ip"                 varchar  NOT NULL,
     "user_remark"             varchar,
     "maxlabel_org_id"         bigint   NULL,

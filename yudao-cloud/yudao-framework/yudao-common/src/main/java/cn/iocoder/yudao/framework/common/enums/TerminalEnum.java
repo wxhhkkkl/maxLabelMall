@@ -20,6 +20,7 @@ public enum TerminalEnum implements ArrayValuable<Integer> {
     WECHAT_WAP(11, "微信公众号"),
     H5(20, "H5 网页"),
     APP(31, "手机 App"),
+    ADMIN_AGENT(40, "后台代客"),
     ;
 
     public static final Integer[] ARRAYS = Arrays.stream(values()).map(TerminalEnum::getTerminal).toArray(Integer[]::new);

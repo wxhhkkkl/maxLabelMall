@@ -34,6 +34,15 @@ specs/016-shared-content-space/plan.md
 `sql/mysql/032-order-user-delete.sql`；本次发版漏跑该脚本，导致 `/app-api/trade/order/page` 报
 `Unknown column` → 500，已补跑。以后凡是后端引用了新列，必须把对应 ALTER 脚本纳入发版顺序。
 
+当前特性（017 代客下单：管理端运营以客户名义下单）：
+- specs/017-agent-order/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/017-agent-order/contracts/{admin-api,app-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/036-agent-order.sql`（`trade_order.agent_user_id` + 来源字典
+  「后台代客/40」+ 两个权限点 `trade:order:agent-create` / `trade:after-sale:agent-create`），
+  再发后端，最后发管理端 / 门面站；漏跑 SQL 会导致订单列表 500（Unknown column）。
+  📌 口径：微信扫码/支付宝扫码走真实在线支付 + 对公转账；排除印刷定制/门店自提；不用券不抵积分；
+  所有代客订单禁客户自助取消/退款，运营后台可代发起售后；C 端显示「客服代下单」标识
+
 上一个特性（015 发货前修改收货地址：仅待发货，从地址簿选）：
 - specs/015-order-address-edit/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/015-order-address-edit/contracts/app-api.md

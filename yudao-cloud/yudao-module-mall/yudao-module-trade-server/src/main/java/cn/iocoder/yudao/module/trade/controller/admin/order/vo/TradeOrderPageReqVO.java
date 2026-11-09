@@ -74,4 +74,7 @@ public class TradeOrderPageReqVO extends PageParam {
     @Schema(description = "是否定制订单：true 只看定制单；不传 = 全部", example = "true")
     private Boolean customization;
 
+    @Schema(description = "是否代客下单：true 只看代客单；false 只看客户自助；不传 = 全部", example = "true")
+    private Boolean agentCreated;
+
 }

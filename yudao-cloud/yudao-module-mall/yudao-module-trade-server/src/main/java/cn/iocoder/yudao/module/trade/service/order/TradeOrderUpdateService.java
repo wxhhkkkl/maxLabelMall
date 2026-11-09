@@ -45,6 +45,18 @@ public interface TradeOrderUpdateService {
     TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO);
 
     /**
+     * 【管理员】代客创建交易订单（017）
+     *
+     * 与会员下单共用同一段计价/落库逻辑，额外写 `agent_user_id` 与来源「后台代客」。
+     *
+     * @param operatorUserId 代下单的后台用户编号
+     * @param customerUserId 目标客户编号
+     * @param createReqVO    创建请求（券/积分已由调用方关闭）
+     * @return 交易订单
+     */
+    TradeOrderDO createOrderByAdmin(Long operatorUserId, Long customerUserId, AppTradeOrderCreateReqVO createReqVO);
+
+    /**
      * 更新交易订单已支付
      *
      * @param id         交易订单编号

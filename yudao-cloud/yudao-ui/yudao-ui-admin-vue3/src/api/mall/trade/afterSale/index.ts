@@ -92,3 +92,8 @@ export const refuse = async (id: any) => {
 export const refund = async (id: any) => {
   return await request.put({ url: `/trade/after-sale/refund?id=${id}` })
 }
+
+// 代客发起售后（017）：仅代客订单，需 trade:after-sale:agent-create 权限
+export const agentCreate = async (data: any) => {
+  return await request.post({ url: '/trade/after-sale/agent-create', data })
+}

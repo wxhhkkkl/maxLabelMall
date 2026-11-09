@@ -252,3 +252,22 @@ describe('后台订单详情 —— 用户已删除标记（假删除）', () =>
     expect(w.text()).not.toContain('用户已删除')
   })
 })
+
+describe('后台订单详情 —— 付款方式与交易单号', () => {
+  it('微信/支付宝在线支付显示第三方交易单号', async () => {
+    const w = await mountDetail(
+      order({ payChannelCode: 'wx_lite', payChannelOrderNo: '4200001234202601011234567890' })
+    )
+
+    expect(w.text()).toContain('交易单号')
+    expect(w.text()).toContain('4200001234202601011234567890')
+  })
+
+  it('对公转账不显示交易单号（流水号在收款信息里）', async () => {
+    const w = await mountDetail(
+      order({ payChannelCode: 'offline', payChannelOrderNo: 'OFFLINE-1' })
+    )
+
+    expect(w.text()).not.toContain('交易单号')
+  })
+})

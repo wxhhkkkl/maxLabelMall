@@ -211,6 +211,8 @@ onMounted(load)
         <div v-for="o in list" :key="o.id" class="p-card order-card">
           <div class="oc-head">
             <span class="oc-no">订单号 {{ o.no }}</span>
+            <!-- 客服代下单（017）：中性标识，不暴露运营身份 -->
+            <span v-if="o.agentCreated" class="oc-agent-tag">客服代下单</span>
             <span class="oc-time">{{ formatDateTime(o.createTime) }}</span>
             <!-- 开票状态（006 / FR-178）：**未申请时什么都不显示**（后端给的是 null）；
                  票种（011）显示在状态下面 -->
@@ -278,8 +280,9 @@ onMounted(load)
             >
               立即支付
             </button>
+            <!-- 代客订单不允许客户自行取消（017 / Q131）：后端也会拒绝 -->
             <button
-              v-if="o.status === OrderStatus.UNPAID"
+              v-if="o.status === OrderStatus.UNPAID && !o.agentCreated"
               class="btn-cart cancel-order"
               type="button"
               @click="askCancel(o)"
@@ -498,5 +501,14 @@ onMounted(load)
   .oc-total-label { flex: 1; }
   .oc-foot .btn-cart { font-size: 12px; padding: 8px 12px; }
   .oc-actions { flex-basis: 100%; }
+}
+/* 客服代下单（017）：中性标识，不暴露运营身份 */
+.oc-agent-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eaf1ff;
+  color: #2e7cd6;
+  font-size: 12px;
 }
 </style>

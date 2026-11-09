@@ -10,6 +10,7 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.spring.SpringUtil;
+import cn.iocoder.yudao.framework.common.enums.TerminalEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.number.MoneyUtils;
@@ -227,6 +228,23 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Transactional(rollbackFor = Exception.class)
     @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.MEMBER_CREATE)
     public TradeOrderDO createOrder(Long userId, AppTradeOrderCreateReqVO createReqVO) {
+        return createOrder0(userId, createReqVO, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.ADMIN_AGENT_CREATE)
+    public TradeOrderDO createOrderByAdmin(Long operatorUserId, Long customerUserId,
+                                           AppTradeOrderCreateReqVO createReqVO) {
+        return createOrder0(customerUserId, createReqVO, operatorUserId);
+    }
+
+    /**
+     * 会员 / 管理端代客下单共用同一段落库逻辑
+     *
+     * @param agentUserId 代下单的后台用户；会员下单为 null
+     */
+    private TradeOrderDO createOrder0(Long userId, AppTradeOrderCreateReqVO createReqVO, Long agentUserId) {
         // 0. 008 对公转账：先校验入参里的支付渠道（**越早失败越好** —— 别等订单建了一半才发现）
         validatePayChannelCode(createReqVO);
         // 1.1 价格计算：定制单由定制计价服务生成订单项（014 / R89），其余走既有链路
@@ -236,6 +254,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
                 : calculatePrice(userId, createReqVO);
         // 1.2 构建订单
         TradeOrderDO order = buildTradeOrder(userId, createReqVO, calculateRespBO);
+        // 1.2.1 代客下单：记录代下单人，来源固定为「后台代客」（017 / Q132）
+        if (agentUserId != null) {
+            order.setAgentUserId(agentUserId);
+            order.setTerminal(TerminalEnum.ADMIN_AGENT.getTerminal());
+        }
         List<TradeOrderItemDO> orderItems = buildTradeOrderItems(order, calculateRespBO);
         // 1.3 个人会员订阅订单：打快照标记（用户端禁止退款、支付后直接完成）
         markSubscriptionOrder(order, orderItems);
@@ -745,7 +768,11 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (order == null) {
             throw exception(ORDER_NOT_FOUND);
         }
-        // 1.2 校验状态
+        // 1.2 代客订单：客户不允许自行取消（017 / Q131）
+        if (order.getAgentUserId() != null) {
+            throw exception(AGENT_ORDER_CANCEL_NOT_SUPPORTED);
+        }
+        // 1.3 校验状态
         if (ObjectUtil.notEqual(order.getStatus(), TradeOrderStatusEnum.UNPAID.getStatus())) {
             throw exception(ORDER_CANCEL_FAIL_STATUS_NOT_UNPAID);
         }

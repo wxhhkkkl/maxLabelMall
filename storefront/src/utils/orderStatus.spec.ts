@@ -68,6 +68,8 @@ describe('用户侧动作 —— 仅「待支付」可用', () => {
   it('只有待支付能付款与取消', () => {
     expect(canPay(OrderStatus.UNPAID)).toBe(true)
     expect(canCancel(OrderStatus.UNPAID)).toBe(true)
+    // 代客订单客户端不提供取消入口（017 / Q131）
+    expect(canCancel(OrderStatus.UNPAID, true)).toBe(false)
 
     for (const s of [
       OrderStatus.UNDELIVERED,

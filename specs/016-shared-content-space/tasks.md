@@ -166,6 +166,7 @@ DDL、配置、DO/Mapper、枚举等结构性任务不写单元测试，属已�
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [ ] T065 [P] 按 `quickstart.md` §4.5 验证旧端点兼容（`cloud-template`、`shared-template`、`submit-share` 关闭错误）
+  📌 2026-11-05：兼容断言已由 `AppLabelTemplateControllerTest`（`submit-share` 返回 `MEMBER_SHARED_TEMPLATE_SUBMIT_CLOSED`、`cloud-template` 返回结构）与 `AppSharedTemplateControllerTest`（`publisherNickname = 平台运营`）自动化覆盖；HTTP 级人工复核并入 T071
 - [X] T066 [P] 安全复核：检查 `controller/app/share/` 与 `controller/admin/share/` 的登录/权限注解；确认 `downloadUrl` 不泄露长期 URL；确认个人空间不可被同企业成员读取
 - [X] T067 [P] 更新 `CLAUDE.md`：加入 016 当前特性段、SQL 033 上线顺序与旧表只读说明；复核 `specs/009-maxlabel-member-integration/spec.md` 的 FR-219 / FR-233 / FR-237 / FR-238「已被 016 取代」注记（已添加，后续修订需同步）
 - [X] T068 运行服务端全量测试：`mvn -pl yudao-module-member/yudao-module-member-server -am clean test`，修复回归
@@ -286,3 +287,32 @@ Developer C: US53 平台共享（服务端/管理端；桌面端页签等 US50 �
 - [X] T083 为被移出文件夹名单的成员提供「我的上传」入口（跨文件夹列出本人企业内容并可删除），或提供不依赖文件夹可见性的自有内容列表 per FR-409 (partial)
 - [X] T084 对齐旧「云标签模板库」`CloudTemplateDialog` 的免费用户写权限（FR-399），或引导用户使用共享空间入口 per FR-399 (partial)
 - [X] T085 删除已不可达的 `MallSharedLibraryDialog`，或在 ModalHost 中说明保留理由 per plan R108 / FR-417 (unrequested)
+
+---
+
+## Phase 10: 验收记录（2026-11-05）
+
+**Purpose**: 记录本轮可自动化的回归证据；需真实账号/库副本的项保持未勾选，等待手工验收。
+
+### 自动化回归（全部通过）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 服务端共享空间 + 兼容端点 | `mvn -pl yudao-module-member/yudao-module-member-server -am clean test -Dsurefire.failIfNoSpecifiedTests=false -Dtest='Share*Test,PlatformContent*Test,*Share*ControllerTest,*PlatformContentControllerTest,*LabelTemplateControllerTest,*SharedTemplateControllerTest'` | 15 个测试类、**55 条通过**、0 失败（BUILD SUCCESS） |
+| 管理端平台内容页 | `cd yudao-cloud/yudao-ui/yudao-ui-admin-vue3 && pnpm vitest run src/views/member/platformContent` | 1 个文件、**2 条通过** |
+| 桌面端类型检查 | `cd ../maxlabel/app && npm run typecheck` | 通过 |
+| 桌面端 unit + contracts | `cd ../maxlabel/app && npx vitest run --project unit --project contracts` | 168 个文件、**1031 条通过** |
+
+### 静态复核
+
+- `contracts/app-api.md` 的 C 端端点与 `AppShareSpace/AppShareContent/AppShareFolder/AppPlatformContent` 四个控制器逐条对应；`admin-api.md` 的权限点与 `AdminPlatformContentController` 一致。
+- 旧端点保留：`AppLabelTemplateController`（`submit-share` / `cancel-share` 返回关闭错误）、`AppSharedTemplateController`（`publisherNickname = 平台运营`）、`AdminLabelTemplateController`（读新表、`shareStatus` 恒 `null`）；管理端旧 `AdminSharedTemplateController` 按 plan R107 保持原样。
+- 关键操作可追溯：`app/share`、`admin/share` 与 `service/share` 共 12 处 `@LogRecord`，覆盖内容创建/上传/删除、文件夹增删改与名单变更、平台内容上传/编辑/上下架/删除（FR-425）。
+- 越权统一返回 `MEMBER_SHARE_CONTENT_NOT_FOUND`（FR-424）；`033` 的建表、迁移、菜单、用量回填与 `034` 的分类初始化均为幂等写法（T072 的执行演练仍需库副本）。
+- 生产已部署 016：`/app-api/member/share-space/overview`、`/app-api/member/platform-content/page` 均返回 `{"code":401,"msg":"账号未登录"}`（路由存在、鉴权生效）。
+
+### 仍待手工验收（需真实账号或库副本）
+
+- T038 / T045 / T050 / T064 / T071：quickstart §4.1~§4.5 与 §4 全量，需要 A~E 五个会员账号与运营账号。
+- T072：`033`/`034` 的库副本幂等与回滚演练。
+- T065：HTTP 级旧端点复核；兼容断言本身已被自动化覆盖。

@@ -461,6 +461,12 @@ const remainingRouter: AppRouteRecordRaw[] = [
     },
     children: [
       {
+        path: 'order/agent',
+        component: () => import('@/views/mall/trade/order/agent/index.vue'),
+        name: 'TradeOrderAgentCreate',
+        meta: { title: '代客下单', icon: 'ep:plus', hidden: true, activeMenu: '/mall/trade/order' }
+      },
+      {
         path: 'order/detail/:id(\\d+)',
         component: () => import('@/views/mall/trade/order/detail/index.vue'),
         name: 'TradeOrderDetail',

@@ -106,6 +106,10 @@
           >
             <div>{{ scope.row.user?.nickname || '—' }}</div>
             <div class="order-sub-text">(ID:{{ scope.row.userId }})</div>
+            <!-- 代客下单（017）：只显示代下单人，自助单不占位 -->
+            <div v-if="scope.row.agentUserId" class="order-sub-text">
+              代下单：{{ scope.row.agentUserName || `后台用户#${scope.row.agentUserId}` }}
+            </div>
           </div>
           <!-- 是否需要发票（2026-10-23 替换原来的「推荐人」列） -->
           <div

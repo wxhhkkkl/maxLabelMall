@@ -654,7 +654,8 @@ function canRefund(it: OrderDetail['items'][number]): boolean {
   return order.value
     // 014 / Q96：定制单用户端不提供自助退款（与 012 的企业 / 订阅单同一口径）
     ? canApplyRefund(it, order.value.status,
-      order.value.enterprise || order.value.subscription || order.value.customization === true)
+      order.value.enterprise || order.value.subscription || order.value.customization === true
+        || order.value.agentCreated === true)
     : false
 }
 
@@ -777,6 +778,8 @@ onMounted(async () => {
         <div class="ml-card od-status">
           <div class="od-status-row">
             <span class="od-status-text">{{ statusText }}</span>
+            <!-- 客服代下单（017）：中性标识，不暴露运营身份 -->
+            <span v-if="order.agentCreated" class="od-agent-tag">客服代下单</span>
             <!-- 对公待收款单：底层仍是「未支付」，只是说辞不同（008 / FR-200） -->
             <MlPill
               :status="order.status"
@@ -788,7 +791,7 @@ onMounted(async () => {
               打在款前反悔走的就是它（008 spec 的 Edge Case）。
             -->
             <button
-              v-if="offlineWaiting"
+              v-if="offlineWaiting && !order.agentCreated"
               class="btn-cart cancel-order od-cancel-inline"
               type="button"
               @click="cancelOpen = true"
@@ -838,7 +841,13 @@ onMounted(async () => {
                ⚠️ 对公待收款单**不落到这里**（`needsNoPay` 已排除它）—— 它要显示的是
                收款账户，不是"无需支付"（R47）。 -->
           <span v-if="needsNoPay" class="od-nopay">本单无需支付</span>
-          <button class="btn-cart cancel-order" type="button" @click="cancelOpen = true">
+          <!-- 代客订单不允许客户自行取消（017 / Q131）：后端也会拒绝 -->
+          <button
+            v-if="!order.agentCreated"
+            class="btn-cart cancel-order"
+            type="button"
+            @click="cancelOpen = true"
+          >
             取消订单
           </button>
           <!-- 对公待收款单**没有任何在线支付入口**（FR-201：防重复付款） -->
@@ -1506,5 +1515,14 @@ onMounted(async () => {
   border-radius: 8px;
   margin-top: 12px;
   background: #F5F8FF;
+}
+/* 客服代下单（017）：中性标识，不暴露运营身份 */
+.od-agent-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eaf1ff;
+  color: #2e7cd6;
+  font-size: 12px;
 }
 </style>

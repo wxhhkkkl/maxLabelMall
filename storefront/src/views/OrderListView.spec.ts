@@ -141,6 +141,12 @@ describe('OrderListView —— 取消订单（FR-036 / T112）', () => {
     expect(cards[1]?.find('.cancel-order').exists()).toBe(false)
   })
 
+  it('代客订单显示「客服代下单」，且不提供取消入口（017）', async () => {
+    const w = await mountList([order(1, { agentCreated: true })])
+    expect(w.text()).toContain('客服代下单')
+    expect(w.find('.cancel-order').exists()).toBe(false)
+  })
+
   it('取消前二次确认；确认后调后端并重新拉列表', async () => {
     const w = await mountList([order(1)])
     await w.get('.cancel-order').trigger('click')

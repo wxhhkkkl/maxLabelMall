@@ -1,8 +1,13 @@
 package cn.iocoder.yudao.module.pay.api.order;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderSubmitReqDTO;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderSubmitRespDTO;
+import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
+import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderSubmitRespVO;
 import cn.iocoder.yudao.module.pay.convert.order.PayOrderConvert;
 import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO;
 import cn.iocoder.yudao.module.pay.service.order.PayOrderService;
@@ -40,6 +45,13 @@ public class PayOrderApiImpl implements PayOrderApi {
     public CommonResult<Boolean> updatePayOrderPrice(Long id, Integer payPrice) {
         payOrderService.updatePayOrderPrice(id, payPrice);
         return success(true);
+    }
+
+    @Override
+    public CommonResult<PayOrderSubmitRespDTO> submitOrder(PayOrderSubmitReqDTO reqDTO, String userIp) {
+        PayOrderSubmitRespVO respVO = payOrderService.submitOrder(
+                BeanUtils.toBean(reqDTO, PayOrderSubmitReqVO.class), userIp);
+        return success(BeanUtils.toBean(respVO, PayOrderSubmitRespDTO.class));
     }
 
 }

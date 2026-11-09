@@ -3,12 +3,22 @@
 .mall-topline { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding-top: 32px; margin-bottom: 26px; }
 .mall-topline h1 { font-size: 28px; line-height: 1.4; margin: 0 0 6px; }
 .mall-topline p { font-size: 14px; color: #7b889d; margin: 0; }
-.mall-search-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; width: min(510px, 50%); }
+.mall-search-wrap { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; width: min(510px, 50%); }
 .mall-search { display: flex; align-items: center; gap: 12px; width: 100%; background: white; border: 1px solid #dae3ee; border-radius: 10px; padding: 5px 5px 5px 16px; color: #8190a7; }
-.mall-search-history { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 14px; font-size: 12px; color: #7b889d; }
-.mall-search-history .msh-label { color: #9aa8ba; }
-.mall-page .mall-search-history button { border: 0; background: none; padding: 0; font: inherit; color: #60748f; cursor: pointer; }
-.mall-page .mall-search-history button:hover { color: #2e7cd6; text-decoration: underline; }
+/* 历史搜索下拉：聚焦搜索框时展开，覆盖在搜索框下方 */
+.mall-search-history {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 30;
+  background: #fff; border: 1px solid #dae3ee; border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(39,58,98,.12);
+  padding: 14px 16px; font-size: 13px; color: #7b889d;
+}
+.msh-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.msh-label { color: #162c50; font-size: 13px; font-weight: 600; }
+.mall-page .msh-clear { display: inline-flex; border: 0; background: none; color: #9aa8ba; cursor: pointer; padding: 2px; }
+.mall-page .msh-clear:hover { color: #2e7cd6; }
+.msh-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.mall-page .msh-items button { border: 0; background: #f2f6fc; color: #60748f; border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.mall-page .msh-items button:hover { background: #eaf2ff; color: #2e7cd6; }
 .mall-search:focus-within { border-color: #2e7cd6; box-shadow: 0 0 0 3px #2e7cd610; }
 .mall-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: #162c50; height: 38px; }
 .mall-search input::-webkit-search-cancel-button { display: none; }
@@ -123,7 +133,6 @@
   .mall-topline p { font-size: 12px; }
   .mall-search-wrap { width: 100%; align-items: stretch; }
   .mall-search { width: 100%; box-sizing: border-box; }
-  .mall-search-history { justify-content: flex-start; }
   .mall-search input { font-size: 12px; }
   .mall-search .ms-btn { padding-inline: 18px; }
   .mall-banner { border-radius: 12px; }

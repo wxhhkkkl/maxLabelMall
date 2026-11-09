@@ -72,6 +72,12 @@ public class TradeOrderDO extends BaseDO {
      */
     private Long userId;
     /**
+     * 代客下单的后台用户编号；NULL = 客户自助下单
+     *
+     * 关联 AdminUserDO 的 id；由管理端代客下单写入，后台不提供修改入口。
+     */
+    private Long agentUserId;
+    /**
      * 用户 IP
      */
     private String userIp;

@@ -495,6 +495,13 @@ describe('OrderDetailView —— 取消订单（FR-036 / T112）', () => {
     expect(b.find('.cancel-order').exists()).toBe(false)
   })
 
+  it('代客订单显示「客服代下单」，且没有取消入口（017 / Q131）', async () => {
+    const w = await mountDetail(detail({ agentCreated: true }))
+    expect(w.text()).toContain('客服代下单')
+    expect(w.find('.od-agent-tag').exists()).toBe(true)
+    expect(w.find('.cancel-order').exists()).toBe(false)
+  })
+
   it('二次确认后取消，并以后端状态为准重新拉详情', async () => {
     const w = await mountDetail()
     await w.get('.cancel-order').trigger('click')
@@ -1125,6 +1132,11 @@ describe('OrderDetailView —— 申请退款', () => {
 
   it('**个人会员订阅订单没有退款入口**（2026-10-27，后端售后接口同样会拒）', async () => {
     const w = await mountDetail(paid({ subscription: true }))
+    expect(w.find('.od-refund').exists()).toBe(false)
+  })
+
+  it('**代客订单没有退款入口**（017 / Q126，后端会员售后接口会拒）', async () => {
+    const w = await mountDetail(paid({ agentCreated: true }))
     expect(w.find('.od-refund').exists()).toBe(false)
   })
 

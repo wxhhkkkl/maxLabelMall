@@ -40,6 +40,18 @@ export default {
     return res as unknown as Promise<T>
   },
   upload: async <T = any>(option: any) => {
+    // ⚠️ `infra/file/upload` 传的是普通对象（file + directory），必须转成 FormData；
+    // 其它上传（CRM 导入、工资导入、平台内容）已经自己构造了 FormData，不能覆盖。
+    if (!(option.data instanceof FormData)) {
+      const formData = new FormData()
+      Object.keys(option.data || {}).forEach((key) => {
+        const value = option.data[key]
+        if (value !== undefined && value !== null) {
+          formData.append(key, value)
+        }
+      })
+      option.data = formData
+    }
     option.headersType = 'multipart/form-data'
     const res = await request({ method: 'POST', ...option })
     return res as unknown as Promise<T>

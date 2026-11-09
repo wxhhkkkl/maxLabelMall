@@ -112,6 +112,14 @@ public class AppTradeOrderDetailRespVO {
     @Schema(description = "是否个人会员订阅订单（用户端不支持退款）", example = "false")
     private Boolean subscription;
 
+    /**
+     * 是否客服代下单（2026-11-06）。为 true 时：
+     * ① C 端显示「客服代下单」中性标识；② 隐藏取消与退款入口；③ 后端在会员取消/售后入口拒绝。
+     * 不暴露代下单的运营身份。
+     */
+    @Schema(description = "是否客服代下单", example = "false")
+    private Boolean agentCreated;
+
     /** 能否「再次购买」：仅普通商品单；定制 / 企业授权 / 订阅单为 false */
     @Schema(description = "是否可以再次购买（仅普通商品单）", example = "true")
     private Boolean canReorder;

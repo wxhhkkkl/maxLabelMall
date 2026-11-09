@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.service.order;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.enums.TerminalEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
@@ -543,6 +544,41 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         calculateRespBO.setItems(List.of(item));
         when(tradePriceService.calculateOrderPrice(any())).thenReturn(calculateRespBO);
         when(cartService.getCartList(any(), any())).thenReturn(new ArrayList<>());
+    }
+
+    @Test
+    public void testCreateOrderByAdmin_writesAgentAndSource() {
+        // 普通虚拟商品单：非企业、非订阅
+        when(productSubscriptionPlanApi.getBySkuId(302L)).thenReturn(CommonResult.success(null));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-AGENT");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockPersonalPrice();
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            TradeOrderDO order = orderService.createOrderByAdmin(9L, 88L, personalCreateReq());
+            // 归属目标客户，代下单人与来源正确
+            assertEquals(88L, order.getUserId());
+            assertEquals(9L, order.getAgentUserId());
+            assertEquals(TerminalEnum.ADMIN_AGENT.getTerminal(), order.getTerminal());
+        }
+    }
+
+    @Test
+    public void testCancelOrderByMember_agentOrderRejected() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNPAID.getStatus(), null, null,
+                LocalDateTime.now());
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(order.getId());
+        update.setAgentUserId(9L);
+        tradeOrderMapper.updateById(update);
+
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> orderService.cancelOrderByMember(88L, order.getId()));
+        assertEquals(AGENT_ORDER_CANCEL_NOT_SUPPORTED.getCode(), exception.getCode());
     }
 
     @Test

@@ -95,6 +95,18 @@ public class TradeOrderDO extends BaseDO {
      */
     private Boolean maxlabelSubscription;
     /**
+     * 是否已在 ERP 系统开单（2026-11-10）
+     *
+     * 运营在管理端手工维护，未来由 ERP 对接回写。**独立于订单主状态**（status）。
+     */
+    private Boolean erpCreated;
+    /**
+     * ERP 系统单号；未开单时为 null。
+     *
+     * 撤销开单时必须**显式置空**（MyBatis-Plus 的 updateById 会忽略 null 字段）。
+     */
+    private String erpNo;
+    /**
      * 是否印刷定制订单（014）
      *
      * 定制要求放在 `trade_customization_order`，这里只用于筛选与详情联查。

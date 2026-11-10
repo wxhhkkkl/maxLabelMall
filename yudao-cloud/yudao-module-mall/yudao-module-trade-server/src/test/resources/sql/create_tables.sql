@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS "trade_order"
     "user_remark"             varchar,
     "maxlabel_org_id"         bigint   NULL,
     "maxlabel_subscription"   bit      NOT NULL DEFAULT FALSE,
+    "erp_created"             bit      NOT NULL DEFAULT FALSE,
+    "erp_no"                  varchar  NULL,
     "customization"           bit      NOT NULL DEFAULT FALSE,
     "user_deleted"            bit      NOT NULL DEFAULT FALSE,
     "status"                  int      NOT NULL,

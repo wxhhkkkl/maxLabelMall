@@ -27,6 +27,19 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .eq(TradeOrderDO::getId, id).eq(TradeOrderDO::getStatus, status));
     }
 
+    /**
+     * 更新 ERP 开单状态（2026-11-10）
+     *
+     * ⚠️ 必须用 `set(...)` 显式写 `erp_no` —— `updateById(DO)` 会**忽略 null 字段**，
+     * 撤销开单时清不掉上一张 ERP 单号（与「NOT NULL 无默认值」是同一类静默失败）。
+     */
+    default int updateErpStatus(Long id, Boolean erpCreated, String erpNo) {
+        return update(null, new LambdaUpdateWrapper<TradeOrderDO>()
+                .eq(TradeOrderDO::getId, id)
+                .set(TradeOrderDO::getErpCreated, erpCreated)
+                .set(TradeOrderDO::getErpNo, erpNo));
+    }
+
     default TradeOrderDO selectByIdAndUserId(Long id, Long userId) {
         return selectOne(new LambdaQueryWrapperX<TradeOrderDO>()
                 .eq(TradeOrderDO::getId, id)

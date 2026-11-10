@@ -33,7 +33,8 @@ vi.mock('@/api/mall/trade/order', () => ({
   getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
   getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
   cancelOrder: vi.fn(),
-  pickUpOrder: vi.fn()
+  pickUpOrder: vi.fn(),
+  updateOrderErp: vi.fn()
 }))
 const getSimpleDeliveryExpressList = vi.fn()
 vi.mock('@/api/mall/trade/delivery/express', () => ({
@@ -280,5 +281,84 @@ describe('后台订单详情 —— 付款方式与交易单号', () => {
     )
 
     expect(w.text()).not.toContain('交易单号')
+  })
+})
+
+describe('后台订单详情 —— ERP开单（2026-11-10）', () => {
+  it('未开单：显示「未开单」，给「标记ERP已开单」按钮', async () => {
+    const w = await mountDetail(order({ erpCreated: false }))
+
+    expect(w.text()).toContain('ERP系统开单')
+    expect(w.text()).toContain('未开单')
+    expect(w.text()).toContain('标记ERP已开单')
+    expect(w.text()).not.toContain('撤销开单')
+  })
+
+  it('已开单：显示 ERP 单号，给「撤销开单」按钮', async () => {
+    const w = await mountDetail(order({ erpCreated: true, erpNo: 'ERP-20261110-001' }))
+
+    expect(w.text()).toContain('已开单')
+    expect(w.text()).toContain('ERP-20261110-001')
+    expect(w.text()).toContain('撤销开单')
+    expect(w.text()).not.toContain('标记ERP已开单')
+  })
+})
+
+describe('后台订单详情 —— 发票详情', () => {
+  const invoice = {
+    id: 77,
+    orderId: 1,
+    orderNo: 'NO-1',
+    type: 2,
+    typeName: '电子增值税专用发票',
+    titleKind: 1,
+    titleKindName: '企业',
+    status: 0,
+    statusName: '待开票',
+    amount: 7800,
+    orderPayPrice: 7800,
+    orderRefundPrice: 0,
+    titleName: '南京路桥机械有限公司',
+    taxNo: '91320100MA1XXXXXX',
+    titleAddress: '南京市玄武区 xx 路 1 号',
+    titlePhone: '025-88888888',
+    bankName: '招商银行南京分行',
+    bankAccount: '6214xxxxxxxx',
+    bankCode: '308301000001',
+    email: 'finance@example.com',
+    createTime: new Date(2026, 9, 20, 9, 0, 0).getTime()
+  }
+
+  it('有开票申请：展示抬头/税号/银行/邮箱，开票按钮在「发票详情」块里', async () => {
+    const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
+
+    expect(w.text()).toContain('发票详情')
+    expect(w.text()).toContain('待开票')
+    expect(w.text()).toContain('电子增值税专用发票')
+    expect(w.text()).toContain('南京路桥机械有限公司')
+    expect(w.text()).toContain('91320100MA1XXXXXX')
+    expect(w.text()).toContain('招商银行南京分行')
+    expect(w.text()).toContain('6214xxxxxxxx')
+    expect(w.text()).toContain('finance@example.com')
+    expect(w.text()).toContain('78.00')
+
+    // 按钮必须落在「发票详情」区块内，而不是还留在「订单状态」里
+    const invoiceSection = w
+      .findAll('.el-descriptions')
+      .find((section) => section.text().includes('发票详情'))
+    expect(invoiceSection, '找不到「发票详情」区块').toBeTruthy()
+    expect(invoiceSection!.findAll('button').some((button) => button.text().includes('开票'))).toBe(
+      true
+    )
+  })
+
+  it('未申请开票：显示「未申请开票」，没有开票按钮', async () => {
+    const w = await mountDetail(order({ invoiceStatus: null, invoice: null }))
+
+    expect(w.text()).toContain('该订单未申请开票')
+    const invoiceSection = w
+      .findAll('.el-descriptions')
+      .find((section) => section.text().includes('发票详情'))
+    expect(invoiceSection!.findAll('button')).toHaveLength(0)
   })
 })

@@ -38,6 +38,7 @@ import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialWxaSubscribeMessageSendReqDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderErpReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
@@ -1074,6 +1075,27 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
 
         // 记录订单日志
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), order.getStatus());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @TradeOrderLog(operateType = TradeOrderOperateTypeEnum.ADMIN_UPDATE_ERP)
+    public void updateOrderErpStatus(TradeOrderErpReqVO reqVO) {
+        // 1. 校验交易订单
+        validateOrderExists(reqVO.getId());
+
+        // 2. 更新：撤销时显式清空 erp_no（updateById 会忽略 null 字段，见 mapper 注释）
+        boolean erpCreated = Boolean.TRUE.equals(reqVO.getErpCreated());
+        String erpNo = erpCreated ? StrUtil.trim(reqVO.getErpNo()) : null;
+        tradeOrderMapper.updateErpStatus(reqVO.getId(), erpCreated, erpNo);
+
+        // 3. 记录订单日志
+        TradeOrderLogUtils.setOrderInfo(reqVO.getId(), null, null,
+                MapUtil.<String, Object>builder()
+                        .put("erpAction", erpCreated
+                                ? "已开单，ERP单号 " + erpNo
+                                : "已撤销开单")
+                        .build());
     }
 
     @Override

@@ -152,6 +152,23 @@ describe('后台订单列表 —— 定制单标记（014）', () => {
   })
 })
 
+describe('后台订单列表 —— ERP开单标记（2026-11-10）', () => {
+  it('已开单显示绿色「ERP已开单」标签', async () => {
+    const w = mountTable([order({ erpCreated: true, erpNo: 'ERP-20261110-001' })])
+    await flushPromises()
+
+    expect(w.find('.order-erp-tag').exists()).toBe(true)
+    expect(w.find('.order-erp-tag').text()).toContain('ERP已开单')
+  })
+
+  it('未开单不占位', async () => {
+    const w = mountTable([order({ erpCreated: false })])
+    await flushPromises()
+
+    expect(w.find('.order-erp-tag').exists()).toBe(false)
+  })
+})
+
 describe('后台订单列表 —— 各列的信息落位', () => {
   it('金额：实付 + 商品原价（原价带「元」）', async () => {
     const w = mountTable([order()])

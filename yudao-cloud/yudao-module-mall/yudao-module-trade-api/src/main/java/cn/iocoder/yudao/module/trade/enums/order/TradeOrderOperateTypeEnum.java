@@ -30,6 +30,7 @@ public enum TradeOrderOperateTypeEnum {
     ADMIN_CANCEL(42, "管理员取消订单"),
     ADMIN_CANCEL_AFTER_SALE(43, "订单全部售后，管理员自动取消订单"),
     MEMBER_DELETE(49, "删除订单"),
+    ADMIN_UPDATE_ERP(50, "更新ERP开单状态：{erpAction}"),
     ;
 
     /**

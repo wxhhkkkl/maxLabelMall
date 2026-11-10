@@ -166,6 +166,10 @@
             <div v-if="scope.row.customization" class="order-custom-tag">
               <el-tag type="success" size="small">定制</el-tag>
             </div>
+            <!-- ERP开单（2026-11-10）：已开单才显示；未开单不占位 -->
+            <div v-if="scope.row.erpCreated" class="order-erp-tag">
+              <el-tag type="success" size="small">ERP已开单</el-tag>
+            </div>
             <!-- 售后状态原来独占一列；收成一列后挂在状态下面，免得"退款中"在列表上看不见 -->
             <div v-if="hasAfterSale(scope.row)" class="order-after-sale">
               <dict-tag
@@ -342,6 +346,10 @@ const openDetail = (id?: number | null) => {
 }
 
 .order-custom-tag {
+  margin-top: 4px;
+}
+
+.order-erp-tag {
   margin-top: 4px;
 }
 

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.controller.admin.order.vo;
 
 import cn.iocoder.yudao.module.trade.controller.admin.base.member.user.MemberUserRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.base.product.property.ProductPropertyValueDetailRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -40,6 +41,15 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
      */
     @Schema(description = "开票状态：0 待开票，10 已开票，20 已作废；未申请为 null", example = "0")
     private Integer invoiceStatus;
+
+    /**
+     * 开票申请详情（006）；**未申请时为 null**。
+     *
+     * 详情页「发票详情」区块直接展示抬头、税号、邮箱、银行信息与发票文件，
+     * 不再为拿这些字段额外调一次开票申请列表接口。
+     */
+    @Schema(description = "开票申请详情；未申请为 null")
+    private TradeOrderInvoiceRespVO invoice;
 
     /**
      * 推广用户信息

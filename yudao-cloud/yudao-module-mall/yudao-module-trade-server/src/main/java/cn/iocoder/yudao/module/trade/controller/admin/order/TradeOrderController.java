@@ -1,9 +1,14 @@
 package cn.iocoder.yudao.module.trade.controller.admin.order;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
+import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.framework.ip.core.utils.AreaUtils;
 import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
@@ -13,11 +18,14 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.*;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
 import cn.iocoder.yudao.module.trade.framework.delivery.config.TradeExpressProperties;
+import cn.iocoder.yudao.module.trade.convert.invoice.InvoiceConvert;
 import cn.iocoder.yudao.module.trade.convert.order.TradeOrderConvert;
+import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.offline.TradeOrderOfflinePaymentDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderLogDO;
+import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import cn.iocoder.yudao.module.trade.service.offline.TradeOrderOfflinePaymentService;
@@ -29,18 +37,24 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils.getLoginUserId;
@@ -111,6 +125,119 @@ public class TradeOrderController {
         // 代下单人昵称（017）：一次批量解析；账号不存在时为 null，前端显示 后台用户#{id}
         fillAgentUserNames(page.getList());
         return success(page);
+    }
+
+    /**
+     * 导出交易订单 Excel（2026-11-10 所有者口径：**仅按下单时间范围**筛选）
+     *
+     * <p>列表上的状态、支付方式等筛选条件一律不参与 —— 运营选完时间就得到该时间段的全部订单。
+     * 权限沿用 `trade:order:query`（能看订单就能导出，不新增权限点）。
+     */
+    @GetMapping("/export-excel")
+    @Operation(summary = "导出交易订单 Excel")
+    @PreAuthorize("@ss.hasPermission('trade:order:query')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportOrderExcel(@Valid TradeOrderExportReqVO exportReqVO,
+                                 HttpServletResponse response) throws IOException {
+        // ⚠️ 只把时间范围带过去，不把列表筛选条件塞进来（口径见方法注释）
+        TradeOrderPageReqVO pageReqVO = new TradeOrderPageReqVO();
+        pageReqVO.setCreateTime(exportReqVO.getCreateTime());
+        pageReqVO.setPageSize(PAGE_SIZE_NONE);
+        List<TradeOrderDO> orders = tradeOrderQueryService.getOrderPage(pageReqVO).getList();
+
+        List<TradeOrderExcelVO> dataList = buildOrderExcelList(orders);
+        ExcelUtils.write(response, "交易订单.xls", "数据", TradeOrderExcelVO.class, dataList);
+    }
+
+    /**
+     * 组装导出的行：**一笔订单一行**，商品名称合并、数量汇总
+     */
+    List<TradeOrderExcelVO> buildOrderExcelList(List<TradeOrderDO> orders) {
+        if (CollUtil.isEmpty(orders)) {
+            return Collections.emptyList();
+        }
+        // 订单项：一次 IN 查询，避免逐笔查（与列表页同一手法）
+        Map<Long, List<TradeOrderItemDO>> orderItemMap = tradeOrderQueryService
+                .getOrderItemListByOrderId(convertSet(orders, TradeOrderDO::getId))
+                .stream().collect(Collectors.groupingBy(TradeOrderItemDO::getOrderId));
+        // 会员昵称
+        Map<Long, MemberUserRespDTO> userMap = memberUserApi.getUserMap(
+                convertSet(orders, TradeOrderDO::getUserId, Objects::nonNull));
+        // 代下单人
+        Set<Long> agentUserIds = convertSet(orders, TradeOrderDO::getAgentUserId, Objects::nonNull);
+        Map<Long, AdminUserRespDTO> agentUserMap = CollUtil.isEmpty(agentUserIds)
+                ? Collections.emptyMap() : adminUserApi.getUserMap(agentUserIds);
+        // 开票状态：一次 IN 批量查
+        Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(
+                convertSet(orders, TradeOrderDO::getId));
+
+        return convertList(orders, order -> {
+            TradeOrderExcelVO vo = new TradeOrderExcelVO();
+            vo.setNo(order.getNo());
+            vo.setCreateTime(order.getCreateTime());
+            vo.setStatus(order.getStatus());
+            vo.setPayChannelCode(order.getPayChannelCode());
+            vo.setPayTime(order.getPayTime());
+            vo.setUserId(order.getUserId());
+            MemberUserRespDTO user = userMap.get(order.getUserId());
+            vo.setUserNickname(user != null ? user.getNickname() : null);
+
+            // 下单方式 + 代下单人（017）
+            if (order.getAgentUserId() != null) {
+                vo.setOrderSource("后台代客");
+                AdminUserRespDTO agentUser = agentUserMap.get(order.getAgentUserId());
+                vo.setAgentUserName(agentUser != null && StrUtil.isNotBlank(agentUser.getNickname())
+                        ? agentUser.getNickname() : "后台用户#" + order.getAgentUserId());
+            } else {
+                vo.setOrderSource("客户自助");
+            }
+
+            // 商品：名称合并、数量汇总
+            List<TradeOrderItemDO> items = orderItemMap.getOrDefault(order.getId(), Collections.emptyList());
+            vo.setProductNames(items.stream()
+                    .map(TradeOrderItemDO::getSpuName)
+                    .filter(StrUtil::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.joining("、")));
+            vo.setProductCount(ObjectUtils.defaultIfNull(order.getProductCount(), 0));
+
+            // 金额：统一转成非 null（MoneyConvert 遇到 null 会 NPE）
+            vo.setTotalPrice(ObjectUtils.defaultIfNull(order.getTotalPrice(), 0));
+            vo.setDeliveryPrice(ObjectUtils.defaultIfNull(order.getDeliveryPrice(), 0));
+            vo.setDiscountPrice(ObjectUtils.defaultIfNull(order.getDiscountPrice(), 0));
+            vo.setPayPrice(ObjectUtils.defaultIfNull(order.getPayPrice(), 0));
+            vo.setRefundPrice(ObjectUtils.defaultIfNull(order.getRefundPrice(), 0));
+
+            // 收件信息 + 物流
+            vo.setReceiverName(order.getReceiverName());
+            vo.setReceiverMobile(order.getReceiverMobile());
+            vo.setReceiverAddress(formatReceiverAddress(order));
+            vo.setDeliveryType(order.getDeliveryType());
+            vo.setLogisticsNo(order.getLogisticsNo());
+            vo.setDeliveryTime(order.getDeliveryTime());
+
+            // 开票状态（006）：未申请为 null
+            Integer invoiceStatus = invoiceStatusMap.get(order.getId());
+            TradeOrderInvoiceStatusEnum invoiceStatusEnum = invoiceStatus != null
+                    ? TradeOrderInvoiceStatusEnum.valueOf(invoiceStatus) : null;
+            vo.setInvoiceStatus(invoiceStatusEnum != null ? invoiceStatusEnum.getName() : "未申请");
+
+            vo.setRemark(order.getRemark());
+            return vo;
+        });
+    }
+
+    /** 收货地址：省市区 + 详细地址；虚拟商品没有地址时不报错 */
+    private static String formatReceiverAddress(TradeOrderDO order) {
+        String areaName = order.getReceiverAreaId() != null
+                ? AreaUtils.format(order.getReceiverAreaId()) : null;
+        if (StrUtil.isBlank(areaName)) {
+            return order.getReceiverDetailAddress();
+        }
+        if (StrUtil.isBlank(order.getReceiverDetailAddress())) {
+            return areaName;
+        }
+        return areaName + " " + order.getReceiverDetailAddress();
     }
 
     private void fillAgentUserNames(List<TradeOrderPageItemRespVO> list) {
@@ -197,9 +324,10 @@ public class TradeOrderController {
                 respVO.setPayChannelOrderNo(payOrder.getChannelOrderNo());
             }
         }
-        // 开票状态（006）：详情页据此显示「开票 / 重新上传发票」按钮
-        Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(Set.of(id));
-        respVO.setInvoiceStatus(invoiceStatusMap != null ? invoiceStatusMap.get(id) : null);
+        // 开票详情（006）：一次查询同时给出状态与完整申请内容；未申请时为 null
+        TradeOrderInvoiceDO invoice = tradeOrderInvoiceService.getInvoiceByOrderId(id);
+        respVO.setInvoiceStatus(invoice != null ? invoice.getStatus() : null);
+        respVO.setInvoice(invoice != null ? InvoiceConvert.convertToAdminRespVO(invoice, order) : null);
         // 对公转账信息（008）：待收款标记 + 确认痕迹（FR-205 的可追溯）
         buildOfflinePayment(respVO, order);
         // 印刷定制（014）：不是定制单时为 null
@@ -323,6 +451,20 @@ public class TradeOrderController {
     @PreAuthorize("@ss.hasPermission('trade:order:update')")
     public CommonResult<Boolean> updateOrderAddress(@RequestBody TradeOrderUpdateAddressReqVO reqVO) {
         tradeOrderUpdateService.updateOrderAddress(reqVO);
+        return success(true);
+    }
+
+    /**
+     * 更新订单 **ERP 开单状态**（2026-11-10）
+     *
+     * <p>运营手工维护：标记已开单时必填 ERP 单号，撤销时清空。沿用既有的
+     * `trade:order:update` 权限点（不新增权限点、无需 SQL 菜单）。
+     */
+    @PutMapping("/update-erp")
+    @Operation(summary = "更新订单ERP开单状态")
+    @PreAuthorize("@ss.hasPermission('trade:order:update')")
+    public CommonResult<Boolean> updateOrderErp(@Valid @RequestBody TradeOrderErpReqVO reqVO) {
+        tradeOrderUpdateService.updateOrderErpStatus(reqVO);
         return success(true);
     }
 

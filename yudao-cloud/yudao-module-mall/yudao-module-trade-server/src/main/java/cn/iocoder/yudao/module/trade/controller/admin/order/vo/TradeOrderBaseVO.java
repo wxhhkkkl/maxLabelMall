@@ -62,6 +62,12 @@ public class TradeOrderBaseVO {
     @Schema(description = "商家备注", example = "你猜一下")
     private String remark;
 
+    @Schema(description = "是否已在ERP系统开单（运营手工维护）", example = "false")
+    private Boolean erpCreated;
+
+    @Schema(description = "ERP系统单号；未开单为 null", example = "ERP-20261110-001")
+    private String erpNo;
+
     // ========== 价格 + 支付基本信息 ==========
 
     @Schema(description = "支付订单编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")

@@ -155,6 +155,25 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testUpdateErpStatus_markAndClear() {
+        TradeOrderDO order = createOrder(null, TradeOrderStatusEnum.UNDELIVERED.getStatus());
+        TradeOrderDO created = tradeOrderMapper.selectById(order.getId());
+        assertFalse(Boolean.TRUE.equals(created.getErpCreated()));
+
+        // 标记已开单：状态 + ERP 单号
+        tradeOrderMapper.updateErpStatus(order.getId(), true, "ERP-20261110-001");
+        TradeOrderDO marked = tradeOrderMapper.selectById(order.getId());
+        assertTrue(marked.getErpCreated());
+        assertEquals("ERP-20261110-001", marked.getErpNo());
+
+        // 撤销开单：单号必须被清空（updateById 会忽略 null，这里钉住 set(...) 的写法）
+        tradeOrderMapper.updateErpStatus(order.getId(), false, null);
+        TradeOrderDO cleared = tradeOrderMapper.selectById(order.getId());
+        assertFalse(cleared.getErpCreated());
+        assertNull(cleared.getErpNo());
+    }
+
+    @Test
     public void testSelectPage_payChannelCodeEmpty_noFilter() {
         // 不传渠道 = 不筛（后台默认视图）—— 空串也当作没传（与 eqIfPresent 同一口径）
         TradeOrderDO a = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());

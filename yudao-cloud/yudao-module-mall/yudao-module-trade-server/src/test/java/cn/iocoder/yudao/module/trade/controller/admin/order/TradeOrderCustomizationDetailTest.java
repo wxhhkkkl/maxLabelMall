@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.AdminCustomizationDetailRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDetailRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationOrderDO;
+import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
 import cn.iocoder.yudao.module.trade.service.customization.CustomizationOrderService;
@@ -31,7 +32,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -67,7 +67,7 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
         when(tradeOrderQueryService.getOrder(order.getId())).thenReturn(order);
         when(tradeOrderQueryService.getOrderItemListByOrderId(order.getId())).thenReturn(Collections.emptyList());
         when(memberUserApi.getUser(anyLong())).thenReturn(CommonResult.success(new MemberUserRespDTO()));
-        when(tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(any())).thenReturn(Collections.emptyMap());
+        when(tradeOrderInvoiceService.getInvoiceByOrderId(anyLong())).thenReturn(null);
     }
 
     private TradeOrderDO order(boolean customization) {
@@ -98,13 +98,32 @@ public class TradeOrderCustomizationDetailTest extends BaseMockitoUnitTest {
     }
 
     @Test
-    public void testGetOrderDetail_invoiceStatus() {
+    public void testGetOrderDetail_invoiceDetail() {
         TradeOrderDO order = order(false);
         mockOrder(order);
-        when(tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(any())).thenReturn(Map.of(1001L, 0));
+        when(tradeOrderInvoiceService.getInvoiceByOrderId(1001L)).thenReturn(TradeOrderInvoiceDO.builder()
+                .id(77L).orderId(1001L).orderNo("NO-1001").userId(88L)
+                .type(2).titleKind(1).status(0).amount(45520)
+                .titleName("南京路桥机械有限公司").taxNo("91320100MA1XXXXXX")
+                .titleAddress("南京市玄武区 xx 路 1 号").titlePhone("025-88888888")
+                .bankName("招商银行南京分行").bankAccount("6214xxxxxxxx").bankCode("308301000001")
+                .email("finance@example.com")
+                .build());
 
         TradeOrderDetailRespVO result = controller.getOrderDetail(1001L).getData();
+
         assertEquals(0, result.getInvoiceStatus());
+        assertNotNull(result.getInvoice());
+        assertEquals("电子增值税专用发票", result.getInvoice().getTypeName());
+        assertEquals("企业", result.getInvoice().getTitleKindName());
+        assertEquals("待开票", result.getInvoice().getStatusName());
+        assertEquals("南京路桥机械有限公司", result.getInvoice().getTitleName());
+        assertEquals("91320100MA1XXXXXX", result.getInvoice().getTaxNo());
+        assertEquals("招商银行南京分行", result.getInvoice().getBankName());
+        assertEquals("6214xxxxxxxx", result.getInvoice().getBankAccount());
+        assertEquals("308301000001", result.getInvoice().getBankCode());
+        assertEquals("finance@example.com", result.getInvoice().getEmail());
+        assertEquals(45520, result.getInvoice().getAmount());
     }
 
     @Test

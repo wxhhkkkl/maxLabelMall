@@ -181,6 +181,14 @@
           <Icon class="mr-5px" icon="ep:plus" />
           代客下单
         </el-button>
+        <!--
+          导出（2026-11-10）：点开弹窗选时间范围（含近 1 周 / 近 1 个月 / 近半年快捷项）。
+          口径：**只按下单时间范围**导出，不受列表当前筛选影响。
+        -->
+        <el-button v-hasPermi="['trade:order:query']" plain type="primary" @click="openExport">
+          <Icon class="mr-5px" icon="ep:download" />
+          导出
+        </el-button>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -291,6 +299,7 @@
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getList" />
   <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getList" />
   <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getList" />
+  <OrderExportForm ref="exportFormRef" />
 </template>
 
 <script lang="ts" setup>
@@ -298,6 +307,7 @@ import type { FormInstance } from 'element-plus'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
+import OrderExportForm from '@/views/mall/trade/order/form/OrderExportForm.vue'
 import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
 import * as TradeOrderApi from '@/api/mall/trade/order'
 import * as InvoiceApi from '@/api/mall/trade/invoice/index'
@@ -472,6 +482,12 @@ const openDetail = (id: number) => {
 /** 代客下单（017） */
 const openAgentCreate = () => {
   push({ name: 'TradeOrderAgentCreate' })
+}
+
+/** 导出（2026-11-10）：弹窗里选时间范围 */
+const exportFormRef = ref()
+const openExport = () => {
+  exportFormRef.value?.open()
 }
 
 /** 操作分发 */

@@ -1,4 +1,5 @@
 import request from '@/config/axios'
+import type { TradeOrderInvoiceVO } from '@/api/mall/trade/invoice'
 
 export interface OrderVO {
   // ========== 订单基本信息 ==========
@@ -78,6 +79,12 @@ export interface OrderVO {
    * **未申请时后端不给值（null）** —— 列上显示「否」。
    */
   invoiceStatus?: number | null
+  /** 开票申请详情（006）；未申请为 null */
+  invoice?: TradeOrderInvoiceVO | null
+  /** 是否已在ERP系统开单（运营手工维护；2026-11-10） */
+  erpCreated?: boolean
+  /** ERP系统单号；未开单为 null */
+  erpNo?: string | null
   // 订单操作日志
   logs?: OrderLogRespVO[]
 
@@ -190,6 +197,15 @@ export const getOrderPage = async (params: any) => {
   return await request.get<PageResult<OrderVO[]>>({ url: `/trade/order/page`, params })
 }
 
+/**
+ * 导出交易订单 Excel（2026-11-10）
+ *
+ * ⚠️ 口径：**只按下单时间范围**导出，列表上的状态 / 支付方式等筛选条件不参与。
+ */
+export const exportOrderExcel = async (params: { createTime: [string, string] }) => {
+  return await request.download({ url: `/trade/order/export-excel`, params })
+}
+
 // 查询交易订单统计
 export const getOrderSummary = async (params: any) => {
   return await request.get<TradeOrderSummaryRespVO>({ url: `/trade/order/summary`, params })
@@ -265,6 +281,15 @@ export const updateOrderRemark = async (data: any) => {
 // 订单调价
 export const updateOrderPrice = async (data: any) => {
   return await request.put({ url: `/trade/order/update-price`, data })
+}
+
+/**
+ * 更新订单 ERP 开单状态（2026-11-10）
+ *
+ * 标记已开单时 `erpNo` 必填；撤销时传 `erpCreated: false`，服务端会清空单号。
+ */
+export const updateOrderErp = async (data: { id: number; erpCreated: boolean; erpNo?: string }) => {
+  return await request.put({ url: `/trade/order/update-erp`, data })
 }
 
 // 修改订单地址

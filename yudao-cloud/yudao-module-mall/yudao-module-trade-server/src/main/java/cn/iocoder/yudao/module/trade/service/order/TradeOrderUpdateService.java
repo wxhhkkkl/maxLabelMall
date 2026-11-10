@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.service.order;
 
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCancelReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderDeliveryReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderErpReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderOfflineConfirmReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderRemarkReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderUpdateAddressReqVO;
@@ -168,6 +169,15 @@ public interface TradeOrderUpdateService {
      * @param reqVO 请求
      */
     void updateOrderAddress(TradeOrderUpdateAddressReqVO reqVO);
+
+    /**
+     * 【管理员】更新 ERP 开单状态（2026-11-10）
+     *
+     * <p>ERP 开单独立于订单主状态：现在由运营手工标记/撤销，未来由 ERP 对接回写。
+     *
+     * @param reqVO 请求
+     */
+    void updateOrderErpStatus(TradeOrderErpReqVO reqVO);
 
     /**
      * 【会员】修改待发货订单的收货地址

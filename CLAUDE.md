@@ -34,6 +34,10 @@ specs/016-shared-content-space/plan.md
 `sql/mysql/032-order-user-delete.sql`；本次发版漏跑该脚本，导致 `/app-api/trade/order/page` 报
 `Unknown column` → 500，已补跑。以后凡是后端引用了新列，必须把对应 ALTER 脚本纳入发版顺序。
 
+📌 **2026-11-10 订单 ERP 开单状态**：`trade_order` 新增 `erp_created` / `erp_no`。
+上线必须先执行 `sql/mysql/037-order-erp-status.sql`，再发后端，最后发管理端；
+漏跑会让订单列表 / 详情报 `Unknown column 'erp_created'`。权限复用 `trade:order:update`，无需新增菜单。
+
 当前特性（017 代客下单：管理端运营以客户名义下单）：
 - specs/017-agent-order/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/017-agent-order/contracts/{admin-api,app-api}.md

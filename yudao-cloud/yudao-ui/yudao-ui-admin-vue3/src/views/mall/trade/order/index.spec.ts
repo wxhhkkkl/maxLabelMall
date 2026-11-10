@@ -23,7 +23,8 @@ const getOrderPage = vi.fn()
 vi.mock('@/api/mall/trade/order', () => ({
   getOrderPage: (...a: unknown[]) => getOrderPage(...a),
   cancelOrder: vi.fn(),
-  getOrderSummary: vi.fn()
+  getOrderSummary: vi.fn(),
+  exportOrderExcel: vi.fn()
 }))
 
 // 订单列表「更多 → 开票」：点开先按订单号查申请，再把申请交给上传弹层
@@ -38,6 +39,15 @@ const invoiceOpen = vi.fn()
 const InvoiceIssueFormStub = defineComponent({
   setup(_, { expose }) {
     expose({ open: invoiceOpen })
+    return () => h('div')
+  }
+})
+
+// 导出弹窗只验证"被打开"，它自己的表单逻辑有单独的 spec
+const exportOpen = vi.fn()
+const OrderExportFormStub = defineComponent({
+  setup(_, { expose }) {
+    expose({ open: exportOpen })
     return () => h('div')
   }
 })
@@ -110,6 +120,7 @@ beforeEach(() => {
   getOrderPage.mockResolvedValue({ list: [], total: 0 })
   getInvoicePage.mockReset()
   invoiceOpen.mockReset()
+  exportOpen.mockReset()
   // el-dropdown 的菜单会 teleport 到 body；不清掉上一条用例的下拉会串味
   document.querySelectorAll('.el-popper').forEach((el) => el.remove())
 })
@@ -235,5 +246,25 @@ describe('后台订单列表 —— 更多里的开票入口', () => {
 
     const items = await openMoreMenu(w)
     expect(items.some((el) => el.textContent?.includes('开票'))).toBe(false)
+  })
+})
+
+/**
+ * 导出入口（2026-11-10）：列表页只负责"打开时间范围弹窗"，
+ * 真正的范围选择与请求在 OrderExportForm 里（见它自己的 spec）。
+ */
+describe('后台订单列表 —— 导出入口', () => {
+  it('点「导出」打开时间范围弹窗', async () => {
+    const w = mount(OrderIndex, {
+      global: { plugins: [createPinia()], stubs: { OrderExportForm: OrderExportFormStub } }
+    })
+    await flushPromises()
+
+    const exportButton = w.findAll('button').find((button) => button.text().includes('导出'))
+    expect(exportButton, '找不到「导出」按钮').toBeTruthy()
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(exportOpen).toHaveBeenCalled()
   })
 })

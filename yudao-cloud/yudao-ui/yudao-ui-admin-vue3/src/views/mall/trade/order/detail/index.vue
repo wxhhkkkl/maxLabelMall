@@ -18,7 +18,33 @@
         <dict-tag :type="DICT_TYPE.TERMINAL" :value="formData.terminal!" />
       </el-descriptions-item>
       <el-descriptions-item label="买家留言: ">{{ formData.userRemark }}</el-descriptions-item>
-      <el-descriptions-item label="商家备注: ">{{ formData.remark }}</el-descriptions-item>
+      <!-- 商家备注：**点一下就能改**（2026-11-16 所有者要求），不再走弹窗 -->
+      <el-descriptions-item label="商家备注: " min-width="240">
+        <div v-if="remarkEditing" class="remark-edit">
+          <el-input
+            ref="remarkInputRef"
+            v-model="remarkDraft"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            placeholder="请输入订单备注"
+            type="textarea"
+          />
+          <div class="remark-edit-actions">
+            <el-button :loading="remarkSaving" size="small" type="primary" @click="saveRemark">
+              保存
+            </el-button>
+            <el-button size="small" @click="cancelRemark">取消</el-button>
+          </div>
+        </div>
+        <span
+          v-else
+          class="remark-view"
+          :class="{ 'is-editable': canEditRemark }"
+          @click="startRemarkEdit"
+        >
+          {{ formData.remark || (canEditRemark ? '点击填写备注' : '—') }}
+          <Icon v-if="canEditRemark" class="remark-edit-icon" icon="ep:edit-pen" />
+        </span>
+      </el-descriptions-item>
       <el-descriptions-item label="支付单号: ">{{ formData.payOrderId }}</el-descriptions-item>
       <el-descriptions-item label="付款方式: ">
         <dict-tag :type="DICT_TYPE.PAY_CHANNEL_CODE" :value="formData.payChannelCode!" />
@@ -163,119 +189,6 @@
       ></iframe>
     </div>
 
-    <!-- 订单状态 -->
-    <el-descriptions class="od-section" :column="1" title="订单状态">
-      <el-descriptions-item label="订单状态: ">
-        <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
-        <!-- 买家已删除（假删除）：C 端不可见，运营后台仍可见并在此标记 -->
-        <el-tag v-if="formData.userDeleted" class="ml-8px" type="info">用户已删除</el-tag>
-      </el-descriptions-item>
-      <!-- ERP开单（2026-11-10）：独立于订单主状态，运营手工维护；未来由 ERP 回写 -->
-      <el-descriptions-item label="ERP系统开单: ">
-        <el-tag v-if="formData.erpCreated" type="success">已开单</el-tag>
-        <el-tag v-else type="info">未开单</el-tag>
-        <span v-if="formData.erpCreated && formData.erpNo" class="ml-8px">
-          ERP单号：{{ formData.erpNo }}
-        </span>
-        <el-button
-          v-if="!formData.erpCreated"
-          v-hasPermi="['trade:order:update']"
-          class="ml-8px"
-          size="small"
-          type="primary"
-          @click="markErpCreated"
-        >
-          标记ERP已开单
-        </el-button>
-        <el-button
-          v-else
-          v-hasPermi="['trade:order:update']"
-          class="ml-8px"
-          size="small"
-          type="danger"
-          @click="cancelErpCreated"
-        >
-          撤销开单
-        </el-button>
-      </el-descriptions-item>
-      <!--
-        确认对公转账收款（008 / FR-203）。**独立权限点、独立一行** ——
-        它是**资金动作**，不是所有后台角色都该能做；塞进下面那行（trade:order:update）
-        会让"只有 confirm-paid 权限"的人看不到它。
-      -->
-      <el-descriptions-item v-hasPermi="['trade:order:confirm-paid']" label-class-name="no-colon">
-        <el-button v-if="formData.offlineWaiting" type="primary" @click="confirmOfflinePaid">
-          确认收款
-        </el-button>
-      </el-descriptions-item>
-      <!-- 代客发起售后（017）：独立权限点，与同意/退款权限分离 -->
-      <el-descriptions-item
-        v-hasPermi="['trade:after-sale:agent-create']"
-        label-class-name="no-colon"
-      >
-        <el-button v-if="canAgentAfterSale" type="warning" @click="agentAfterSale">
-          代客发起售后
-        </el-button>
-      </el-descriptions-item>
-      <el-descriptions-item v-hasPermi="['trade:order:update']" label-class-name="no-colon">
-        <el-button
-          v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
-          type="primary"
-          @click="updatePrice"
-        >
-          调整价格
-        </el-button>
-        <el-button type="primary" @click="remark">备注</el-button>
-        <!--
-          取消订单（008 / FR-213）。**只能取消未支付订单** —— 已支付（含已确认收款）的
-          必须走**退款**：取消不改金额，账对不上。后台此前根本没有这个入口，
-          对公转账单又不参与超时自动取消（FR-212），弃单就是靠它清掉的。
-        -->
-        <el-button
-          v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
-          type="danger"
-          @click="cancelOrder"
-        >
-          取消订单
-        </el-button>
-        <!-- 待发货 -->
-        <template v-if="formData.status! === TradeOrderStatusEnum.UNDELIVERED.status">
-          <!--
-            快递要发货；**虚拟商品（软件等）也要**（007）—— 客服线下交付完，
-            运营点「发货 → 无需发货」把它推进到已发货。自提不走这里（另外的核销入口）。
-          -->
-          <el-button
-            v-if="formData.deliveryType !== DeliveryTypeEnum.PICK_UP.type"
-            type="primary"
-            @click="delivery"
-          >
-            发货
-          </el-button>
-          <el-button
-            v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type"
-            type="primary"
-            @click="updateAddress"
-          >
-            修改地址
-          </el-button>
-          <!-- 到店自提 -->
-          <el-button
-            v-if="formData.deliveryType === DeliveryTypeEnum.PICK_UP.type && showPickUp"
-            type="primary"
-            @click="handlePickUp"
-          >
-            核销
-          </el-button>
-        </template>
-      </el-descriptions-item>
-      <el-descriptions-item>
-        <template #label><span style="color: red">提醒: </span></template>
-        买家付款成功后，货款将直接进入您的商户号（微信、支付宝）<br />
-        请及时关注你发出的包裹状态，确保可以配送至买家手中 <br />
-        如果买家表示没收到货或货物有问题，请及时联系买家处理，友好协商
-      </el-descriptions-item>
-    </el-descriptions>
-
     <!-- 发票详情（006）：客户申请过开票才有内容；开票按钮也从「订单状态」挪到这里 -->
     <el-descriptions class="od-section" :column="3" title="发票详情">
       <template v-if="formData.invoice">
@@ -344,38 +257,12 @@
           <el-button v-if="invoiceAction" type="primary" @click="openInvoiceIssue">
             {{ invoiceAction }}
           </el-button>
+          <!-- 客户打电话说抬头写错时，运营在这里代改（只允许待开票，见后端） -->
+          <el-button v-if="canEditInvoice" @click="openInvoiceEdit">修改发票信息</el-button>
         </el-descriptions-item>
       </template>
       <el-descriptions-item v-else label-class-name="no-colon">
         该订单未申请开票
-      </el-descriptions-item>
-    </el-descriptions>
-
-    <!--
-      对公转账（008）。**待收款**时提示财务去核对到账；已确认时把痕迹摆出来（FR-205）——
-      "凭哪笔流水、谁确认的、什么时候"，事后对账全靠这几行。
-      ⚠️ `offlinePayment` 为 null 时整块不渲染（不是对公单）。
-    -->
-    <el-descriptions v-if="formData.offlinePayment" class="od-section" :column="2" title="对公转账">
-      <el-descriptions-item label="收款状态: ">
-        <el-tag v-if="formData.offlineWaiting" type="warning">待收款</el-tag>
-        <el-tag v-else type="success">已确认收款</el-tag>
-      </el-descriptions-item>
-      <el-descriptions-item v-if="formData.offlinePayment.bankSerialNo" label="银行流水号: ">
-        {{ formData.offlinePayment.bankSerialNo }}
-      </el-descriptions-item>
-      <el-descriptions-item v-if="formData.offlinePayment.payerName" label="打款方: ">
-        {{ formData.offlinePayment.payerName }}
-      </el-descriptions-item>
-      <el-descriptions-item v-if="formData.offlinePayment.paidTime" label="到账时间: ">
-        {{ formatDate(formData.offlinePayment.paidTime) }}
-      </el-descriptions-item>
-      <el-descriptions-item v-if="formData.offlinePayment.remark" label="备注: ">
-        {{ formData.offlinePayment.remark }}
-      </el-descriptions-item>
-      <el-descriptions-item v-if="formData.offlinePayment.confirmTime" label="确认人 / 确认时间: ">
-        {{ formData.offlinePayment.confirmUserId }} /
-        {{ formatDate(formData.offlinePayment.confirmTime) }}
       </el-descriptions-item>
     </el-descriptions>
 
@@ -450,6 +337,146 @@
       </el-descriptions-item>
     </el-descriptions>
 
+    <!-- 订单状态 -->
+    <el-descriptions class="od-section" :column="1" title="订单状态">
+      <el-descriptions-item label="订单状态: ">
+        <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="formData.status!" />
+        <!-- 买家已删除（假删除）：C 端不可见，运营后台仍可见并在此标记 -->
+        <el-tag v-if="formData.userDeleted" class="ml-8px" type="info">用户已删除</el-tag>
+      </el-descriptions-item>
+      <!-- ERP开单（2026-11-10）：独立于订单主状态，运营手工维护；未来由 ERP 回写 -->
+      <el-descriptions-item label="ERP系统开单: ">
+        <el-tag v-if="formData.erpCreated" type="success">已开单</el-tag>
+        <el-tag v-else type="info">未开单</el-tag>
+        <span v-if="formData.erpCreated && formData.erpNo" class="ml-8px">
+          ERP单号：{{ formData.erpNo }}
+        </span>
+        <el-button
+          v-if="!formData.erpCreated"
+          v-hasPermi="['trade:order:update']"
+          class="ml-8px"
+          size="small"
+          type="primary"
+          @click="markErpCreated"
+        >
+          标记ERP已开单
+        </el-button>
+        <el-button
+          v-else
+          v-hasPermi="['trade:order:update']"
+          class="ml-8px"
+          size="small"
+          type="danger"
+          @click="cancelErpCreated"
+        >
+          撤销开单
+        </el-button>
+      </el-descriptions-item>
+      <!--
+        确认对公转账收款（008 / FR-203）。**独立权限点、独立一行** ——
+        它是**资金动作**，不是所有后台角色都该能做；塞进下面那行（trade:order:update）
+        会让"只有 confirm-paid 权限"的人看不到它。
+      -->
+      <el-descriptions-item v-hasPermi="['trade:order:confirm-paid']" label-class-name="no-colon">
+        <el-button v-if="formData.offlineWaiting" type="primary" @click="confirmOfflinePaid">
+          确认收款
+        </el-button>
+      </el-descriptions-item>
+      <!-- 代客发起售后（017）：独立权限点，与同意/退款权限分离 -->
+      <el-descriptions-item
+        v-hasPermi="['trade:after-sale:agent-create']"
+        label-class-name="no-colon"
+      >
+        <el-button v-if="canAgentAfterSale" type="warning" @click="agentAfterSale">
+          代客发起售后
+        </el-button>
+      </el-descriptions-item>
+      <el-descriptions-item v-hasPermi="['trade:order:update']" label-class-name="no-colon">
+        <el-button
+          v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
+          type="primary"
+          @click="updatePrice"
+        >
+          调整价格
+        </el-button>
+        <!--
+          取消订单（008 / FR-213）。**只能取消未支付订单** —— 已支付（含已确认收款）的
+          必须走**退款**：取消不改金额，账对不上。后台此前根本没有这个入口，
+          对公转账单又不参与超时自动取消（FR-212），弃单就是靠它清掉的。
+        -->
+        <el-button
+          v-if="formData.status! === TradeOrderStatusEnum.UNPAID.status"
+          type="danger"
+          @click="cancelOrder"
+        >
+          取消订单
+        </el-button>
+        <!-- 待发货 -->
+        <template v-if="formData.status! === TradeOrderStatusEnum.UNDELIVERED.status">
+          <!--
+            快递要发货；**虚拟商品（软件等）也要**（007）—— 客服线下交付完，
+            运营点「发货 → 无需发货」把它推进到已发货。自提不走这里（另外的核销入口）。
+          -->
+          <el-button
+            v-if="formData.deliveryType !== DeliveryTypeEnum.PICK_UP.type"
+            type="primary"
+            @click="delivery"
+          >
+            发货
+          </el-button>
+          <el-button
+            v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type"
+            type="primary"
+            @click="updateAddress"
+          >
+            修改地址
+          </el-button>
+          <!-- 到店自提 -->
+          <el-button
+            v-if="formData.deliveryType === DeliveryTypeEnum.PICK_UP.type && showPickUp"
+            type="primary"
+            @click="handlePickUp"
+          >
+            核销
+          </el-button>
+        </template>
+      </el-descriptions-item>
+      <el-descriptions-item>
+        <template #label><span style="color: red">提醒: </span></template>
+        买家付款成功后，货款将直接进入您的商户号（微信、支付宝）<br />
+        请及时关注你发出的包裹状态，确保可以配送至买家手中 <br />
+        如果买家表示没收到货或货物有问题，请及时联系买家处理，友好协商
+      </el-descriptions-item>
+    </el-descriptions>
+
+    <!--
+      对公转账（008）。**待收款**时提示财务去核对到账；已确认时把痕迹摆出来（FR-205）——
+      "凭哪笔流水、谁确认的、什么时候"，事后对账全靠这几行。
+      ⚠️ `offlinePayment` 为 null 时整块不渲染（不是对公单）。
+    -->
+    <el-descriptions v-if="formData.offlinePayment" class="od-section" :column="2" title="对公转账">
+      <el-descriptions-item label="收款状态: ">
+        <el-tag v-if="formData.offlineWaiting" type="warning">待收款</el-tag>
+        <el-tag v-else type="success">已确认收款</el-tag>
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.bankSerialNo" label="银行流水号: ">
+        {{ formData.offlinePayment.bankSerialNo }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.payerName" label="打款方: ">
+        {{ formData.offlinePayment.payerName }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.paidTime" label="到账时间: ">
+        {{ formatDate(formData.offlinePayment.paidTime) }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.remark" label="备注: ">
+        {{ formData.offlinePayment.remark }}
+      </el-descriptions-item>
+      <el-descriptions-item v-if="formData.offlinePayment.confirmTime" label="确认人 / 确认时间: ">
+        {{ formData.offlinePayment.confirmUserId }} /
+        {{ formatDate(formData.offlinePayment.confirmTime) }}
+      </el-descriptions-item>
+    </el-descriptions>
+
     <!-- 订单日志 -->
     <el-descriptions class="od-section" title="订单操作日志">
       <el-descriptions-item labelClassName="no-colon">
@@ -480,25 +507,26 @@
   <!-- 各种操作的弹窗 -->
   <OrderDeliveryForm ref="deliveryFormRef" @success="getDetail" />
   <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getDetail" />
-  <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getDetail" />
   <OrderUpdateAddressForm ref="updateAddressFormRef" @success="getDetail" />
   <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getDetail" />
   <OrderAgentAfterSaleForm ref="agentAfterSaleFormRef" @success="getDetail" />
   <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getDetail" />
+  <InvoiceEditForm ref="invoiceEditFormRef" @success="getDetail" />
 </template>
 <script lang="ts" setup>
 import * as TradeOrderApi from '@/api/mall/trade/order'
 import { fenToYuan } from '@/utils'
 import { formatDate } from '@/utils/formatTime'
 import { DICT_TYPE, getDictLabel, getDictObj } from '@/utils/dict'
-import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateAddressForm from '@/views/mall/trade/order/form/OrderUpdateAddressForm.vue'
 import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
 import OrderAgentAfterSaleForm from '@/views/mall/trade/order/form/OrderAgentAfterSaleForm.vue'
 import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
+import InvoiceEditForm from '@/views/mall/trade/invoice/InvoiceEditForm.vue'
 import { INVOICE_STATUS, orderInvoiceAction } from '@/utils/invoice'
+import { checkPermi } from '@/utils/permission'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { DeliveryTypeEnum, TradeOrderStatusEnum } from '@/utils/constants'
@@ -553,11 +581,47 @@ const customizationProcesses = computed(() => {
   return parts
 })
 
-/** 各种操作 */
-const updateRemarkForm = ref() // 订单备注表单 Ref
-const remark = () => {
-  updateRemarkForm.value?.open(formData.value)
+/** 商家备注：点备注就地编辑（2026-11-16 所有者要求，原「备注」弹窗已从本页撤掉） */
+const canEditRemark = computed(() => checkPermi(['trade:order:update']))
+const remarkEditing = ref(false)
+const remarkSaving = ref(false)
+const remarkDraft = ref('')
+const remarkInputRef = ref()
+const startRemarkEdit = () => {
+  if (!canEditRemark.value) {
+    return
+  }
+  remarkDraft.value = formData.value.remark || ''
+  remarkEditing.value = true
+  // 直接聚焦，运营点完就能打字
+  nextTick(() => remarkInputRef.value?.focus())
 }
+const cancelRemark = () => {
+  remarkEditing.value = false
+  remarkDraft.value = ''
+}
+const saveRemark = async () => {
+  if (remarkSaving.value) {
+    return
+  }
+  const remark = remarkDraft.value.trim()
+  // 没改（或只多了空格）就不发请求，直接退出编辑
+  if (remark === (formData.value.remark || '').trim()) {
+    cancelRemark()
+    return
+  }
+  remarkSaving.value = true
+  try {
+    await TradeOrderApi.updateOrderRemark({ id: formData.value.id, remark })
+    message.success('备注已保存')
+    remarkEditing.value = false
+    await getDetail()
+  } finally {
+    remarkSaving.value = false
+  }
+}
+
+/** 各种操作 */
 const deliveryFormRef = ref() // 发货表单 Ref
 const delivery = () => {
   deliveryFormRef.value?.open(formData.value)
@@ -593,6 +657,16 @@ const openInvoiceIssue = () => {
     return
   }
   invoiceIssueFormRef.value?.open(formData.value.invoice)
+}
+
+/** 改开票信息：只有**待开票**的申请能改（已开票的票面文件已经生成） */
+const invoiceEditFormRef = ref()
+const canEditInvoice = computed(() => formData.value.invoice?.status === INVOICE_STATUS.WAITING)
+const openInvoiceEdit = () => {
+  if (!formData.value.invoice) {
+    return
+  }
+  invoiceEditFormRef.value?.open(formData.value.invoice)
 }
 
 /** 代客发起售后（017） */
@@ -864,6 +938,31 @@ onMounted(async () => {
       }
     }
   }
+}
+
+// 商家备注：点文字就地编辑
+.remark-view {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+
+  &.is-editable {
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline dashed;
+    }
+  }
+}
+
+.remark-edit-icon {
+  color: var(--el-color-primary);
+}
+
+.remark-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 // 时间线样式调整

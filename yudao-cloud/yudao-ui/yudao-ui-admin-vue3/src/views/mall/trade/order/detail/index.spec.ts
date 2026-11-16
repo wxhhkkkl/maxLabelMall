@@ -25,6 +25,7 @@ vi.mock('vue-router', async (importOriginal) => {
 const getOrder = vi.fn()
 const getExpressTrackList = vi.fn()
 const getExpressMapUrl = vi.fn()
+const updateOrderRemark = vi.fn()
 vi.mock('@/api/mall/trade/order', () => ({
   EXPRESS_QUERY_NOT_SUPPORTED: 1_011_004_103,
   EXPRESS_MAP_NOT_CONFIGURED: 1_011_004_104,
@@ -32,6 +33,7 @@ vi.mock('@/api/mall/trade/order', () => ({
   getOrder: (...a: unknown[]) => getOrder(...a),
   getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
   getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
+  updateOrderRemark: (...a: unknown[]) => updateOrderRemark(...a),
   cancelOrder: vi.fn(),
   pickUpOrder: vi.fn(),
   updateOrderErp: vi.fn()
@@ -57,7 +59,8 @@ vi.mock('@/utils/dict', () => ({
   getDictLabel: () => '',
   getDictObj: () => undefined
 }))
-vi.mock('@/utils/permission', () => ({ checkPermi: () => true }))
+const checkPermi = vi.fn()
+vi.mock('@/utils/permission', () => ({ checkPermi: (...a: unknown[]) => checkPermi(...a) }))
 // 字典标签会去后端拉字典；单测里不要真发请求
 vi.mock('@/config/axios', () => ({
   default: {
@@ -122,6 +125,10 @@ beforeEach(() => {
   getExpressTrackList.mockResolvedValue([])
   getExpressMapUrl.mockReset()
   getExpressMapUrl.mockResolvedValue('')
+  updateOrderRemark.mockReset()
+  updateOrderRemark.mockResolvedValue(true)
+  checkPermi.mockReset()
+  checkPermi.mockReturnValue(true)
 })
 
 describe('后台订单详情 —— 物流信息', () => {
@@ -304,6 +311,48 @@ describe('后台订单详情 —— ERP开单（2026-11-10）', () => {
   })
 })
 
+describe('后台订单详情 —— 商家备注就地编辑', () => {
+  it('点备注文字出现输入框，保存后带上订单号与新备注', async () => {
+    const w = await mountDetail(order({ remark: '已确认收货' }))
+
+    await w.get('.remark-view').trigger('click')
+    const textarea = w.get('.remark-edit textarea')
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('已确认收货')
+
+    await textarea.setValue('客户要开专票，已电话确认')
+    await w.get('.remark-edit-actions .el-button--primary').trigger('click')
+    await flushPromises()
+
+    expect(updateOrderRemark).toHaveBeenCalledWith({ id: 1, remark: '客户要开专票，已电话确认' })
+    expect(w.find('.remark-edit').exists()).toBe(false) // 保存后退出编辑态
+  })
+
+  it('内容没改就保存：不发请求（避免无意义的写库）', async () => {
+    const w = await mountDetail(order({ remark: '已确认收货' }))
+
+    await w.get('.remark-view').trigger('click')
+    await w.get('.remark-edit-actions .el-button--primary').trigger('click')
+    await flushPromises()
+
+    expect(updateOrderRemark).not.toHaveBeenCalled()
+  })
+
+  it('没有 trade:order:update 权限：点备注不进入编辑态', async () => {
+    checkPermi.mockReturnValue(false)
+    const w = await mountDetail(order({ remark: '已确认收货' }))
+
+    await w.get('.remark-view').trigger('click')
+
+    expect(w.find('.remark-edit').exists()).toBe(false)
+  })
+
+  it('原本没有备注：显示「点击填写备注」', async () => {
+    const w = await mountDetail(order({ remark: '' }))
+
+    expect(w.text()).toContain('点击填写备注')
+  })
+})
+
 describe('后台订单详情 —— 发票详情', () => {
   const invoice = {
     id: 77,
@@ -350,6 +399,36 @@ describe('后台订单详情 —— 发票详情', () => {
     expect(invoiceSection!.findAll('button').some((button) => button.text().includes('开票'))).toBe(
       true
     )
+  })
+
+  it('待开票：「修改发票信息」按钮出现在「发票详情」块里', async () => {
+    const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
+
+    const invoiceSection = w
+      .findAll('.el-descriptions')
+      .find((section) => section.text().includes('发票详情'))
+    expect(
+      invoiceSection!.findAll('button').some((button) => button.text().includes('修改发票信息'))
+    ).toBe(true)
+  })
+
+  it('已开票：不给「修改发票信息」入口（票面文件已经生成，后端也会拒）', async () => {
+    const w = await mountDetail(
+      order({ invoiceStatus: 10, invoice: { ...invoice, status: 10, statusName: '已开票' } })
+    )
+
+    expect(w.text()).not.toContain('修改发票信息')
+  })
+
+  it('区块顺序：发票详情、商品详情紧跟在收货信息之后（2026-11-16 所有者要求）', async () => {
+    const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
+
+    const sections = w.findAll('.el-descriptions').map((section) => section.text())
+    const indexOf = (title: string) => sections.findIndex((text) => text.includes(title))
+    expect(indexOf('收货信息')).toBeGreaterThanOrEqual(0)
+    expect(indexOf('收货信息')).toBeLessThan(indexOf('发票详情'))
+    expect(indexOf('发票详情')).toBeLessThan(indexOf('商品详情'))
+    expect(indexOf('商品详情')).toBeLessThan(indexOf('订单状态'))
   })
 
   it('未申请开票：显示「未申请开票」，没有开票按钮', async () => {

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.invoice;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
@@ -80,5 +81,13 @@ public interface TradeOrderInvoiceService {
      * 部分退款不会改它，运营开具前要靠这两个数判断（Q33）。
      */
     PageResult<TradeOrderInvoiceRespVO> getInvoicePage(TradeOrderInvoicePageReqVO reqVO);
+
+    /**
+     * 后台代客户**修改开票信息**（票种 + 抬头 + 邮箱），客户打电话说抬头写错时用
+     *
+     * ⚠️ **只允许「待开票」的申请**：已开票的发票文件已经生成，改抬头只会让记录与票面不一致；
+     * 已作废的更不该再动。校验复用 {@code InvoiceValidator}，与客户自己提交时同一套规则。
+     */
+    void updateInvoice(TradeOrderInvoiceUpdateReqVO reqVO);
 
 }

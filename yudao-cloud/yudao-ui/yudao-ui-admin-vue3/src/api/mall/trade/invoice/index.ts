@@ -52,3 +52,12 @@ export const getInvoicePage = async (params: PageParam & { status?: number; orde
 export const issueInvoice = async (id: number, fileUrl: string) => {
   return await request.put({ url: '/trade/order-invoice/issue', params: { id, fileUrl } })
 }
+
+/**
+ * 修改开票信息（运营代客户改票种 / 抬头 / 邮箱）
+ *
+ * 服务端只允许**待开票**的申请修改，校验规则与客户自己提交时同一套。
+ */
+export const updateInvoice = async (data: TradeOrderInvoiceVO) => {
+  return await request.put({ url: '/trade/order-invoice/update', data })
+}

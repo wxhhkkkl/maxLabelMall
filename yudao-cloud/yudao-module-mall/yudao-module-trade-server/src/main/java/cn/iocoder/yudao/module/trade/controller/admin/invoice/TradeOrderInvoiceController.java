@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.member.api.user.MemberUserApi;
 import cn.iocoder.yudao.module.member.api.user.dto.MemberUserRespDTO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.service.invoice.TradeOrderInvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -74,6 +76,14 @@ public class TradeOrderInvoiceController {
     public CommonResult<Boolean> issueInvoice(@RequestParam("id") Long id,
                                              @RequestParam("fileUrl") String fileUrl) {
         tradeOrderInvoiceService.issueInvoice(id, fileUrl, getLoginUserId());
+        return success(true);
+    }
+
+    @PutMapping("/update")
+    @Operation(summary = "修改开票信息", description = "运营代客户改票种 / 抬头 / 邮箱；只允许待开票的申请")
+    @PreAuthorize("@ss.hasPermission('trade:order-invoice:issue')")
+    public CommonResult<Boolean> updateInvoice(@Valid @RequestBody TradeOrderInvoiceUpdateReqVO reqVO) {
+        tradeOrderInvoiceService.updateInvoice(reqVO);
         return success(true);
     }
 

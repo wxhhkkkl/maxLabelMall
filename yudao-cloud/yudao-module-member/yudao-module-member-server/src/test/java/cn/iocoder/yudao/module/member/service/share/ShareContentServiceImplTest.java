@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareContentSaveReqVO;
 import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareContentUploadReqVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelShareContentDO;
+import cn.iocoder.yudao.module.member.dal.dataobject.share.MaxLabelShareFolderDO;
 import cn.iocoder.yudao.module.member.dal.mysql.share.MaxLabelShareContentMapper;
 import cn.iocoder.yudao.module.member.service.share.dto.ShareEnterpriseAccess;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,55 @@ public class ShareContentServiceImplTest {
             row.setId(9L);
             return 1;
         }).when(contentMapper).insert(any(MaxLabelShareContentDO.class));
+    }
+
+    @Test
+    void getPersonalPageForAdmin_delegatesWithoutSeatCheck() {
+        cn.iocoder.yudao.framework.common.pojo.PageParam page =
+                new cn.iocoder.yudao.framework.common.pojo.PageParam();
+        when(contentMapper.selectPersonalPage(MEMBER_ID, null, "key", 1, page))
+                .thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(), 0L));
+
+        var result = contentService.getPersonalPageForAdmin(MEMBER_ID, null, "key", 1, page);
+
+        assertEquals(0L, result.getTotal());
+        verify(contentMapper).selectPersonalPage(MEMBER_ID, null, "key", 1, page);
+    }
+
+    @Test
+    void getPersonalPageForAdmin_validatesAndFiltersFolder() {
+        cn.iocoder.yudao.framework.common.pojo.PageParam page =
+                new cn.iocoder.yudao.framework.common.pojo.PageParam();
+        when(folderService.requirePersonalFolder(MEMBER_ID, 600L))
+                .thenReturn(MaxLabelShareFolderDO.builder().id(600L).scope(1)
+                        .ownerMemberId(MEMBER_ID).name("我的模板").build());
+        when(contentMapper.selectPersonalPage(MEMBER_ID, 600L, null, 1, page))
+                .thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(), 0L));
+
+        contentService.getPersonalPageForAdmin(MEMBER_ID, 600L, null, 1, page);
+
+        verify(folderService).requirePersonalFolder(MEMBER_ID, 600L);
+        verify(contentMapper).selectPersonalPage(MEMBER_ID, 600L, null, 1, page);
+    }
+
+    @Test
+    void getPersonalContentForAdmin_rejectsOtherScopeOrOwner() {
+        MaxLabelShareContentDO enterprise = MaxLabelShareContentDO.builder()
+                .id(9L).scope(2).ownerMemberId(MEMBER_ID).build();
+        when(contentMapper.selectById(9L)).thenReturn(enterprise);
+        assertThrows(ServiceException.class,
+                () -> contentService.getPersonalContentForAdmin(MEMBER_ID, 9L));
+
+        MaxLabelShareContentDO otherOwner = MaxLabelShareContentDO.builder()
+                .id(10L).scope(1).ownerMemberId(2002L).build();
+        when(contentMapper.selectById(10L)).thenReturn(otherOwner);
+        assertThrows(ServiceException.class,
+                () -> contentService.getPersonalContentForAdmin(MEMBER_ID, 10L));
+
+        MaxLabelShareContentDO mine = MaxLabelShareContentDO.builder()
+                .id(11L).scope(1).ownerMemberId(MEMBER_ID).build();
+        when(contentMapper.selectById(11L)).thenReturn(mine);
+        assertEquals(11L, contentService.getPersonalContentForAdmin(MEMBER_ID, 11L).getId());
     }
 
     @Test

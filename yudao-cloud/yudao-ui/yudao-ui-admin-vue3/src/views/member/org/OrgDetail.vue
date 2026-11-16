@@ -14,6 +14,13 @@
             >
               加入成员
             </el-button>
+            <el-button
+              v-hasPermi="['member:org:labelshop-import']"
+              type="primary"
+              @click="importVisible = true"
+            >
+              导入历史模板
+            </el-button>
             <el-button @click="loadMembers">刷新</el-button>
           </el-form-item>
         </el-form>
@@ -184,6 +191,8 @@
     <Dialog v-model="sharePreviewVisible" title="共享内容预览" width="720px">
       <el-input v-model="sharePreviewContent" :rows="14" readonly type="textarea" />
     </Dialog>
+
+    <LabelshopImportDialog v-model="importVisible" :org-id="orgId" @completed="onImportCompleted" />
   </div>
 </template>
 
@@ -209,6 +218,7 @@ import {
   type OrgShareFolderVO,
   type OrgShareOverviewVO
 } from '@/api/member/orgShareContent'
+import LabelshopImportDialog from './LabelshopImportDialog.vue'
 import { dateFormatter } from '@/utils/formatTime'
 
 defineOptions({ name: 'MemberOrgDetail' })
@@ -218,6 +228,7 @@ const emit = defineEmits(['changed'])
 const message = useMessage()
 
 const activeTab = ref('members')
+const importVisible = ref(false)
 const mobile = ref('')
 const members = ref<OrgMemberVO[]>([])
 const memberTotal = ref(0)
@@ -309,6 +320,12 @@ const previewShareContent = async (row: OrgShareContentVO) => {
   } else if (detail.downloadUrl) {
     window.open(detail.downloadUrl, '_blank')
   }
+}
+
+const onImportCompleted = async () => {
+  await loadMembers()
+  if (activeTab.value === 'share') await loadShareContent()
+  emit('changed')
 }
 
 const onTabChange = async (name: string) => {

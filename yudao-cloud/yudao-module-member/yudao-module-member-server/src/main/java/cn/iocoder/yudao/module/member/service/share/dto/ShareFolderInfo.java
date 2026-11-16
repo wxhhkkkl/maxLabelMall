@@ -10,6 +10,8 @@ public class ShareFolderInfo {
 
     private Long id;
     private String name;
+    /** 父文件夹；NULL = 根目录（个人空间为多层，企业空间保持单层） */
+    private Long parentId;
     private Integer memberCount;
     /** 仅管理员返回 */
     private Integer contentCount;

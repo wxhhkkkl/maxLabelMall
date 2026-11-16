@@ -105,5 +105,20 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_SHARE_FILE_STORAGE_FAILED = new ErrorCode(1_004_016_014, "文件保存失败，请稍后重试");
     ErrorCode MEMBER_PLATFORM_CONTENT_CATEGORY_EXISTS = new ErrorCode(1_004_016_015, "分类名称已存在");
     ErrorCode MEMBER_PLATFORM_CONTENT_CATEGORY_NOT_FOUND = new ErrorCode(1_004_016_016, "分类不存在");
+    ErrorCode MEMBER_SHARE_FOLDER_NAME_EXISTS = new ErrorCode(1_004_016_017, "同一目录下已存在同名文件夹");
+    ErrorCode MEMBER_SHARE_FOLDER_MOVE_INVALID = new ErrorCode(1_004_016_018, "不能把文件夹移动到自身或其子文件夹下");
+
+    //========== MaxLabel LabelShop 模板导入 1-004-018-000 ==========
+    ErrorCode MEMBER_LABELSHOP_CREDENTIAL_REQUIRED = new ErrorCode(1_004_018_001,
+            "请填写历史系统账号、密码并确认授权");
+    ErrorCode MEMBER_LABELSHOP_LOGIN_FAILED = new ErrorCode(1_004_018_002, "历史系统登录失败，请检查账号密码");
+    ErrorCode MEMBER_LABELSHOP_UPSTREAM_ERROR = new ErrorCode(1_004_018_003, "历史系统接口异常，请稍后重试");
+    ErrorCode MEMBER_LABELSHOP_IMPORT_RUNNING = new ErrorCode(1_004_018_004, "该企业已有导入任务在进行");
+    ErrorCode MEMBER_LABELSHOP_TASK_NOT_FOUND = new ErrorCode(1_004_018_005, "导入任务不存在");
+    ErrorCode MEMBER_LABELSHOP_OWNER_MISSING = new ErrorCode(1_004_018_006, "企业缺少有效 OWNER，无法导入");
+    ErrorCode MEMBER_LABELSHOP_ORG_READ_ONLY = new ErrorCode(1_004_018_007,
+            "企业授权已到期或企业已停用，不能导入");
+    ErrorCode MEMBER_LABELSHOP_TASK_REJECTED = new ErrorCode(1_004_018_008, "导入任务繁忙，请稍后重试");
+    ErrorCode MEMBER_LABELSHOP_SUBJECT_REQUIRED = new ErrorCode(1_004_018_009, "请指定企业或会员");
 
 }

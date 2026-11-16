@@ -2,6 +2,9 @@ package cn.iocoder.yudao.module.member.controller.app.share;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.member.controller.app.share.vo.AppPersonalFolderMoveReqVO;
+import cn.iocoder.yudao.module.member.controller.app.share.vo.AppPersonalFolderSaveReqVO;
+import cn.iocoder.yudao.module.member.controller.app.share.vo.AppPersonalFolderUpdateReqVO;
 import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareFolderMemberListRespVO;
 import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareFolderMemberReqVO;
 import cn.iocoder.yudao.module.member.controller.app.share.vo.AppShareFolderSaveReqVO;
@@ -69,6 +72,45 @@ public class AppShareFolderController {
     @Operation(summary = "保存文件夹可见成员名单")
     public CommonResult<Boolean> updateMembers(@Valid @RequestBody AppShareFolderMemberReqVO reqVO) {
         folderService.updateMembers(SecurityFrameworkUtils.getLoginUserId(), reqVO.getId(), reqVO.getMemberIds());
+        return success(true);
+    }
+
+    // ======================= 个人空间文件夹 =======================
+
+    @GetMapping("/personal/list")
+    @Operation(summary = "获得个人空间文件夹（含父级，前端组树）")
+    public CommonResult<List<ShareFolderInfo>> personalList() {
+        return success(folderService.getPersonalList(SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/personal/create")
+    @Operation(summary = "创建个人空间文件夹")
+    public CommonResult<Long> createPersonal(@Valid @RequestBody AppPersonalFolderSaveReqVO reqVO) {
+        return success(folderService.createPersonal(SecurityFrameworkUtils.getLoginUserId(),
+                reqVO.getName(), reqVO.getParentId()));
+    }
+
+    @PutMapping("/personal/update")
+    @Operation(summary = "重命名个人空间文件夹")
+    public CommonResult<Boolean> updatePersonal(@Valid @RequestBody AppPersonalFolderUpdateReqVO reqVO) {
+        folderService.updatePersonal(SecurityFrameworkUtils.getLoginUserId(),
+                reqVO.getId(), reqVO.getName());
+        return success(true);
+    }
+
+    @PutMapping("/personal/move")
+    @Operation(summary = "移动个人空间文件夹")
+    public CommonResult<Boolean> movePersonal(@Valid @RequestBody AppPersonalFolderMoveReqVO reqVO) {
+        folderService.movePersonal(SecurityFrameworkUtils.getLoginUserId(),
+                reqVO.getId(), reqVO.getParentId());
+        return success(true);
+    }
+
+    @DeleteMapping("/personal/delete")
+    @Operation(summary = "删除空的个人空间文件夹")
+    @Parameter(name = "id", required = true)
+    public CommonResult<Boolean> deletePersonal(@RequestParam("id") Long id) {
+        folderService.deletePersonal(SecurityFrameworkUtils.getLoginUserId(), id);
         return success(true);
     }
 

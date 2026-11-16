@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.dal.dataobject.favorite.ProductFavoriteDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.favorite.ProductFavoriteMapper;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,8 @@ public class ProductFavoriteServiceImplTest {
     private ProductSpuService productSpuService;
     @Mock
     private MemberOrgApi memberOrgApi;
+    @Mock
+    private ProductSpuBrowseLevelService browseLevelService;
     @InjectMocks
     private ProductFavoriteServiceImpl favoriteService;
 
@@ -72,6 +75,7 @@ public class ProductFavoriteServiceImplTest {
     void publicSpuPassesVisibilityCheck() {
         ProductSpuDO publicSpu = ProductSpuDO.builder().id(200L).name("公开商品").enterpriseOnly(false).build();
         when(productSpuService.getSpu(200L)).thenReturn(publicSpu);
+        when(browseLevelService.isVisible(publicSpu, 1001L)).thenReturn(true);
         // 已收藏 → 抛 FAVORITE_EXISTS，说明它已经越过了「企业专享」那道校验
         when(productFavoriteMapper.selectByUserIdAndSpuId(1001L, 200L))
                 .thenReturn(ProductFavoriteDO.builder().id(1L).build());

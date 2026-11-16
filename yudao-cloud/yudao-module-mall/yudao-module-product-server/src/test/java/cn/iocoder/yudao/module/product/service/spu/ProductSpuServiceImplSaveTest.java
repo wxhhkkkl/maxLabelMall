@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.service.spu;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuSaveReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
@@ -57,6 +58,10 @@ public class ProductSpuServiceImplSaveTest extends BaseDbUnitTest {
     private ProductSkuService productSkuService;
     @MockitoBean
     private ProductBrandService brandService;
+    @MockitoBean
+    private ProductSpuBrowseLevelService browseLevelService;
+    @MockitoBean
+    private MemberLevelApi memberLevelApi;
 
     private static final Long CATEGORY_CARBON = 113L;
     private static final Long CATEGORY_WAX = 114L;

@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.product.controller.app.history.vo.AppProductBrows
 import cn.iocoder.yudao.module.product.dal.dataobject.history.ProductBrowseHistoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,8 @@ public class AppProductBrowseHistoryVisibilityTest {
     private ProductSpuService productSpuService;
     @Mock
     private MemberOrgApi memberOrgApi;
+    @Mock
+    private ProductSpuBrowseLevelService browseLevelService;
     @InjectMocks
     private AppProductBrowseHistoryController controller;
 
@@ -78,8 +81,9 @@ public class AppProductBrowseHistoryVisibilityTest {
      * 非企业管理员走「SQL 前置过滤」的查询：返回的页本身就不含企业商品，total 与之匹配。
      */
     private void withoutEnterpriseOnly(ProductBrowseHistoryDO publicHistory) {
-        when(productBrowseHistoryService.getBrowseHistoryPageExcludingEnterprise(any()))
+        when(productBrowseHistoryService.getBrowseHistoryPageExcludingEnterprise(any(), any()))
                 .thenReturn(new PageResult<>(List.of(publicHistory), 1L));
+        when(browseLevelService.getViewerLevelId(1001L)).thenReturn(null);
         when(productSpuService.getSpuList(any()))
                 .thenReturn(List.of(spu(1L, "公开商品", false)));
         when(memberOrgApi.getByMemberId(1001L)).thenReturn(success(null));

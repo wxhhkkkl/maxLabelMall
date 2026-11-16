@@ -35,10 +35,10 @@ public interface ProductFavoriteService {
      * @param userId 用户编号
      * @param reqVO 请求 vo
      */
-    PageResult<ProductFavoriteDO> getFavoritePage(Long userId, @Valid AppFavoritePageReqVO reqVO);
+    PageResult<ProductFavoriteDO> getFavoritePage(Long userId, Long levelId, @Valid AppFavoritePageReqVO reqVO);
 
     /** 非企业管理员：分页时排除企业专享商品（total 与列表一致） */
-    PageResult<ProductFavoriteDO> getFavoritePageExcludingEnterprise(Long userId, @Valid AppFavoritePageReqVO reqVO);
+    PageResult<ProductFavoriteDO> getFavoritePageExcludingEnterprise(Long userId, Long levelId, @Valid AppFavoritePageReqVO reqVO);
 
     /**
      * 分页查询用户收藏列表

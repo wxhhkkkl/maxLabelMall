@@ -4,7 +4,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/018-labelshop-template-import/plan.md
+specs/019-product-browse-level/plan.md
 
 企业席位（012）相关产物：
 - specs/012-enterprise-seat-licensing/spec.md — 功能规格（Q65~Q74：企业 / 席位 / 有效期 / 可见性）
@@ -21,7 +21,18 @@ specs/018-labelshop-template-import/plan.md
   📌 2026-10-27：**个人会员订阅订单用户端同样不允许退款**（后台保留人工通道）；纯虚拟订阅订单
   支付成功后直接置为「已完成」，历史已支付待发货订阅单由 `024` 迁移补成已完成（Q82）
 
-当前特性（018 LabelShop 模板导入：后台按来源白名单迁移模板）：
+当前特性（019 商品浏览等级：与会员等级关联）：
+- specs/019-product-browse-level/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/019-product-browse-level/contracts/{admin-api,app-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/041-product-browse-level.sql`（`product_spu` 增加
+  `browse_level_type` / `browse_level_ids`），再发后端，最后发管理端；C 端无需发版（服务端过滤生效）
+  📌 口径：`0` 公开（含未登录访客）/ `1` 全部登录会员 / `2` 指定等级会员（多选等级集合）；
+  等级不足**完全隐藏**（列表 / 搜索 / 详情等同商品不存在，详情不泄露名称价格）；
+  与企业专享、会员授权商品**独立叠加**，全部条件满足才可见；存量商品默认公开（`041` 前须先执行）
+  📌 交易链路（加购 / 结算 / 下单）服务端二次校验，购物车/收藏/浏览历史只隐藏不删记录；
+  营销活动（秒杀/拼团/积分/砍价）同样过滤；企业管理员不豁免等级条件
+
+上一个特性（018 LabelShop 模板导入：后台按来源白名单迁移模板）：
 - specs/018-labelshop-template-import/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/018-labelshop-template-import/contracts/{admin-api,labelshop-upstream}.md
   ⚠️ **上线顺序**：先执行 `sql/mysql/038-labelshop-template-import.sql`（2 表 + 按钮权限），

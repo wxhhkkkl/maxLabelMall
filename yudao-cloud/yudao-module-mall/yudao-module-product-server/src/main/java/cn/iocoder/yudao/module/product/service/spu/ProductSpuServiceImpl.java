@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.member.api.level.MemberLevelApi;
+import cn.iocoder.yudao.module.member.api.level.dto.MemberLevelRespDTO;
 import cn.iocoder.yudao.module.product.controller.admin.category.vo.ProductCategoryListReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSkuSaveReqVO;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuPageReqVO;
@@ -18,6 +20,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.subscriptionplan.MaxLabelS
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.dal.mysql.subscriptionplan.MaxLabelSubscriptionPlanMapper;
 import cn.iocoder.yudao.module.product.enums.subscriptionplan.MaxLabelSubscriptionScopeEnum;
+import cn.iocoder.yudao.module.product.enums.spu.ProductSpuBrowseLevelTypeEnum;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.brand.ProductBrandService;
 import cn.iocoder.yudao.module.product.service.category.ProductCategoryService;
@@ -34,6 +37,7 @@ import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO.CATEGORY_LEVEL;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.*;
 
@@ -66,6 +70,10 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     private ProductSpuFilterTagService spuFilterTagService;
     @Resource
     private MaxLabelSubscriptionPlanMapper subscriptionPlanMapper;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
+    @Resource
+    private MemberLevelApi memberLevelApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -76,6 +84,10 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验 SKU
         List<ProductSkuSaveReqVO> skuSaveReqList = createReqVO.getSkus();
         productSkuService.validateSkuList(skuSaveReqList, createReqVO.getSpecType());
+        // 浏览等级（019）：缺省公开；指定等级时校验等级存在
+        createReqVO.setBrowseLevelType(ObjectUtil.defaultIfNull(createReqVO.getBrowseLevelType(), 0));
+        createReqVO.setBrowseLevelIds(normalizeBrowseLevelIds(
+                createReqVO.getBrowseLevelType(), createReqVO.getBrowseLevelIds()));
 
         ProductSpuDO spu = BeanUtils.toBean(createReqVO, ProductSpuDO.class);
         // 初始化 SPU 中 SKU 相关属性
@@ -104,6 +116,10 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         productSkuService.validateSkuList(skuSaveReqList, updateReqVO.getSpecType());
         // 改成企业专享前，先确认没有个人授权计划还指向它（契约 admin-api §4.1）
         validateEnterpriseOnlySwitch(spu.getId(), spu.getEnterpriseOnly(), updateReqVO.getEnterpriseOnly());
+        // 浏览等级（019）：缺省公开；type 非 2 时清空等级集合
+        updateReqVO.setBrowseLevelType(ObjectUtil.defaultIfNull(updateReqVO.getBrowseLevelType(), 0));
+        updateReqVO.setBrowseLevelIds(normalizeBrowseLevelIds(
+                updateReqVO.getBrowseLevelType(), updateReqVO.getBrowseLevelIds()));
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
@@ -132,6 +148,38 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         if (hasPersonalPlan) {
             throw exception(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH);
         }
+    }
+
+    /**
+     * 归一化浏览等级配置（019）
+     *
+     * - 缺省 type 按 0（公开）
+     * - 非法 type 拒绝
+     * - type != 2 时清空等级集合（用空列表而不是 null，否则 updateById 清不掉旧值）
+     * - type = 2 时至少一个等级，去重且每个等级都存在
+     *
+     * 包级可见：便于单元测试直接覆盖校验规则。
+     */
+    List<Long> normalizeBrowseLevelIds(Integer type, List<Long> levelIds) {
+        Integer normalizedType = ObjectUtil.defaultIfNull(type, 0);
+        if (!ProductSpuBrowseLevelTypeEnum.isValid(normalizedType)) {
+            throw exception(SPU_BROWSE_LEVEL_TYPE_INVALID);
+        }
+        if (!ProductSpuBrowseLevelTypeEnum.isLevel(normalizedType)) {
+            return Collections.emptyList();
+        }
+        List<Long> distinctIds = CollUtil.isEmpty(levelIds) ? Collections.emptyList()
+                : levelIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (distinctIds.isEmpty()) {
+            throw exception(SPU_BROWSE_LEVEL_IDS_EMPTY);
+        }
+        for (Long levelId : distinctIds) {
+            MemberLevelRespDTO level = memberLevelApi.getMemberLevel(levelId).getCheckedData();
+            if (level == null) {
+                throw exception(SPU_BROWSE_LEVEL_NOT_EXISTS, levelId);
+            }
+        }
+        return distinctIds;
     }
 
     /**
@@ -278,8 +326,10 @@ public class ProductSpuServiceImpl implements ProductSpuService {
                     .setStatus(CommonStatusEnum.ENABLE.getStatus()).setParentIds(pageReqVO.getCategoryIds()));
             categoryIds.addAll(convertList(categoryChildren, ProductCategoryDO::getId));
         }
-        // 分页查询
-        return productSpuMapper.selectPage(pageReqVO, categoryIds);
+        // 分页查询：按当前登录态与会员等级过滤（019）
+        Long userId = getLoginUserId();
+        Long levelId = userId == null ? null : browseLevelService.getViewerLevelId(userId);
+        return productSpuMapper.selectPage(pageReqVO, categoryIds, userId != null, levelId);
     }
 
     @Override

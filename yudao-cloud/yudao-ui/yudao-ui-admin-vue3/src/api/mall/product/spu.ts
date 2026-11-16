@@ -42,6 +42,8 @@ export interface Spu {
   deliveryTypes?: number[] // 配送方式
   deliveryTemplateId?: number | undefined // 运费模版
   enterpriseOnly?: boolean // 是否企业专享（不在公开商城展示）
+  browseLevelType?: number // 浏览等级：0 公开 1 全部登录会员 2 指定等级会员
+  browseLevelIds?: number[] // 指定等级会员的等级编号数组（仅 type=2 生效）
   brandId?: number // 商品品牌编号
   specType?: boolean // 商品规格
   subCommissionType?: boolean // 分销类型

@@ -40,8 +40,13 @@ public interface ProductBrowseHistoryService {
     PageResult<ProductBrowseHistoryDO> getBrowseHistoryPage(ProductBrowseHistoryPageReqVO pageReqVO);
 
     /**
+     * C 端：按浏览等级过滤后的分页（019）
+     */
+    PageResult<ProductBrowseHistoryDO> getBrowseHistoryPage(ProductBrowseHistoryPageReqVO pageReqVO, Long levelId);
+
+    /**
      * 同上，但在 SQL 分页前就排除企业专享商品（非企业管理员用，保证 total 一致）。
      */
-    PageResult<ProductBrowseHistoryDO> getBrowseHistoryPageExcludingEnterprise(ProductBrowseHistoryPageReqVO pageReqVO);
+    PageResult<ProductBrowseHistoryDO> getBrowseHistoryPageExcludingEnterprise(ProductBrowseHistoryPageReqVO pageReqVO, Long levelId);
 
 }

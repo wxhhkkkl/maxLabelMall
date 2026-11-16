@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.product.controller.app.favorite.vo.AppFavoritePag
 import cn.iocoder.yudao.module.product.dal.dataobject.favorite.ProductFavoriteDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.favorite.ProductFavoriteService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,8 @@ public class AppFavoriteVisibilityTest {
     private ProductSpuService productSpuService;
     @Mock
     private MemberOrgApi memberOrgApi;
+    @Mock
+    private ProductSpuBrowseLevelService browseLevelService;
     @InjectMocks
     private AppFavoriteController controller;
 
@@ -50,8 +53,9 @@ public class AppFavoriteVisibilityTest {
         AppFavoritePageReqVO reqVO = new AppFavoritePageReqVO();
         ProductFavoriteDO favorite = ProductFavoriteDO.builder()
                 .id(1L).userId(1001L).spuId(1L).build();
-        when(productFavoriteService.getFavoritePageExcludingEnterprise(eq(1001L), any()))
+        when(productFavoriteService.getFavoritePageExcludingEnterprise(eq(1001L), any(), any()))
                 .thenReturn(new PageResult<>(List.of(favorite), 1L));
+        when(browseLevelService.getViewerLevelId(1001L)).thenReturn(null);
         when(productSpuService.getSpuList(any())).thenReturn(List.of(publicSpu(1L)));
         when(memberOrgApi.getByMemberId(1001L)).thenReturn(success(null));
 
@@ -61,7 +65,7 @@ public class AppFavoriteVisibilityTest {
             assertEquals(1L, page.getTotal());
             assertEquals(1, page.getList().size());
         }
-        verify(productFavoriteService, never()).getFavoritePage(any(), any());
+        verify(productFavoriteService, never()).getFavoritePage(any(), any(), any());
     }
 
 }

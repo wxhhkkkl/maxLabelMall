@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.product.convert.favorite.ProductFavoriteConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.favorite.ProductFavoriteDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.favorite.ProductFavoriteService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,8 @@ public class AppFavoriteController {
     private ProductSpuService productSpuService;
     @Resource
     private MemberOrgApi memberOrgApi;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
 
     @PostMapping(value = "/create")
     @Operation(summary = "添加商品收藏")
@@ -54,9 +57,10 @@ public class AppFavoriteController {
     @Operation(summary = "获得商品收藏分页")
     public CommonResult<PageResult<AppFavoriteRespVO>> getFavoritePage(AppFavoritePageReqVO reqVO) {
         Long userId = getLoginUserId();
+        Long levelId = userId == null ? null : browseLevelService.getViewerLevelId(userId);
         PageResult<ProductFavoriteDO> favoritePage = isEnterpriseAdmin()
-                ? productFavoriteService.getFavoritePage(userId, reqVO)
-                : productFavoriteService.getFavoritePageExcludingEnterprise(userId, reqVO);
+                ? productFavoriteService.getFavoritePage(userId, levelId, reqVO)
+                : productFavoriteService.getFavoritePageExcludingEnterprise(userId, levelId, reqVO);
         if (CollUtil.isEmpty(favoritePage.getList())) {
             return success(PageResult.empty());
         }

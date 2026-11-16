@@ -4,8 +4,10 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.app.comment.vo.AppCommentPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.comment.ProductCommentService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +19,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,8 +36,15 @@ public class AppProductCommentVisibilityTest {
     private ProductSpuService productSpuService;
     @Mock
     private MaxLabelSubscriptionPlanService subscriptionPlanService;
+    @Mock
+    private ProductSpuBrowseLevelService browseLevelService;
     @InjectMocks
     private AppProductCommentController controller;
+
+    @BeforeEach
+    void setUpBrowseLevel() {
+        lenient().when(browseLevelService.isVisible(any(), any())).thenReturn(true);
+    }
 
     private AppCommentPageReqVO req(Long spuId) {
         AppCommentPageReqVO reqVO = new AppCommentPageReqVO();

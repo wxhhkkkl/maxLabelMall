@@ -24,14 +24,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_NOT_EXISTS;
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_STOCK_NOT_ENOUGH;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRICE_CALCULATE_PAY_PRICE_ILLEGAL;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRODUCT_SPU_NOT_VISIBLE;
 
 /**
  * 价格计算 Service 实现类
@@ -62,8 +66,8 @@ public class TradePriceServiceImpl implements TradePriceService {
     public TradePriceCalculateRespBO calculateOrderPrice(TradePriceCalculateReqBO calculateReqBO) {
         // 1.1 获得商品 SKU 数组
         List<ProductSkuRespDTO> skuList = checkSkuList(calculateReqBO);
-        // 1.2 获得商品 SPU 数组
-        List<ProductSpuRespDTO> spuList = checkSpuList(skuList);
+        // 1.2 获得商品 SPU 数组（含浏览等级校验）
+        List<ProductSpuRespDTO> spuList = checkSpuList(calculateReqBO.getUserId(), skuList);
         // 1.3 客户端没指定配送方式时，**由商品自动判定**（全是虚拟商品 → 虚拟；否则快递）
         if (calculateReqBO.getDeliveryType() == null) {
             calculateReqBO.setDeliveryType(resolveDeliveryType(spuList));
@@ -126,8 +130,19 @@ public class TradePriceServiceImpl implements TradePriceService {
         return skus;
     }
 
-    private List<ProductSpuRespDTO> checkSpuList(List<ProductSkuRespDTO> skuList) {
-        return productSpuApi.validateSpuList(convertSet(skuList, ProductSkuRespDTO::getSpuId)).getCheckedData();
+    private List<ProductSpuRespDTO> checkSpuList(Long userId, List<ProductSkuRespDTO> skuList) {
+        List<ProductSpuRespDTO> spus = productSpuApi.validateSpuList(
+                convertSet(skuList, ProductSkuRespDTO::getSpuId)).getCheckedData();
+        // 浏览等级（019）：一次批量判定，避免多 SPU 订单产生 N 次 RPC
+        List<Long> visibleIds = productSpuApi.getVisibleSpuIds(userId,
+                convertSet(spus, ProductSpuRespDTO::getId)).getCheckedData();
+        Set<Long> visibleSpuIds = visibleIds == null ? Collections.emptySet() : new HashSet<>(visibleIds);
+        spus.forEach(spu -> {
+            if (!visibleSpuIds.contains(spu.getId())) {
+                throw exception(PRODUCT_SPU_NOT_VISIBLE);
+            }
+        });
+        return spus;
     }
 
     @Override
@@ -137,6 +152,15 @@ public class TradePriceServiceImpl implements TradePriceService {
                 .filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList(),
                 ProductSpuRespDTO::getId);
         spuIds = spuIds.stream().filter(visibleSpuIds::contains).toList();
+        if (spuIds.isEmpty()) {
+            return List.of();
+        }
+        // 0.1 浏览等级（019）：展示接口静默过滤不可见商品
+        List<Long> browseVisibleSpuIds = productSpuApi.getVisibleSpuIds(userId, spuIds).getCheckedData();
+        if (browseVisibleSpuIds == null || browseVisibleSpuIds.isEmpty()) {
+            return List.of();
+        }
+        spuIds = spuIds.stream().filter(browseVisibleSpuIds::contains).toList();
         if (spuIds.isEmpty()) {
             return List.of();
         }

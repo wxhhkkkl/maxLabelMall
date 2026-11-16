@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.product.convert.favorite.ProductFavoriteConvert;
 import cn.iocoder.yudao.module.product.dal.dataobject.favorite.ProductFavoriteDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.mysql.favorite.ProductFavoriteMapper;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -33,6 +34,8 @@ public class ProductFavoriteServiceImpl implements ProductFavoriteService {
     private ProductSpuService productSpuService;
     @Resource
     private MemberOrgApi memberOrgApi;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
 
     @Override
     public Long createFavorite(Long userId, Long spuId) {
@@ -43,6 +46,10 @@ public class ProductFavoriteServiceImpl implements ProductFavoriteService {
         // 企业专享商品：非企业 OWNER/ADMIN 不允许收藏（否则收藏列表会泄露名称/价格）
         if (Boolean.TRUE.equals(spu.getEnterpriseOnly()) && !isEnterpriseAdmin(userId)) {
             throw exception(SPU_ENTERPRISE_ONLY);
+        }
+        // 浏览等级（019）：不可见商品等同不存在，不能从收藏入口绕过
+        if (!browseLevelService.isVisible(spu, userId)) {
+            throw exception(SPU_NOT_EXISTS);
         }
         ProductFavoriteDO favorite = productFavoriteMapper.selectByUserIdAndSpuId(userId, spuId);
         if (favorite != null) {
@@ -74,14 +81,14 @@ public class ProductFavoriteServiceImpl implements ProductFavoriteService {
     }
 
     @Override
-    public PageResult<ProductFavoriteDO> getFavoritePageExcludingEnterprise(Long userId,
+    public PageResult<ProductFavoriteDO> getFavoritePageExcludingEnterprise(Long userId, Long levelId,
                                                                            @Valid AppFavoritePageReqVO reqVO) {
-        return productFavoriteMapper.selectPageByUserAndTypeExcludingEnterprise(userId, reqVO);
+        return productFavoriteMapper.selectPageByUserAndTypeExcludingEnterprise(userId, levelId, reqVO);
     }
 
     @Override
-    public PageResult<ProductFavoriteDO> getFavoritePage(Long userId, @Valid AppFavoritePageReqVO reqVO) {
-        return productFavoriteMapper.selectPageByUserAndType(userId, reqVO);
+    public PageResult<ProductFavoriteDO> getFavoritePage(Long userId, Long levelId, @Valid AppFavoritePageReqVO reqVO) {
+        return productFavoriteMapper.selectPageByUserAndType(userId, levelId, reqVO);
     }
 
     @Override

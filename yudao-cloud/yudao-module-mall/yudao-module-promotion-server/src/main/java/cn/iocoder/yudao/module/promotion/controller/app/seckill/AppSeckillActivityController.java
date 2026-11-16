@@ -42,6 +42,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.framework.common.util.cache.CacheUtils.buildAsyncReloadingCache;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.findFirst;
@@ -181,15 +182,28 @@ public class AppSeckillActivityController {
      * 不在公开商城出售的商品不下发名称/头图/市场价（FR-328）：
      * 保存入口已拦过一遍，但「历史活动」与「先建活动后建计划」两种顺序仍会漏，渲染前再过滤一次。
      */
-    private List<ProductSpuRespDTO> getPublicSpuList(Collection<Long> spuIds) {
+    /**
+     * 包级可见：便于单元测试直接覆盖「公开 / 授权计划 / 浏览等级」三层过滤。
+     */
+    List<ProductSpuRespDTO> getPublicSpuList(Collection<Long> spuIds) {
         List<ProductSpuRespDTO> spus = spuApi.getSpuList(spuIds).getCheckedData();
         if (CollUtil.isEmpty(spus)) {
             return spus;
         }
-        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData();
-        if (CollUtil.isEmpty(planSpuIds)) {
-            return spus;
+        // 企业专享商品在渲染期再兜底排除（保存入口已拦，历史活动可能残留；019 / FR-532）
+        spus = spus.stream().filter(spu -> !Boolean.TRUE.equals(spu.getEnterpriseOnly())).toList();
+        if (CollUtil.isEmpty(spus)) {
+            return Collections.emptyList();
         }
-        return spus.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+        List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuIds).getCheckedData();
+        if (CollUtil.isNotEmpty(planSpuIds)) {
+            spus = spus.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
+        }
+        // 浏览等级（019）
+        List<Long> visibleIds = spuApi.getVisibleSpuIds(getLoginUserId(), spuIds).getCheckedData();
+        if (CollUtil.isEmpty(visibleIds)) {
+            return Collections.emptyList();
+        }
+        return spus.stream().filter(spu -> visibleIds.contains(spu.getId())).toList();
     }
 }

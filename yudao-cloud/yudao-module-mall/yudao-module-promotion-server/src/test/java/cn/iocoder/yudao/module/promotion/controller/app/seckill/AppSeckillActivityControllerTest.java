@@ -66,6 +66,7 @@ public class AppSeckillActivityControllerTest {
         when(spuApi.getSpuList(any())).thenReturn(success(List.of(
                 spu(400L, "pic-400", 9900), spu(200L, "pic-200", 100))));
         when(subscriptionPlanApi.getPlanSpuIds(any())).thenReturn(success(List.of(400L)));
+        when(spuApi.getVisibleSpuIds(any(), any())).thenReturn(success(List.of(400L, 200L)));
 
         List<AppSeckillActivityRespVO> list = controller
                 .getSeckillActivityPage(new AppSeckillActivityPageReqVO()).getData().getList();

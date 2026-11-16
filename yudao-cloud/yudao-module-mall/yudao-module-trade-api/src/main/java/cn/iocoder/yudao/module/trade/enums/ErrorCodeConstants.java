@@ -150,6 +150,8 @@ public interface ErrorCodeConstants {
     ErrorCode INVOICE_ISSUE_FAIL_STATUS_CANCELED = new ErrorCode(1_011_009_041, "该开票申请已作废，不能开具");
     ErrorCode INVOICE_FILE_TYPE_NOT_ALLOWED = new ErrorCode(1_011_009_042, "发票文件格式不支持，只允许 PDF 或图片（jpg / jpeg / png）");
     ErrorCode INVOICE_ISSUE_FAIL_ORDER_NOT_PAID = new ErrorCode(1_011_009_043, "订单还未支付，不能开具发票");
+    // 后台代客户改开票信息
+    ErrorCode INVOICE_UPDATE_FAIL_STATUS_NOT_WAITING = new ErrorCode(1_011_009_044, "只有待开票的申请可以修改发票信息");
 
     // ========== MaxLabel 企业授权订单 1-011-010-000 ==========
     ErrorCode ENTERPRISE_ORDER_BUYER_NOT_ADMIN = new ErrorCode(1_011_010_000, "仅企业管理员可购买企业授权");
@@ -159,6 +161,8 @@ public interface ErrorCodeConstants {
     ErrorCode ENTERPRISE_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_003, "企业授权订单不支持退款，如有特殊情况请联系平台处理");
     // 个人会员订阅订单**用户端同样不允许退款**（2026-10-27）：后台人工通道保留
     ErrorCode SUBSCRIPTION_ORDER_REFUND_NOT_SUPPORTED = new ErrorCode(1_011_010_004, "会员订阅订单不支持退款，如有特殊情况请联系平台处理");
+    // 商品浏览等级（019）：不可见商品的加购 / 结算 / 下单统一提示，不泄露商品存在性
+    ErrorCode PRODUCT_SPU_NOT_VISIBLE = new ErrorCode(1_011_010_005, "商品不存在或不可购买");
 
     // ========== 印刷定制 1-011-011-000 ==========
     ErrorCode CUSTOMIZATION_MATERIAL_NOT_AVAILABLE = new ErrorCode(1_011_011_000, "该材质不存在或已停用");

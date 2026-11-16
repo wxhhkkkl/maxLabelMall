@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.trade.service.invoice;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
@@ -373,6 +374,118 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         ServiceException e = assertThrows(ServiceException.class,
                 () -> invoiceService.issueInvoice(9999L, "https://x.com/a.pdf", 100L));
         assertEquals(INVOICE_NOT_FOUND.getCode(), e.getCode());
+    }
+
+    // ==================== 后台代客户改开票信息 ====================
+
+    /** 修改请求：默认改成一张**企业专票**，银行栏位都填上 */
+    private TradeOrderInvoiceUpdateReqVO updateReq(Long id) {
+        TradeOrderInvoiceUpdateReqVO reqVO = new TradeOrderInvoiceUpdateReqVO();
+        reqVO.setId(id);
+        reqVO.setType(InvoiceTypeEnum.E_SPECIAL.getType());
+        reqVO.setTitleKind(InvoiceTitleKindEnum.COMPANY.getKind());
+        reqVO.setTitleName("南京路桥机械有限公司（改）");
+        reqVO.setTaxNo("91320104660690975E");
+        reqVO.setTitleAddress("南京市玄武区 xx 路 1 号");
+        reqVO.setTitlePhone("025-88886666");
+        reqVO.setBankName("工商银行南京分行");
+        reqVO.setBankAccount("6222021000000000000");
+        reqVO.setBankCode("102301000123");
+        reqVO.setEmail("finance@example.com");
+        return reqVO;
+    }
+
+    @Test
+    public void testUpdateInvoice_success() {
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+
+        invoiceService.updateInvoice(updateReq(invoice.getId()));
+
+        TradeOrderInvoiceDO updated = invoiceMapper.selectById(invoice.getId());
+        assertEquals(InvoiceTypeEnum.E_SPECIAL.getType(), updated.getType());
+        assertEquals("南京路桥机械有限公司（改）", updated.getTitleName());
+        assertEquals("南京市玄武区 xx 路 1 号", updated.getTitleAddress());
+        assertEquals("工商银行南京分行", updated.getBankName());
+        assertEquals("6222021000000000000", updated.getBankAccount());
+        assertEquals("102301000123", updated.getBankCode());
+        assertEquals("finance@example.com", updated.getEmail());
+        // 不该被改的东西：金额仍是申请时的实付快照，状态仍是待开票
+        assertEquals(7800, updated.getAmount());
+        assertEquals(TradeOrderInvoiceStatusEnum.WAITING.getStatus(), updated.getStatus());
+    }
+
+    @Test
+    public void testUpdateInvoice_clearFieldsPersist() {
+        // 客户说开户行填错了要删掉：**清空必须真的落库**（updateById 忽略 null 的那道坑）
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+        invoiceService.updateInvoice(updateReq(invoice.getId()));
+
+        TradeOrderInvoiceUpdateReqVO clearReq = updateReq(invoice.getId());
+        clearReq.setTitleAddress("  ");
+        clearReq.setBankName(null);
+        clearReq.setBankAccount("");
+        clearReq.setBankCode(null);
+        invoiceService.updateInvoice(clearReq);
+
+        TradeOrderInvoiceDO cleared = invoiceMapper.selectById(invoice.getId());
+        assertNull(cleared.getTitleAddress(), "空白串应归一成 NULL 并真的写进去");
+        assertNull(cleared.getBankName());
+        assertNull(cleared.getBankAccount());
+        assertNull(cleared.getBankCode());
+    }
+
+    @Test
+    public void testUpdateInvoice_trimsTitleName() {
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+        TradeOrderInvoiceUpdateReqVO reqVO = updateReq(invoice.getId());
+        reqVO.setTitleName("  南京路桥机械有限公司  ");
+
+        invoiceService.updateInvoice(reqVO);
+
+        assertEquals("南京路桥机械有限公司", invoiceMapper.selectById(invoice.getId()).getTitleName());
+    }
+
+    @Test
+    public void testUpdateInvoice_issued_fail() {
+        // 已开票的票面文件已经生成，改抬头只会让记录与票面不一致
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+        invoiceService.issueInvoice(invoice.getId(), "https://x.com/a.pdf", 100L);
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.updateInvoice(updateReq(invoice.getId())));
+        assertEquals(INVOICE_UPDATE_FAIL_STATUS_NOT_WAITING.getCode(), e.getCode());
+        assertEquals("南京路桥机械有限公司", invoiceMapper.selectById(invoice.getId()).getTitleName());
+    }
+
+    @Test
+    public void testUpdateInvoice_canceled_fail() {
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+        invoiceService.cancelInvoiceByOrderId(invoice.getOrderId());
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.updateInvoice(updateReq(invoice.getId())));
+        assertEquals(INVOICE_UPDATE_FAIL_STATUS_NOT_WAITING.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testUpdateInvoice_notFound_fail() {
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.updateInvoice(updateReq(9999L)));
+        assertEquals(INVOICE_NOT_FOUND.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testUpdateInvoice_validationReused() {
+        // 个人抬头不能开专票 —— 与客户自己提交时**同一套规则**（InvoiceValidator），运营没有旁路
+        TradeOrderInvoiceDO invoice = prepareWaitingInvoice(7800);
+        TradeOrderInvoiceUpdateReqVO reqVO = updateReq(invoice.getId());
+        reqVO.setTitleKind(InvoiceTitleKindEnum.PERSONAL.getKind());
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.updateInvoice(reqVO));
+        assertEquals(INVOICE_TITLE_KIND_PERSONAL_SPECIAL.getCode(), e.getCode());
+        assertEquals(InvoiceTypeEnum.E_NORMAL.getType(),
+                invoiceMapper.selectById(invoice.getId()).getType(), "被拒时不该改动任何字段");
     }
 
     // ==================== 订单取消 → 作废（Q30 / FR-184） ====================

@@ -13,7 +13,7 @@ public class AppShareContentPageReqVO extends PageParam {
     @Schema(description = "空间类型：1 个人 2 企业", requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer scope;
 
-    @Schema(description = "文件夹编号；企业空间必填")
+    @Schema(description = "文件夹编号；个人空间 0=根目录、空=全部；企业空间必填")
     private Long folderId;
 
     @Schema(description = "内容类型：1 模板 2 txt 3 excel 4 csv 5 图片")

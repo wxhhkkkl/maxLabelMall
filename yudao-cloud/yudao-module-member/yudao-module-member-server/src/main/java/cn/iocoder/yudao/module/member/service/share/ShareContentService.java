@@ -24,6 +24,13 @@ public interface ShareContentService {
     /** 管理端：按 id 查看企业共享内容（不限上传者） */
     MaxLabelShareContentDO getContentForAdmin(Long id);
 
+    /** 管理端：按会员查看其个人空间内容；folderId 空=全部、0=根目录、>0=指定文件夹 */
+    PageResult<MaxLabelShareContentDO> getPersonalPageForAdmin(Long memberId, Long folderId, String keyword,
+                                                                Integer contentType, cn.iocoder.yudao.framework.common.pojo.PageParam pageParam);
+
+    /** 管理端：按 id 查看某会员的个人空间内容 */
+    MaxLabelShareContentDO getPersonalContentForAdmin(Long memberId, Long id);
+
     MaxLabelShareContentDO getContent(Long memberId, Long id);
 
     Long create(Long memberId, AppShareContentSaveReqVO reqVO);

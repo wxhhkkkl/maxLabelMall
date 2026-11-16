@@ -367,6 +367,7 @@ const queryParams = ref({
   payChannelCode: undefined, // 支付方式
   customization: undefined, // 是否定制订单（014）
   agentCreated: undefined, // 是否代客下单（017）
+  receiverName: undefined, // 收货人姓名（聚合搜索）
   receiverMobile: undefined, // 收货人手机号（聚合搜索）
   createTime: undefined, // 创建时间
   terminal: undefined, // 订单来源
@@ -384,6 +385,7 @@ const dynamicSearchList = ref([
   { value: 'userId', label: '用户UID' },
   { value: 'userNickname', label: '用户昵称' },
   { value: 'userMobile', label: '用户电话' },
+  { value: 'receiverName', label: '收货人姓名' },
   { value: 'receiverMobile', label: '收货人电话' }
 ])
 /**
@@ -462,6 +464,7 @@ const resetQuery = () => {
     payChannelCode: undefined, // 支付方式
     customization: undefined, // 是否定制订单（014）
     agentCreated: undefined, // 是否代客下单（017）
+    receiverName: undefined, // 收货人姓名（聚合搜索）
     receiverMobile: undefined, // 收货人手机号（聚合搜索）
     createTime: undefined, // 创建时间
     terminal: undefined, // 订单来源

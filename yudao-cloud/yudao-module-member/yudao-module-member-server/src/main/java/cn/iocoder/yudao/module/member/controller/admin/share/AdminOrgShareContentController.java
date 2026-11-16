@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.member.controller.admin.share;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminMemberShareContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminOrgShareContentDetailRespVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminOrgShareContentPageReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.share.vo.AdminOrgShareContentRespVO;
@@ -100,6 +101,66 @@ public class AdminOrgShareContentController {
         resp.setUploaderMemberId(content.getOwnerMemberId());
         resp.setUploaderNickname(nickname(content.getOwnerMemberId()));
         resp.setDownloadUrl(contentService.getDownloadUrl(content));
+        return success(resp);
+    }
+
+    @GetMapping("/member-overview")
+    @Operation(summary = "会员个人空间容量概览")
+    @PreAuthorize("@ss.hasPermission('member:user:query')")
+    public CommonResult<AdminOrgShareOverviewRespVO> getMemberOverview(
+            @RequestParam("memberId") Long memberId) {
+        long used = spaceService.getPersonalUsedBytes(memberId);
+        long quota = spaceService.getPersonalQuotaBytes(memberId);
+        AdminOrgShareOverviewRespVO resp = new AdminOrgShareOverviewRespVO();
+        resp.setQuotaBytes(quota);
+        resp.setUsedBytes(used);
+        resp.setRemainingBytes(Math.max(0, quota - used));
+        return success(resp);
+    }
+
+    @GetMapping("/member-folders")
+    @Operation(summary = "会员个人空间文件夹（含父级，前端组树）")
+    @PreAuthorize("@ss.hasPermission('member:user:query')")
+    public CommonResult<List<cn.iocoder.yudao.module.member.service.share.dto.ShareFolderInfo>> getMemberFolders(
+            @RequestParam("memberId") Long memberId) {
+        return success(folderService.getPersonalList(memberId));
+    }
+
+    @GetMapping("/member-page")
+    @Operation(summary = "会员个人空间内容分页")
+    @PreAuthorize("@ss.hasPermission('member:user:query')")
+    public CommonResult<PageResult<AdminOrgShareContentRespVO>> getMemberPage(
+            @Valid AdminMemberShareContentPageReqVO reqVO) {
+        PageResult<MaxLabelShareContentDO> page = contentService.getPersonalPageForAdmin(
+                reqVO.getMemberId(), reqVO.getFolderId(), reqVO.getKeyword(), reqVO.getContentType(), reqVO);
+        Map<Long, String> folderNames = folderService.getPersonalList(reqVO.getMemberId()).stream()
+                .collect(Collectors.toMap(
+                        cn.iocoder.yudao.module.member.service.share.dto.ShareFolderInfo::getId,
+                        cn.iocoder.yudao.module.member.service.share.dto.ShareFolderInfo::getName,
+                        (left, right) -> left));
+        List<AdminOrgShareContentRespVO> list = page.getList().stream()
+                .map(content -> toResp(content, content.getFolderId() == null
+                        ? null : folderNames.get(content.getFolderId())))
+                .toList();
+        return success(new PageResult<>(list, page.getTotal()));
+    }
+
+    @GetMapping("/member-get")
+    @Operation(summary = "会员个人空间内容详情")
+    @PreAuthorize("@ss.hasPermission('member:user:query')")
+    public CommonResult<AdminOrgShareContentDetailRespVO> getMemberContent(
+            @RequestParam("memberId") Long memberId, @RequestParam("id") Long id) {
+        MaxLabelShareContentDO content = contentService.getPersonalContentForAdmin(memberId, id);
+        AdminOrgShareContentDetailRespVO resp = BeanUtils.toBean(content, AdminOrgShareContentDetailRespVO.class);
+        resp.setUploaderMemberId(content.getOwnerMemberId());
+        resp.setUploaderNickname(nickname(content.getOwnerMemberId()));
+        resp.setDownloadUrl(contentService.getDownloadUrl(content));
+        if (content.getFolderId() != null) {
+            resp.setFolderName(folderService.getPersonalList(memberId).stream()
+                    .filter(folder -> folder.getId().equals(content.getFolderId()))
+                    .map(cn.iocoder.yudao.module.member.service.share.dto.ShareFolderInfo::getName)
+                    .findFirst().orElse(null));
+        }
         return success(resp);
     }
 

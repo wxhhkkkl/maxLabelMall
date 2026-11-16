@@ -21,7 +21,13 @@ public class MaxLabelShareFolderDO extends BaseDO {
 
     @TableId
     private Long id;
-    /** 企业编号，关联 maxlabel_org.id */
+    /** 空间类型：1 个人 2 企业 */
+    private Integer scope;
+    /** 个人文件夹归属会员编号；企业文件夹为 NULL */
+    private Long ownerMemberId;
+    /** 父文件夹编号；NULL = 根目录 */
+    private Long parentId;
+    /** 企业编号，关联 maxlabel_org.id；个人文件夹为 NULL */
     private Long orgId;
     /** 文件夹名称 */
     private String name;

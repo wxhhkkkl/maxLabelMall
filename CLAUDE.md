@@ -4,7 +4,7 @@
 
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/016-shared-content-space/plan.md
+specs/019-product-browse-level/plan.md
 
 企业席位（012）相关产物：
 - specs/012-enterprise-seat-licensing/spec.md — 功能规格（Q65~Q74：企业 / 席位 / 有效期 / 可见性）
@@ -20,6 +20,40 @@ specs/016-shared-content-space/plan.md
   **企业授权订单用户端不允许退款**，运营后台保留人工通道（Q79）
   📌 2026-10-27：**个人会员订阅订单用户端同样不允许退款**（后台保留人工通道）；纯虚拟订阅订单
   支付成功后直接置为「已完成」，历史已支付待发货订阅单由 `024` 迁移补成已完成（Q82）
+
+当前特性（019 商品浏览等级：与会员等级关联）：
+- specs/019-product-browse-level/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/019-product-browse-level/contracts/{admin-api,app-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/041-product-browse-level.sql`（`product_spu` 增加
+  `browse_level_type` / `browse_level_ids`），再发后端，最后发管理端；C 端无需发版（服务端过滤生效）
+  📌 口径：`0` 公开（含未登录访客）/ `1` 全部登录会员 / `2` 指定等级会员（多选等级集合）；
+  等级不足**完全隐藏**（列表 / 搜索 / 详情等同商品不存在，详情不泄露名称价格）；
+  与企业专享、会员授权商品**独立叠加**，全部条件满足才可见；存量商品默认公开（`041` 前须先执行）
+  📌 交易链路（加购 / 结算 / 下单）服务端二次校验，购物车/收藏/浏览历史只隐藏不删记录；
+  营销活动（秒杀/拼团/积分/砍价）同样过滤；企业管理员不豁免等级条件
+
+上一个特性（018 LabelShop 模板导入：后台按来源白名单迁移模板）：
+- specs/018-labelshop-template-import/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/018-labelshop-template-import/contracts/{admin-api,labelshop-upstream}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/038-labelshop-template-import.sql`（2 表 + 按钮权限），
+  **已执行过旧版 038 的库再执行 `039-labelshop-member-import.sql`**（幂等补
+  `subject_type` / `running_member_id` / 索引 / 会员按钮权限），再执行
+  `040-personal-share-folders.sql`（016 文件夹加 `scope`/`owner_member_id`/`parent_id`，`org_id` 可空），
+  再发后端，最后发管理端 / 桌面端；桌面端需发布 `maxlabel` 的 `.lsdx` 云端加载识别与个人文件夹 UI
+  📌 **2026-11-16 个人云端模板与目录**：`Own_Type=0` 云端 JSON 导入时转 `.lsdx`（转换失败记失败项，
+  不回退归档）；个人空间按来源分类路径建**多层稳定文件夹树**（同名路径复用），桌面端支持
+  新建/改名/移动/删除；企业空间仍只建一个 `<时间>导入` 文件夹
+  📌 口径：我的模板库 → OWNER 个人空间；组模板库 + 企业/组织模板 → 企业空间；公共 / 用户模板库不下载；
+  每次导入新建 `<时间>导入` 文件夹；导入不受容量闸门限制；模板原样导入不清洗；企业/组织私有 JSON 仅归档
+  📌 **2026-11-13 个人会员代导（Q145）**：仅供管理端运营在「会员详情 → 个人空间」发起，
+  权限 `member:user:labelshop-import`；只读「我的模板库」写入该会员 016 个人空间，不建文件夹、不碰企业空间；
+  C 端不开放；`038` 同一脚本已含 `subject_type` / `running_member_id` 与会员按钮权限；
+  会员详情的「个人空间」页签已改为直接展示 016 个人空间内容（只读接口
+  `/member/share-content/member-overview|member-page|member-get`，权限 `member:user:query`）
+  📌 **2026-11-13 所有者取消强制 HTTPS**（原 FR-507 / Q137）：导入接口 HTTP 与 HTTPS 均可用，
+  前端不再按协议禁用；nginx 无需为本功能额外配置 `X-Forwarded-Proto`
+  📌 回滚：把按钮权限 `member:org:labelshop-import` 置为停用/删除即关闭入口（接口变 403）；
+  已导入内容保留在 016 空间，2 张导入表保留供审计，不自动删除
 
 当前特性（016 共享内容空间：个人 / 企业 / 平台）：
 - specs/016-shared-content-space/{spec,plan,research,data-model,tasks,quickstart}.md

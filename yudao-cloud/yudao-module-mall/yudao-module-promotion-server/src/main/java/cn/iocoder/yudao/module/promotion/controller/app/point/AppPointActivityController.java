@@ -33,6 +33,7 @@ import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.framework.common.util.collection.MapUtils.findAndThen;
 
 @Tag(name = "用户 App - 积分商城活动")
@@ -103,16 +104,28 @@ public class AppPointActivityController {
         return success(result);
     }
 
-    private List<AppPointActivityRespVO> buildAppPointActivityRespVOList(List<PointActivityDO> activityList) {
+    /**
+     * 包级可见：便于单元测试直接覆盖「公开 / 授权计划 / 浏览等级」三层过滤。
+     */
+    List<AppPointActivityRespVO> buildAppPointActivityRespVOList(List<PointActivityDO> activityList) {
         List<PointProductDO> products = pointActivityService.getPointProductListByActivityIds(
                 convertSet(activityList, PointActivityDO::getId));
         Map<Long, List<PointProductDO>> productsMap = convertMultiMap(products, PointProductDO::getActivityId);
         Map<Long, ProductSpuRespDTO> spuMap = productSpuApi.getSpuMap(
                 convertSet(activityList, PointActivityDO::getSpuId));
+        // 企业专享商品在渲染期再兜底排除（保存入口已拦，历史活动可能残留；019 / FR-532）
+        spuMap.entrySet().removeIf(entry -> Boolean.TRUE.equals(entry.getValue().getEnterpriseOnly()));
         // 不在公开商城出售的商品不下发名称/头图/市场价（FR-328 / T112）
         List<Long> planSpuIds = subscriptionPlanApi.getPlanSpuIds(spuMap.keySet()).getCheckedData();
         if (CollUtil.isNotEmpty(planSpuIds)) {
             planSpuIds.forEach(spuMap::remove);
+        }
+        // 浏览等级（019）
+        List<Long> visibleIds = productSpuApi.getVisibleSpuIds(getLoginUserId(), spuMap.keySet()).getCheckedData();
+        if (CollUtil.isNotEmpty(visibleIds)) {
+            spuMap.keySet().retainAll(visibleIds);
+        } else {
+            spuMap.clear();
         }
         List<AppPointActivityRespVO> result = BeanUtils.toBean(activityList, AppPointActivityRespVO.class);
         result.forEach(activity -> {

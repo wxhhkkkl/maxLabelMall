@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -55,6 +56,8 @@ public class AppProductSpuController {
     private MemberOrgApi memberOrgApi;
     @Resource
     private MaxLabelSubscriptionPlanService subscriptionPlanService;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -76,6 +79,12 @@ public class AppProductSpuController {
                 visibleList = visibleList.stream().filter(spu -> !planSpuIds.contains(spu.getId())).toList();
             }
         }
+        // 浏览等级（019）：登录态 + 会员等级，企业管理员不豁免
+        Long userId = getLoginUserId();
+        Long levelId = userId == null ? null : browseLevelService.getViewerLevelId(userId);
+        visibleList = visibleList.stream()
+                .filter(spu -> browseLevelService.isVisible(spu, userId, levelId))
+                .toList();
 
         // 拼接返回
         visibleList.forEach(spu -> spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount()));
@@ -108,6 +117,8 @@ public class AppProductSpuController {
         if (spu == null) {
             throw exception(SPU_NOT_EXISTS);
         }
+        // 浏览等级（019）：不可见等同商品不存在，先于企业专享判定，避免泄露存在性
+        browseLevelService.validateVisible(spu);
         // 企业专享商品不通过公开详情暴露（企业管理员走企业计划专用接口）
         if (Boolean.TRUE.equals(spu.getEnterpriseOnly())) {
             throw exception(SPU_ENTERPRISE_ONLY);

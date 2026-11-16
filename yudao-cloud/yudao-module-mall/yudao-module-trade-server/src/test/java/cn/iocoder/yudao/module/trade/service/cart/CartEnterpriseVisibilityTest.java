@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.trade.controller.app.cart.vo.AppCartAddReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.cart.vo.AppCartListRespVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.cart.CartDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.cart.CartMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,6 +27,7 @@ import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -44,6 +46,14 @@ public class CartEnterpriseVisibilityTest {
     private ProductSkuApi productSkuApi;
     @InjectMocks
     private CartServiceImpl cartService;
+
+    @BeforeEach
+    void setUpBrowseLevel() {
+        // 本测试只验证企业专享逻辑，浏览等级默认全部放行
+        lenient().when(productSpuApi.validateSpuVisible(any(), any())).thenReturn(success(true));
+        lenient().when(productSpuApi.getVisibleSpuIds(any(), any()))
+                .thenReturn(success(List.of(300L, 200L)));
+    }
 
     private ProductSkuRespDTO sku() {
         ProductSkuRespDTO sku = new ProductSkuRespDTO();

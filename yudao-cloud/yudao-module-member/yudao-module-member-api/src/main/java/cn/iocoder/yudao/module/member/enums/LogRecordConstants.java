@@ -63,4 +63,11 @@ public interface LogRecordConstants {
     String MEMBER_PLATFORM_CONTENT_DELETE_SUB_TYPE = "删除平台共享内容";
     String MEMBER_PLATFORM_CONTENT_DELETE_SUCCESS = "删除了平台共享内容【{{#id}}】";
 
+    // ======================= LabelShop 模板导入 =======================
+
+    String MEMBER_LABELSHOP_TYPE = "历史模板导入";
+    String MEMBER_LABELSHOP_START_SUB_TYPE = "发起历史模板导入";
+    String MEMBER_LABELSHOP_START_SUCCESS_ORG = "发起了历史模板导入（企业【{{#reqVO.orgId}}】）";
+    String MEMBER_LABELSHOP_START_SUCCESS_MEMBER = "发起了历史模板导入（会员【{{#reqVO.memberId}}】）";
+
 }

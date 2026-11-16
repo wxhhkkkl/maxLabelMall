@@ -102,6 +102,14 @@ public class ProductSpuRespVO {
     @Schema(description = "是否企业专享：不在公开商城展示", example = "false")
     private Boolean enterpriseOnly;
 
+    // ========== 浏览等级（特性 019） =========
+
+    @Schema(description = "浏览等级：0 公开 1 全部登录会员 2 指定等级会员", example = "0")
+    private Integer browseLevelType;
+
+    @Schema(description = "指定等级会员的会员等级编号数组；仅 type=2 时生效", example = "[3,5]")
+    private List<Long> browseLevelIds;
+
     // ========== 营销相关字段 =========
 
     @Schema(description = "赠送积分", requiredMode = Schema.RequiredMode.REQUIRED, example = "111")

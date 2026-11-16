@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.product.dal.dataobject.spu;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
+import cn.iocoder.yudao.framework.mybatis.core.type.LongListTypeHandler;
 import cn.iocoder.yudao.module.product.dal.dataobject.brand.ProductBrandDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
@@ -141,6 +142,23 @@ public class ProductSpuDO extends BaseDO {
      * 是否企业专享：不在公开商城展示
      */
     private Boolean enterpriseOnly;
+
+    // ========== 可见性相关字段（019 浏览等级） ==========
+
+    /**
+     * 浏览等级模式
+     *
+     * 枚举 {@link cn.iocoder.yudao.module.product.enums.spu.ProductSpuBrowseLevelTypeEnum}
+     */
+    private Integer browseLevelType;
+    /**
+     * 指定等级会员的会员等级编号数组
+     *
+     * 仅 {@link #browseLevelType} = 2 时有意义；关联
+     * {@link cn.iocoder.yudao.module.member.dal.dataobject.level.MemberLevelDO#getId()}
+     */
+    @TableField(typeHandler = LongListTypeHandler.class)
+    private List<Long> browseLevelIds;
 
     // ========== 营销相关字段 =========
 

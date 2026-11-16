@@ -7,8 +7,10 @@ import cn.iocoder.yudao.module.member.api.org.dto.MemberOrgRespDTO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +26,7 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SPU_ENTER
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -43,8 +46,16 @@ public class AppProductSpuVisibilityTest {
     private MemberOrgApi memberOrgApi;
     @Mock
     private MaxLabelSubscriptionPlanService subscriptionPlanService;
+    @Mock
+    private ProductSpuBrowseLevelService browseLevelService;
     @InjectMocks
     private AppProductSpuController controller;
+
+    @BeforeEach
+    void setUpBrowseLevel() {
+        // 本测试只验证企业专享 / 授权商品过滤，浏览等级默认全部放行
+        lenient().when(browseLevelService.isVisible(any(), any(), any())).thenReturn(true);
+    }
 
     private ProductSpuDO spu(long id, String name, boolean enterpriseOnly) {
         return ProductSpuDO.builder()

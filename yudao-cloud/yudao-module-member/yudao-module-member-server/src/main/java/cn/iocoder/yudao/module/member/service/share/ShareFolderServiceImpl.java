@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.member.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.member.enums.LogRecordConstants.*;
+import static cn.iocoder.yudao.module.member.service.share.ShareConstants.SCOPE_PERSONAL;
 
 @Service
 @Validated
@@ -213,6 +214,155 @@ public class ShareFolderServiceImpl implements ShareFolderService {
             throw exception(MEMBER_SHARE_FOLDER_NOT_FOUND);
         }
         return folder;
+    }
+
+    // ======================= 个人空间文件夹 =======================
+
+    @Override
+    public List<ShareFolderInfo> getPersonalList(Long ownerMemberId) {
+        return folderMapper.selectPersonalList(ownerMemberId).stream().map(folder -> {
+            ShareFolderInfo info = new ShareFolderInfo();
+            info.setId(folder.getId());
+            info.setName(folder.getName());
+            info.setParentId(folder.getParentId());
+            info.setMemberCount(0);
+            info.setContentCount(contentMapper.countByFolder(folder.getId()));
+            info.setUsedBytes(contentMapper.sumSizeByFolder(folder.getId()));
+            info.setCanManage(true);
+            return info;
+        }).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createPersonal(Long ownerMemberId, String name, Long parentId) {
+        String folderName = validateName(name);
+        if (parentId != null) {
+            requirePersonalFolder(ownerMemberId, parentId);
+        }
+        if (existsPersonalSibling(ownerMemberId, parentId, folderName, null)) {
+            throw exception(MEMBER_SHARE_FOLDER_NAME_EXISTS);
+        }
+        MaxLabelShareFolderDO folder = MaxLabelShareFolderDO.builder()
+                .scope(SCOPE_PERSONAL)
+                .ownerMemberId(ownerMemberId)
+                .parentId(parentId)
+                .name(folderName)
+                .creatorMemberId(ownerMemberId)
+                .build();
+        folderMapper.insert(folder);
+        return folder.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePersonal(Long ownerMemberId, Long id, String name) {
+        MaxLabelShareFolderDO folder = requirePersonalFolder(ownerMemberId, id);
+        String folderName = validateName(name);
+        if (existsPersonalSibling(ownerMemberId, folder.getParentId(), folderName, id)) {
+            throw exception(MEMBER_SHARE_FOLDER_NAME_EXISTS);
+        }
+        folderMapper.updateById(new MaxLabelShareFolderDO().setId(id).setName(folderName));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deletePersonal(Long ownerMemberId, Long id) {
+        requirePersonalFolder(ownerMemberId, id);
+        if (contentMapper.countByFolder(id) > 0) {
+            throw exception(MEMBER_SHARE_FOLDER_NOT_EMPTY);
+        }
+        boolean hasChild = folderMapper.selectPersonalList(ownerMemberId).stream()
+                .anyMatch(folder -> Objects.equals(folder.getParentId(), id));
+        if (hasChild) {
+            throw exception(MEMBER_SHARE_FOLDER_NOT_EMPTY);
+        }
+        folderMapper.deleteById(id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void movePersonal(Long ownerMemberId, Long id, Long parentId) {
+        MaxLabelShareFolderDO folder = requirePersonalFolder(ownerMemberId, id);
+        if (parentId != null) {
+            requirePersonalFolder(ownerMemberId, parentId);
+            if (Objects.equals(parentId, id) || isDescendant(ownerMemberId, parentId, id)) {
+                throw exception(MEMBER_SHARE_FOLDER_MOVE_INVALID);
+            }
+            if (existsPersonalSibling(ownerMemberId, parentId, folder.getName(), id)) {
+                throw exception(MEMBER_SHARE_FOLDER_NAME_EXISTS);
+            }
+        }
+        folderMapper.updatePersonalParent(ownerMemberId, id, parentId);
+    }
+
+    @Override
+    public MaxLabelShareFolderDO requirePersonalFolder(Long ownerMemberId, Long folderId) {
+        MaxLabelShareFolderDO folder = folderMapper.selectPersonalById(ownerMemberId, folderId);
+        if (folder == null) {
+            throw exception(MEMBER_SHARE_FOLDER_NOT_FOUND);
+        }
+        return folder;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long resolvePersonalFolder(Long ownerMemberId, String categoryPath) {
+        List<String> segments = StrUtil.splitTrim(StrUtil.nullToEmpty(categoryPath), '/')
+                .stream().filter(StrUtil::isNotBlank).toList();
+        if (segments.isEmpty()) {
+            segments = List.of("未分类");
+        }
+        Map<String, MaxLabelShareFolderDO> existing = new java.util.HashMap<>();
+        for (MaxLabelShareFolderDO folder : folderMapper.selectPersonalList(ownerMemberId)) {
+            existing.put(personalKey(folder.getParentId(), folder.getName()), folder);
+        }
+        Long parentId = null;
+        for (String raw : segments) {
+            String name = raw.length() > 64 ? raw.substring(0, 64) : raw;
+            String key = personalKey(parentId, name);
+            MaxLabelShareFolderDO folder = existing.get(key);
+            if (folder == null) {
+                folder = MaxLabelShareFolderDO.builder()
+                        .scope(SCOPE_PERSONAL)
+                        .ownerMemberId(ownerMemberId)
+                        .parentId(parentId)
+                        .name(name)
+                        .creatorMemberId(ownerMemberId)
+                        .build();
+                folderMapper.insert(folder);
+                existing.put(key, folder);
+            }
+            parentId = folder.getId();
+        }
+        return parentId;
+    }
+
+    private boolean existsPersonalSibling(Long ownerMemberId, Long parentId, String name, Long excludeId) {
+        return folderMapper.selectPersonalList(ownerMemberId).stream().anyMatch(folder ->
+                Objects.equals(folder.getParentId(), parentId)
+                        && Objects.equals(folder.getName(), name)
+                        && !Objects.equals(folder.getId(), excludeId));
+    }
+
+    private boolean isDescendant(Long ownerMemberId, Long candidateId, Long ancestorId) {
+        Map<Long, Long> parents = new java.util.HashMap<>();
+        for (MaxLabelShareFolderDO folder : folderMapper.selectPersonalList(ownerMemberId)) {
+            parents.put(folder.getId(), folder.getParentId());
+        }
+        Set<Long> seen = new java.util.HashSet<>();
+        Long current = candidateId;
+        while (current != null && seen.add(current)) {
+            if (Objects.equals(current, ancestorId)) {
+                return true;
+            }
+            current = parents.get(current);
+        }
+        return false;
+    }
+
+    private static String personalKey(Long parentId, String name) {
+        return Objects.toString(parentId, "") + "\u0000" + name;
     }
 
     private ShareEnterpriseAccess requireAdminWithLicense(Long memberId) {

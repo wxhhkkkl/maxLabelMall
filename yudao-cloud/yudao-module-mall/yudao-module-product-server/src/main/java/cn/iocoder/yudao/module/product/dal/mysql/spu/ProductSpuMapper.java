@@ -6,10 +6,13 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.type.IntegerListTypeHandler;
+import cn.iocoder.yudao.framework.mybatis.core.type.LongListTypeHandler;
+import cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils;
 import cn.iocoder.yudao.module.product.controller.admin.spu.vo.ProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.ProductConstants;
+import cn.iocoder.yudao.module.product.enums.spu.ProductSpuBrowseLevelTypeEnum;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.handlers.Jackson3TypeHandler;
@@ -29,6 +32,7 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
     @Results({
             @Result(column = "slider_pic_urls", property = "sliderPicUrls", typeHandler = Jackson3TypeHandler.class),
             @Result(column = "delivery_types", property = "deliveryTypes", typeHandler = IntegerListTypeHandler.class),
+            @Result(column = "browse_level_ids", property = "browseLevelIds", typeHandler = LongListTypeHandler.class),
     })
     ProductSpuDO selectByIdIncludeDeleted(@Param("id") Long id);
 
@@ -68,6 +72,20 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
      * 获得商品 SPU 分页，提供给用户 App 使用
      */
     default PageResult<ProductSpuDO> selectPage(AppProductSpuPageReqVO pageReqVO, Set<Long> categoryIds) {
+        // 旧签名 = 访客视角；生产调用走带 viewer 的重载
+        return selectPage(pageReqVO, categoryIds, false, null);
+    }
+
+    /**
+     * 获得商品 SPU 分页，提供给用户 App 使用（带浏览等级身份）
+     *
+     * @param pageReqVO 分页请求
+     * @param categoryIds 分类编号集合
+     * @param loggedIn 当前是否已登录
+     * @param levelId 当前会员等级编号；未登录 / 无等级传 null
+     */
+    default PageResult<ProductSpuDO> selectPage(AppProductSpuPageReqVO pageReqVO, Set<Long> categoryIds,
+                                                boolean loggedIn, Long levelId) {
         LambdaQueryWrapperX<ProductSpuDO> query = new LambdaQueryWrapperX<ProductSpuDO>()
                 // 关键字匹配，目前只匹配商品名
                 .likeIfPresent(ProductSpuDO::getName, pageReqVO.getKeyword())
@@ -85,6 +103,17 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
                 + " WHERE msp.spu_id = product_spu.id"
                 + " AND msp.tenant_id = product_spu.tenant_id"
                 + " AND msp.deleted = 0");
+        // 浏览等级（019）：公开 / 全部登录会员 / 指定等级会员
+        query.and(w -> {
+            w.eq(ProductSpuDO::getBrowseLevelType, ProductSpuBrowseLevelTypeEnum.PUBLIC.getType());
+            if (loggedIn) {
+                w.or().eq(ProductSpuDO::getBrowseLevelType, ProductSpuBrowseLevelTypeEnum.LOGIN.getType());
+                if (levelId != null) {
+                    w.or().apply("browse_level_type = 2 AND "
+                            + MyBatisUtils.findInSet("browse_level_ids"), levelId);
+                }
+            }
+        });
 
         // 筛选维度（特性 003 / FR-101）：
         // **每个已选值一条等值 EXISTS**，多条之间自然就是 AND。

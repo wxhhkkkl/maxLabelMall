@@ -127,6 +127,30 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
         assertEquals(List.of(online.getId()), selectIdsByPayChannel(PayChannelEnum.WX_LITE.getCode(), null));
     }
 
+    private List<Long> selectIdsByReceiverName(String receiverName) {
+        TradeOrderPageReqVO reqVO = new TradeOrderPageReqVO();
+        reqVO.setReceiverName(receiverName);
+        PageResult<TradeOrderDO> page = tradeOrderMapper.selectPage(reqVO, (java.util.Set<Long>) null);
+        return page.getList().stream().map(TradeOrderDO::getId).toList();
+    }
+
+    @Test
+    public void testSelectPage_receiverName_filter() {
+        TradeOrderDO target = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        TradeOrderDO other = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        // createOrder 的收件人姓名固定为张三；把 target 改成另一个名字
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(target.getId());
+        update.setReceiverName("李四");
+        tradeOrderMapper.updateById(update);
+
+        assertEquals(List.of(target.getId()), selectIdsByReceiverName("李四"));
+        assertEquals(List.of(other.getId()), selectIdsByReceiverName("张三"));
+        // 模糊匹配：填一个字也能查到
+        assertEquals(2, selectIdsByReceiverName("张").size() + selectIdsByReceiverName("李").size());
+        assertEquals(2, selectIdsByReceiverName(null).size()); // 不传 = 不筛
+    }
+
     @Test
     public void testSelectPage_receiverMobile_filter() {
         TradeOrderDO target = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());

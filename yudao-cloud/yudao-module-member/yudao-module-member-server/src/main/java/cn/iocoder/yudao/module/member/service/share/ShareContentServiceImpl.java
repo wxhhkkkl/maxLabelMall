@@ -51,7 +51,12 @@ public class ShareContentServiceImpl implements ShareContentService {
     @Override
     public PageResult<MaxLabelShareContentDO> getPage(Long memberId, AppShareContentPageReqVO reqVO) {
         if (Objects.equals(reqVO.getScope(), SCOPE_PERSONAL)) {
-            return contentMapper.selectPersonalPage(memberId, reqVO.getKeyword(), reqVO.getContentType(), reqVO);
+            Long folderId = reqVO.getFolderId();
+            if (folderId != null && folderId > 0) {
+                folderService.requirePersonalFolder(memberId, folderId);
+            }
+            return contentMapper.selectPersonalPage(memberId, folderId, reqVO.getKeyword(),
+                    reqVO.getContentType(), reqVO);
         }
         if (Objects.equals(reqVO.getScope(), SCOPE_ENTERPRISE)) {
             ShareEnterpriseAccess access = requireSeat(memberId);
@@ -83,6 +88,26 @@ public class ShareContentServiceImpl implements ShareContentService {
     public MaxLabelShareContentDO getContentForAdmin(Long id) {
         MaxLabelShareContentDO content = contentMapper.selectById(id);
         if (content == null || !Objects.equals(content.getScope(), SCOPE_ENTERPRISE)) {
+            throw exception(MEMBER_SHARE_CONTENT_NOT_FOUND);
+        }
+        return content;
+    }
+
+    @Override
+    public PageResult<MaxLabelShareContentDO> getPersonalPageForAdmin(Long memberId, Long folderId,
+                                                                       String keyword, Integer contentType,
+                                                                       cn.iocoder.yudao.framework.common.pojo.PageParam pageParam) {
+        if (folderId != null && folderId > 0) {
+            folderService.requirePersonalFolder(memberId, folderId);
+        }
+        return contentMapper.selectPersonalPage(memberId, folderId, keyword, contentType, pageParam);
+    }
+
+    @Override
+    public MaxLabelShareContentDO getPersonalContentForAdmin(Long memberId, Long id) {
+        MaxLabelShareContentDO content = contentMapper.selectById(id);
+        if (content == null || !Objects.equals(content.getScope(), SCOPE_PERSONAL)
+                || !Objects.equals(content.getOwnerMemberId(), memberId)) {
             throw exception(MEMBER_SHARE_CONTENT_NOT_FOUND);
         }
         return content;
@@ -298,9 +323,9 @@ public class ShareContentServiceImpl implements ShareContentService {
     private Target prepareTarget(Long memberId, Integer scope, Long folderId) {
         if (Objects.equals(scope, SCOPE_PERSONAL)) {
             if (folderId != null) {
-                throw exception(MEMBER_SHARE_CONTENT_INVALID);
+                folderService.requirePersonalFolder(memberId, folderId);
             }
-            return new Target(SCOPE_PERSONAL, memberId, null, null);
+            return new Target(SCOPE_PERSONAL, memberId, null, folderId);
         }
         if (!Objects.equals(scope, SCOPE_ENTERPRISE)) {
             throw exception(MEMBER_SHARE_SCOPE_INVALID);

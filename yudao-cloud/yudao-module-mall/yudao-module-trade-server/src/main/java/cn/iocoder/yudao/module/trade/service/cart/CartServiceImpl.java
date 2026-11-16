@@ -24,6 +24,7 @@ import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_NOT_E
 import static cn.iocoder.yudao.module.product.enums.ErrorCodeConstants.SKU_STOCK_NOT_ENOUGH;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.CARD_ITEM_NOT_FOUND;
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.ENTERPRISE_PRODUCT_NOT_AVAILABLE;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.PRODUCT_SPU_NOT_VISIBLE;
 import static java.util.Collections.emptyList;
 
 /**
@@ -155,6 +156,8 @@ public class CartServiceImpl implements CartService {
         deleteCartIfSpuDeleted(carts, spus);
         // 非企业 OWNER/ADMIN 不展示企业专享商品（处理历史购物车残留；012 / R75）
         deleteEnterpriseCartIfNotAdmin(userId, carts, spus);
+        // 浏览等级（019）：不展示当前会员不可见的商品；只影响展示，不删除购物车行
+        removeBrowseLevelHiddenCarts(userId, carts);
 
         // 拼接数据
         return TradeCartConvert.INSTANCE.convertList(carts, spus, skus);
@@ -184,6 +187,24 @@ public class CartServiceImpl implements CartService {
             return;
         }
         carts.removeIf(cart -> enterpriseSpuIds.contains(cart.getSpuId()));
+    }
+
+    /**
+     * 浏览等级（019）：把当前会员不可见的商品从购物车展示中移除。
+     *
+     * 只影响展示，不删除 `trade_cart` 行 —— 等级恢复后商品重新出现（Q151）。
+     */
+    private void removeBrowseLevelHiddenCarts(Long userId, List<CartDO> carts) {
+        if (CollUtil.isEmpty(carts)) {
+            return;
+        }
+        List<Long> visibleSpuIds = productSpuApi.getVisibleSpuIds(userId,
+                convertSet(carts, CartDO::getSpuId)).getCheckedData();
+        if (CollUtil.isEmpty(visibleSpuIds)) {
+            carts.clear();
+            return;
+        }
+        carts.removeIf(cart -> !visibleSpuIds.contains(cart.getSpuId()));
     }
 
     private void deleteCartIfSpuDeleted(List<CartDO> carts, List<ProductSpuRespDTO> spus) {
@@ -216,6 +237,10 @@ public class CartServiceImpl implements CartService {
         ProductSpuRespDTO spu = productSpuApi.getSpu(sku.getSpuId()).getCheckedData();
         if (spu != null && Boolean.TRUE.equals(spu.getEnterpriseOnly()) && !isEnterpriseAdmin(userId)) {
             throw exception(ENTERPRISE_PRODUCT_NOT_AVAILABLE);
+        }
+        // 浏览等级（019）：不可见商品不允许加购
+        if (!Boolean.TRUE.equals(productSpuApi.validateSpuVisible(userId, sku.getSpuId()).getCheckedData())) {
+            throw exception(PRODUCT_SPU_NOT_VISIBLE);
         }
         if (count > sku.getStock()) {
             throw exception(SKU_STOCK_NOT_ENOUGH);

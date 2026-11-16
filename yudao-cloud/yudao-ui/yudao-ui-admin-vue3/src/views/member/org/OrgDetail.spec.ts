@@ -135,6 +135,14 @@ describe('企业详情 · 成员与席位页签', () => {
     expect(text).not.toContain('转交 OWNER')
     expect(text).not.toContain('移出')
   })
+
+  it('显示导入历史模板入口', async () => {
+    memberPage.mockResolvedValue({ total: 0, list: [] })
+    const wrapper = mountDetail()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('导入历史模板')
+  })
 })
 
 describe('企业详情 · 隐私（FR-319）', () => {
@@ -157,7 +165,9 @@ describe('企业详情 · 隐私（FR-319）', () => {
 
     const text = wrapper.text()
     expect(text).toContain('李四')
-    expect(text).not.toContain('模板')
+    // 新增的「导入历史模板」是运营入口，不属于成员私有数据；先剔除再断言。
+    const withoutImportEntry = text.replace('导入历史模板', '')
+    expect(withoutImportEntry).not.toContain('模板')
     expect(text).not.toContain('打印')
     // 也不该出现「查看」成员私有数据的入口
     expect(text).not.toContain('云模板')

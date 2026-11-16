@@ -1,0 +1,48 @@
+{
+  "ver": "1.6",
+  "tag": "sample",
+  "date": "2026-11-16",
+  "sign": "s",
+  "docid": "doc-1",
+  "fnc": "0",
+  "lfrm": {
+    "paper": {
+      "width": 8000,
+      "height": 6000,
+      "page": {"left": 0, "top": 0, "right": 8000, "bottom": 6000, "color": 16777215},
+      "prn": {"name": "Printer"}
+    },
+    "leayers": [
+      {
+        "label": {
+          "name": "Sample",
+          "uint": 0,
+          "page": {"l": 0, "t": 0, "r": 8000, "b": 6000, "v": 0},
+          "label": {"w": 8000, "h": 6000, "r": 1, "c": 1, "rg": 0, "cg": 0, "ro": 0},
+          "form": {"cr": 1, "ho": 0, "hs": 0}
+        },
+        "objs": [
+          {"type": 2, "id": 1, "name": "T", "left": 10, "top": 20, "right": 100, "bottom": 50,
+           "text": {"value": "Hello", "align": "0", "spacing": "0"},
+           "font": {"name": "Arial", "size": 9, "color": 0}},
+          {"type": 1, "id": 2, "name": "B", "left": 10, "top": 60, "right": 200, "bottom": 100,
+           "code": {"type": "code128", "data": "123"},
+           "option": {"height": 80}, "option2": {"show": 1},
+           "font": {"name": "Arial", "size": 9}},
+          {"type": 4, "id": 3, "name": "L", "left": 0, "top": 0, "right": 100, "bottom": 0,
+           "line": {"width": 1, "linecolor": 255}},
+          {"type": 3, "id": 4, "name": "P", "left": 0, "top": 0, "right": 10, "bottom": 10,
+           "picture": {"file": "x.png"}},
+          {"type": 8, "id": 5, "name": "R", "left": 0, "top": 0, "right": 10, "bottom": 10,
+           "rfid": {"kl": 0, "sb": 2, "dt": 1}}
+        ],
+        "links": ""
+      }
+    ],
+    "vars": [
+      {"type": 1, "name": "sn", "limit": {"filled": 2, "fillchar": 48, "cutout": 1}},
+      {"type": 0, "name": "c"}
+    ]
+  },
+  "dbs": {"ver": 2}
+}

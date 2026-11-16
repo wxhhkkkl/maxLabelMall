@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     `stock` int NOT NULL DEFAULT '0' COMMENT '库存',
     `delivery_types` varchar(32) NOT NULL DEFAULT '' COMMENT '配送方式数组（DO 有、生产也有，原先这份测试建表漏了它）',
     `delivery_template_id` bigint NOT NULL COMMENT '物流配置模板编号',
+    `browse_level_type` tinyint NOT NULL DEFAULT 0 COMMENT '浏览等级：0 公开 1 全部登录会员 2 指定等级会员',
+    `browse_level_ids` varchar(512) DEFAULT '' COMMENT '指定等级会员的会员等级编号数组，逗号分隔；仅 type=2 有意义',
     `enterprise_only` bit(1) NOT NULL DEFAULT FALSE COMMENT '是否企业专享：0 否 1 是',
     `recommend_hot` bit(1) DEFAULT NULL COMMENT '是否热卖推荐（生产库无此列）',
     `recommend_benefit` bit(1) DEFAULT NULL COMMENT '是否优惠推荐（生产库无此列）',
@@ -296,3 +298,31 @@ CREATE TABLE IF NOT EXISTS "maxlabel_software_version"
     UNIQUE ("tenant_id", "software_id", "platform", "arch", "version"),
     UNIQUE ("tenant_id", "software_id", "platform", "arch", "current_flag")
 ) COMMENT 'MaxLabel 软件版本';
+
+-- 019：收藏 / 浏览历史（供浏览等级分页测试使用）
+CREATE TABLE IF NOT EXISTS `product_favorite` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+    `user_id` bigint NOT NULL COMMENT '用户编号',
+    `spu_id` bigint NOT NULL COMMENT '商品 SPU 编号',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY("id")
+) COMMENT '商品收藏';
+
+CREATE TABLE IF NOT EXISTS `product_browse_history` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '记录编号',
+    `spu_id` bigint NOT NULL COMMENT '商品 SPU 编号',
+    `user_id` bigint NOT NULL COMMENT '用户编号',
+    `user_deleted` bit NOT NULL DEFAULT FALSE COMMENT '用户是否删除',
+    "creator" varchar(64) DEFAULT '',
+    "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '',
+    "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE,
+    "tenant_id" bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY("id")
+) COMMENT '商品浏览记录';

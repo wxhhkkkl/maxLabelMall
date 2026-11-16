@@ -51,8 +51,17 @@
           <el-tab-pane label="订阅" lazy>
             <UserSubscriptionList :user-id="id" />
           </el-tab-pane>
-          <el-tab-pane label="标签模板" lazy>
-            <UserLabelTemplateList :user-id="id" />
+          <el-tab-pane label="个人空间" lazy>
+            <div class="mb-10px">
+              <el-button
+                v-hasPermi="['member:user:labelshop-import']"
+                type="primary"
+                @click="importVisible = true"
+              >
+                导入历史模板
+              </el-button>
+            </div>
+            <UserShareSpaceList ref="shareListRef" :user-id="id" />
           </el-tab-pane>
           <el-tab-pane label="打印记录" lazy>
             <UserPrintRecordList :user-id="id" />
@@ -76,12 +85,16 @@
 
   <!-- 表单弹窗：添加/修改 -->
   <UserForm ref="formRef" @success="getUserData(id)" />
+
+  <!-- 个人会员代导历史模板 -->
+  <LabelshopImportDialog v-model="importVisible" :member-id="id" @completed="onImportCompleted" />
 </template>
 <script lang="ts" setup>
 import * as WalletApi from '@/api/pay/wallet/balance'
 import * as UserApi from '@/api/member/user'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import UserForm from '@/views/member/user/UserForm.vue'
+import LabelshopImportDialog from '@/views/member/org/LabelshopImportDialog.vue'
 import UserAccountInfo from './UserAccountInfo.vue'
 import UserAddressList from './UserAddressList.vue'
 import UserBasicInfo from './UserBasicInfo.vue'
@@ -90,7 +103,7 @@ import UserCouponList from './UserCouponList.vue'
 import UserExperienceRecordList from './UserExperienceRecordList.vue'
 import UserOrderList from './UserOrderList.vue'
 import UserSubscriptionList from './UserSubscriptionList.vue'
-import UserLabelTemplateList from './UserLabelTemplateList.vue'
+import UserShareSpaceList from './UserShareSpaceList.vue'
 import UserPrintRecordList from './UserPrintRecordList.vue'
 import UserPointList from './UserPointList.vue'
 import UserSignList from './UserSignList.vue'
@@ -104,6 +117,10 @@ defineOptions({ name: 'MemberDetail' })
 
 const loading = ref(true) // 加载中
 const user = ref<UserApi.UserVO>({} as UserApi.UserVO)
+const importVisible = ref(false)
+const shareListRef = ref<{ reload: () => Promise<unknown> }>()
+
+const onImportCompleted = () => void shareListRef.value?.reload()
 
 /** 添加/修改操作 */
 const formRef = ref()

@@ -35,4 +35,22 @@ public interface ShareFolderService {
 
     MaxLabelShareFolderDO getFolder(Long orgId, Long folderId);
 
+    // ======================= 个人空间文件夹 =======================
+
+    List<ShareFolderInfo> getPersonalList(Long ownerMemberId);
+
+    Long createPersonal(Long ownerMemberId, String name, Long parentId);
+
+    void updatePersonal(Long ownerMemberId, Long id, String name);
+
+    void deletePersonal(Long ownerMemberId, Long id);
+
+    void movePersonal(Long ownerMemberId, Long id, Long parentId);
+
+    /** 校验个人文件夹归属；不存在或不属于该会员时抛文件夹不存在 */
+    MaxLabelShareFolderDO requirePersonalFolder(Long ownerMemberId, Long folderId);
+
+    /** 按来源分类路径（`父/子`）创建或复用嵌套文件夹，返回最深一级编号 */
+    Long resolvePersonalFolder(Long ownerMemberId, String categoryPath);
+
 }

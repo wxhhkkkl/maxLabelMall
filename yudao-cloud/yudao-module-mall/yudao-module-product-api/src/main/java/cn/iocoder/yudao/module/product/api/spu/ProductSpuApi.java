@@ -47,4 +47,18 @@ public interface ProductSpuApi {
     @Parameter(name = "id", description = "SPU 编号", required = true, example = "1")
     CommonResult<ProductSpuRespDTO> getSpu(@RequestParam("id") Long id);
 
+    @GetMapping(PREFIX + "/visible-ids")
+    @Schema(description = "获得会员可见的 SPU 编号数组（浏览等级，019）")
+    @Parameter(name = "userId", description = "会员编号；未登录传空", example = "1024")
+    @Parameter(name = "spuIds", description = "SPU 编号列表", required = true, example = "1,3,5")
+    CommonResult<List<Long>> getVisibleSpuIds(@RequestParam("userId") Long userId,
+                                              @RequestParam("spuIds") Collection<Long> spuIds);
+
+    @GetMapping(PREFIX + "/validate-visible")
+    @Schema(description = "校验会员是否可见 SPU（浏览等级，019）")
+    @Parameter(name = "userId", description = "会员编号；未登录传空", example = "1024")
+    @Parameter(name = "spuId", description = "SPU 编号", required = true, example = "1")
+    CommonResult<Boolean> validateSpuVisible(@RequestParam("userId") Long userId,
+                                             @RequestParam("spuId") Long spuId);
+
 }

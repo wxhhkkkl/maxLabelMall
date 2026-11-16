@@ -37,6 +37,9 @@ public interface ErrorCodeConstants {
     ErrorCode SPU_SAVE_FAIL_COUPON_TEMPLATE_NOT_EXISTS = new ErrorCode(1_008_005_002, "商品 SPU 保存失败，原因：优惠劵不存在");
     ErrorCode SPU_NOT_ENABLE = new ErrorCode(1_008_005_003, "商品 SPU【{}】不处于上架状态");
     ErrorCode SPU_NOT_RECYCLE = new ErrorCode(1_008_005_004, "商品 SPU 不处于回收站状态");
+    ErrorCode SPU_BROWSE_LEVEL_IDS_EMPTY = new ErrorCode(1_008_005_005, "指定等级会员时，至少选择一个会员等级");
+    ErrorCode SPU_BROWSE_LEVEL_NOT_EXISTS = new ErrorCode(1_008_005_006, "会员等级({})不存在");
+    ErrorCode SPU_BROWSE_LEVEL_TYPE_INVALID = new ErrorCode(1_008_005_007, "浏览等级类型不合法");
 
     // ========== 商品 SKU 1-008-006-000 ==========
     ErrorCode SKU_NOT_EXISTS = new ErrorCode(1_008_006_000, "商品 SKU 不存在");

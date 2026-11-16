@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.product.controller.app.history.vo.AppProductBrows
 import cn.iocoder.yudao.module.product.dal.dataobject.history.ProductBrowseHistoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,8 @@ public class AppProductBrowseHistoryController {
     private ProductSpuService productSpuService;
     @Resource
     private MemberOrgApi memberOrgApi;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
 
     @DeleteMapping(value = "/delete")
     @Operation(summary = "删除商品浏览记录")
@@ -62,10 +65,13 @@ public class AppProductBrowseHistoryController {
         ProductBrowseHistoryPageReqVO pageReqVO = BeanUtils.toBean(reqVO, ProductBrowseHistoryPageReqVO.class)
                 .setUserId(getLoginUserId())
                 .setUserDeleted(false); // 排除用户已删除的（隐藏的）
-        // 非企业管理员：在 SQL 分页前排除企业专享商品，total 与列表保持一致（012 / R75）
+        // 浏览等级（019）：在 SQL 分页前过滤，total 与列表保持一致
+        Long userId = getLoginUserId();
+        Long levelId = userId == null ? null : browseLevelService.getViewerLevelId(userId);
+        // 非企业管理员：同时排除企业专享商品（012 / R75）
         PageResult<ProductBrowseHistoryDO> pageResult = isEnterpriseAdmin()
-                ? productBrowseHistoryService.getBrowseHistoryPage(pageReqVO)
-                : productBrowseHistoryService.getBrowseHistoryPageExcludingEnterprise(pageReqVO);
+                ? productBrowseHistoryService.getBrowseHistoryPage(pageReqVO, levelId)
+                : productBrowseHistoryService.getBrowseHistoryPageExcludingEnterprise(pageReqVO, levelId);
         if (CollUtil.isEmpty(pageResult.getList())) {
             return success(PageResult.empty());
         }

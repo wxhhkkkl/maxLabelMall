@@ -7,6 +7,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.convert.invoice.InvoiceConvert;
@@ -204,6 +205,27 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
             return false;
         }
         return ALLOWED_FILE_EXTENSIONS.contains(path.substring(dot + 1).toLowerCase());
+    }
+
+    @Override
+    public void updateInvoice(TradeOrderInvoiceUpdateReqVO reqVO) {
+        // 1. 申请存在
+        TradeOrderInvoiceDO invoice = invoiceMapper.selectById(reqVO.getId());
+        if (invoice == null) {
+            throw exception(INVOICE_NOT_FOUND);
+        }
+        // 2. **只有待开票的能改**：已开票的票面文件已经生成，抬头改了只会与票面不一致；
+        //    已作废的更不该再动。批量更新里再带一次状态条件，挡住"改的同时另一个人开了票"
+        if (!TradeOrderInvoiceStatusEnum.WAITING.getStatus().equals(invoice.getStatus())) {
+            throw exception(INVOICE_UPDATE_FAIL_STATUS_NOT_WAITING);
+        }
+        // 3. 与客户自己提交时**同一套校验**（必填矩阵随票种/抬头类型而变；trim 也在这里做）
+        InvoiceValidator.validate(reqVO);
+
+        // 4. 逐列写入（mapper 里带 status = 待开票 的条件）；0 行 = 刚好被人开了票
+        if (invoiceMapper.updateInvoiceInfo(reqVO) == 0) {
+            throw exception(INVOICE_UPDATE_FAIL_STATUS_NOT_WAITING);
+        }
     }
 
     @Override

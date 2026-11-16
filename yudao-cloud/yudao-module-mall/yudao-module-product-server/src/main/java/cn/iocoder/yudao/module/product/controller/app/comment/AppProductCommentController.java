@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.product.controller.app.comment.vo.AppProductComme
 import cn.iocoder.yudao.module.product.dal.dataobject.comment.ProductCommentDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.service.comment.ProductCommentService;
+import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
 @Tag(name = "用户 APP - 商品评价")
 @RestController
@@ -37,6 +39,8 @@ public class AppProductCommentController {
     private ProductSpuService productSpuService;
     @Resource
     private MaxLabelSubscriptionPlanService subscriptionPlanService;
+    @Resource
+    private ProductSpuBrowseLevelService browseLevelService;
 
     @GetMapping("/page")
     @Operation(summary = "获得商品评价分页")
@@ -73,6 +77,10 @@ public class AppProductCommentController {
             return true; // 商品不存在就交给评论服务按原逻辑返回空
         }
         if (Boolean.TRUE.equals(spu.getEnterpriseOnly())) {
+            return false;
+        }
+        // 浏览等级（019）：不可见商品的评价同样不返回，避免从评价里泄露 spuName
+        if (!browseLevelService.isVisible(spu, getLoginUserId())) {
             return false;
         }
         return CollUtil.isEmpty(subscriptionPlanService.getPlanSpuIds(List.of(spuId)));

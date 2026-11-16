@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -77,6 +78,35 @@ public interface TradeOrderInvoiceMapper extends BaseMapperX<TradeOrderInvoiceDO
                 .ne(TradeOrderInvoiceDO::getStatus, TradeOrderInvoiceStatusEnum.CANCELED.getStatus())
                 .set(TradeOrderInvoiceDO::getStatus, TradeOrderInvoiceStatusEnum.CANCELED.getStatus())
                 .set(TradeOrderInvoiceDO::getCancelTime, cancelTime));
+    }
+
+    /**
+     * 后台代客户**修改开票信息**（票种 + 抬头 + 邮箱）
+     *
+     * 三条实现要点：
+     * · 条件里带 `status = WAITING` —— 状态校验与更新**一条 SQL 完成**：
+     *   运营点「修改」的同时另一个人开了票，这里更新 0 行，而不是把已开票申请的抬头顶掉
+     *   （票面文件已经生成了，改了只会让记录与票面不一致）。
+     * · **逐列 `set` 而不是 `updateById(DO)`**：MyBatis-Plus 默认忽略 null 字段，
+     *   那样"把开户行 / 税号清空"永远存不进库 —— 客户说填错了要删掉时，会看起来成功但值还在。
+     * · 金额 / 订单号 / 状态 / 发票文件**不在 set 里**：它们不是"改信息"能动的。
+     *
+     * @return 更新行数；0 表示申请不存在或已不是待开票
+     */
+    default int updateInvoiceInfo(TradeOrderInvoiceUpdateReqVO reqVO) {
+        return update(new LambdaUpdateWrapper<TradeOrderInvoiceDO>()
+                .eq(TradeOrderInvoiceDO::getId, reqVO.getId())
+                .eq(TradeOrderInvoiceDO::getStatus, TradeOrderInvoiceStatusEnum.WAITING.getStatus())
+                .set(TradeOrderInvoiceDO::getType, reqVO.getType())
+                .set(TradeOrderInvoiceDO::getTitleKind, reqVO.getTitleKind())
+                .set(TradeOrderInvoiceDO::getTitleName, reqVO.getTitleName())
+                .set(TradeOrderInvoiceDO::getTaxNo, reqVO.getTaxNo())
+                .set(TradeOrderInvoiceDO::getTitleAddress, reqVO.getTitleAddress())
+                .set(TradeOrderInvoiceDO::getTitlePhone, reqVO.getTitlePhone())
+                .set(TradeOrderInvoiceDO::getBankName, reqVO.getBankName())
+                .set(TradeOrderInvoiceDO::getBankAccount, reqVO.getBankAccount())
+                .set(TradeOrderInvoiceDO::getBankCode, reqVO.getBankCode())
+                .set(TradeOrderInvoiceDO::getEmail, reqVO.getEmail()));
     }
 
 }

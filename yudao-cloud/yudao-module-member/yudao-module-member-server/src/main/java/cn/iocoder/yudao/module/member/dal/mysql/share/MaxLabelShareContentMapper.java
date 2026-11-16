@@ -14,15 +14,31 @@ import java.util.List;
 @Mapper
 public interface MaxLabelShareContentMapper extends BaseMapperX<MaxLabelShareContentDO> {
 
-    default PageResult<MaxLabelShareContentDO> selectPersonalPage(Long memberId, String keyword,
+    /**
+     * 个人空间内容分页。
+     *
+     * @param folderId null = 全部（兼容起始页平铺）；0 = 根目录；>0 = 指定文件夹
+     */
+    default PageResult<MaxLabelShareContentDO> selectPersonalPage(Long memberId, Long folderId,
+                                                                  String keyword,
                                                                   Integer contentType, PageParam pageParam) {
         LambdaQueryWrapperX<MaxLabelShareContentDO> wrapper = new LambdaQueryWrapperX<MaxLabelShareContentDO>()
                 .eq(MaxLabelShareContentDO::getScope, 1)
                 .eq(MaxLabelShareContentDO::getOwnerMemberId, memberId)
                 .eqIfPresent(MaxLabelShareContentDO::getContentType, contentType);
+        if (folderId != null && folderId == 0) {
+            wrapper.isNull(MaxLabelShareContentDO::getFolderId);
+        } else if (folderId != null) {
+            wrapper.eq(MaxLabelShareContentDO::getFolderId, folderId);
+        }
         appendKeyword(wrapper, keyword);
         return selectPage(pageParam, wrapper.orderByDesc(MaxLabelShareContentDO::getCreateTime)
                 .orderByDesc(MaxLabelShareContentDO::getId));
+    }
+
+    default PageResult<MaxLabelShareContentDO> selectPersonalPage(Long memberId, String keyword,
+                                                                  Integer contentType, PageParam pageParam) {
+        return selectPersonalPage(memberId, null, keyword, contentType, pageParam);
     }
 
     /** 管理端：按企业查看全部共享内容，不校验席位与文件夹可见性。 */

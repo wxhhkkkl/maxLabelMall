@@ -186,4 +186,33 @@ public interface ErrorCodeConstants {
     ErrorCode AGENT_ORDER_CUSTOMIZATION_NOT_SUPPORTED = new ErrorCode(1_011_012_009, "印刷定制商品不支持代客下单，请让客户在 C 端使用定制向导");
     ErrorCode AGENT_ORDER_ADDRESS_REQUIRED = new ErrorCode(1_011_012_010, "请选择客户的收货地址；客户没有地址时，请先在 C 端添加");
 
+    // ========== 客户服务 1-011-013-000 ==========
+    ErrorCode CUSTOMER_SERVICE_TICKET_NOT_EXISTS = new ErrorCode(1_011_013_000, "工单不存在");
+    ErrorCode CUSTOMER_SERVICE_TICKET_HANDLED = new ErrorCode(1_011_013_001, "该工单已处理，请勿重复操作");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_NOT_EXISTS = new ErrorCode(1_011_013_002, "维修申请不存在");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_STATUS_INVALID = new ErrorCode(1_011_013_003, "当前状态不允许该操作");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_EXISTS = new ErrorCode(1_011_013_004, "该维修申请已生成维修订单，请勿重复开单");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_NOT_EXISTS = new ErrorCode(1_011_013_005, "维修订单不存在");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_NOT_PAYABLE = new ErrorCode(1_011_013_006, "该维修订单当前不可支付");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_NOT_PAID = new ErrorCode(1_011_013_007, "请先完成支付后再寄件");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_NOT_SHIPPABLE = new ErrorCode(1_011_013_008, "当前状态不允许标记已寄出");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_SHIP_NO_REQUIRED = new ErrorCode(1_011_013_009, "请填写寄出运单号");
+    ErrorCode CUSTOMER_SERVICE_OFFLINE_NOT_ALLOWED = new ErrorCode(1_011_013_010, "当前未开启对公转账");
+    ErrorCode CUSTOMER_SERVICE_OFFLINE_CONFIRM_FAIL = new ErrorCode(1_011_013_011, "该维修订单不在待确认收款状态");
+    ErrorCode CUSTOMER_SERVICE_ADDRESS_NOT_CONFIGURED = new ErrorCode(1_011_013_012, "回收邮寄地址尚未配置，请联系客服");
+    ErrorCode CUSTOMER_SERVICE_FILE_INVALID = new ErrorCode(1_011_013_013, "图片不合规（最多 5 张，仅 JPG/PNG/WEBP，单张不超过 10MB）");
+    ErrorCode CUSTOMER_SERVICE_MEMBER_NOT_EXISTS = new ErrorCode(1_011_013_014, "会员不存在，无法代建工单");
+    ErrorCode CUSTOMER_SERVICE_TICKET_INVALID = new ErrorCode(1_011_013_015, "工单内容不合法：请检查类型、内容（1~1000 字）与 11 位联系手机号");
+    ErrorCode CUSTOMER_SERVICE_TICKET_HANDLE_REMARK_REQUIRED = new ErrorCode(1_011_013_016, "请填写处理说明（不超过 500 字）");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_PAID_REFUND_FIRST = new ErrorCode(1_011_013_017, "维修订单已支付，请先完成人工退款后再取消");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_INVALID = new ErrorCode(1_011_013_018, "维修费用不合法：两项费用必须 ≥ 0，且需填写费用说明");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_CONTACT_REQUIRED = new ErrorCode(1_011_013_019, "请填写电话联系结果（不超过 500 字）");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_CANCEL_REASON_REQUIRED = new ErrorCode(1_011_013_020, "请填写取消原因（不超过 255 字）");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_NOT_REFUNDABLE = new ErrorCode(1_011_013_021, "仅已支付且未退款的维修订单可以退款");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_REFUND_REASON_REQUIRED = new ErrorCode(1_011_013_022, "请填写退款原因（不超过 200 字）");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_REFUND_NOTIFY_INVALID = new ErrorCode(1_011_013_023, "退款回调与维修订单不匹配");
+    ErrorCode CUSTOMER_SERVICE_TICKET_LIMIT = new ErrorCode(1_011_013_024, "最多同时提交 10 条待处理投诉咨询，请等待处理完成后再提交");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_LIMIT = new ErrorCode(1_011_013_025, "最多同时提交 10 台设备的维修申请，请等待维修完成或取消后再提交");
+    ErrorCode CUSTOMER_SERVICE_REPAIR_ORDER_NOT_COMPLETABLE = new ErrorCode(1_011_013_026, "当前维修订单不可完成（需已支付且已寄出/维修中，且未退款）");
+
 }

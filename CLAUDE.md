@@ -32,6 +32,43 @@ specs/019-product-browse-level/plan.md
   📌 交易链路（加购 / 结算 / 下单）服务端二次校验，购物车/收藏/浏览历史只隐藏不删记录；
   营销活动（秒杀/拼团/积分/砍价）同样过滤；企业管理员不豁免等级条件
 
+当前特性（020 授权看板：软件管理下看授权规模与赠送）：
+- specs/020-license-dashboard/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/020-license-dashboard/contracts/admin-api.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/042-license-dashboard.sql`（新表 `member_license_grant` +
+  两张表加 `license_grant_id` + 放宽来源列 + 菜单权限），再发后端，最后发管理端
+  📌 口径：个人有效 = 订阅未过期；企业有效 = 启用 + 有有效批次（**不看席位是否分配**）；
+  当年客户拆成「新获得 / 延续 / 合计」三个数，一律按 `create_time` 判年份，合计按客户去重
+  📌 赠送：个人固定专业版、企业固定企业版；单次 ≤ 12 个月且赠送后剩余 ≤ 12 个月；
+  必填理由、不可撤销、原子提交；`member:license:query` 与 `member:license:gift` 分开授
+  📌 **2026-11-17 赠送独立入口（Q162）**：看板顶部可对**全部个人与企业**发起赠送（按客户类型 /
+  关键字筛选，不限是否已有授权），明细行内入口保留；无授权对象从当天起算；
+  企业无有效批次时送席位须同时选时长（Q157）
+  📌 **2026-11-17 看板卡片口径（Q163）**：个人卡片只显示**订阅会员**（席位会员仍在明细）；
+  当年卡片按「新获得 / 延续」两组 × 个人会员数 / 企业席位数 / 合计 展示
+  （合计单位不同，**不是客户数**）；企业席位 = 当年新增有效批次 `seats_total` 之和
+  📌 **2026-11-16 起发版须所有者确认**（宪法原则 VI），任何上线动作不得自动执行
+
+当前特性（021 客户服务：投诉咨询与在线维修）：
+- specs/021-customer-service-repair/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/021-customer-service-repair/contracts/{app-api,admin-api}.md
+  ⚠️ **上线顺序**：先执行 `sql/mysql/043-customer-service.sql`（5 张表 + 菜单/权限），
+  再执行 `sql/mysql/044-customer-service-refund.sql`（维修订单退款列 + 四个菜单 + 退款按钮），
+  再执行 `sql/mysql/045-repair-order-complete.sql`（完成维修时间/操作人），
+  再发后端，最后发管理端 / 门面站；回滚判据见 quickstart §六
+  📌 **2026-11-17 维修订单退款**：仅已支付且未退款的全额退；**在线支付原路退**（pay 退款回调按
+  `repair:` 前缀分流），**对公/线下确认由运营填原因后标记已退款**；权限 `trade:customer-service:refund`
+  📌 **2026-11-17 管理端四个菜单**：客户服务 → 投诉咨询 / 在线维修 / 回收地址设置 / 维修订单
+  📌 **2026-11-17 完成维修**：维修订单页手动「完成维修」（已寄出/维修中、已支付/无需支付、未退款），
+  记录完成人 `complete_operator_id` 与 `complete_time`，维修申请置 50 已完成；已退款订单不可完成
+  📌 **2026-11-17 提交上限**：同一客户最多同时保留 **10 条待处理投诉咨询**、**10 台在修维修申请**；
+  投诉处理完成 / 维修完成或取消后可继续提交（服务端校验，管理员代建同样受限）
+  📌 口径：个人中心「客户服务」含**投诉咨询 / 在线维修**；管理端「客户服务」可查看与代建工单、
+  记录电话联系、开单（维修费 + 寄回运费）、确认对公收款、推进维修状态、维护回收地址
+  📌 维修单是**独立服务单**，不进入「我的订单」；支付复用 pay，`merchantOrderId = repair:<id>`，
+  支付回调在 `/trade/order/update-paid` 按前缀分流（回滚须前后端同时回滚）
+  📌 客户**先支付（或 0 元/对公确认）再寄件**；回收地址由后台维护；客户侧不提供自助退款
+
 上一个特性（018 LabelShop 模板导入：后台按来源白名单迁移模板）：
 - specs/018-labelshop-template-import/{spec,plan,research,data-model,tasks,quickstart}.md
 - specs/018-labelshop-template-import/contracts/{admin-api,labelshop-upstream}.md

@@ -11,3 +11,8 @@ DELETE FROM trade_customization_order;
 DELETE FROM trade_customization_config;
 DELETE FROM trade_customization_area_rule;
 DELETE FROM trade_customization_material;
+DELETE FROM trade_customer_service_log;
+DELETE FROM trade_repair_order;
+DELETE FROM trade_repair_request;
+DELETE FROM trade_customer_service_ticket;
+DELETE FROM trade_customer_service_address;

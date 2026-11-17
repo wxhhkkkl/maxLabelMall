@@ -24,6 +24,7 @@ const router = createRouter({
     { path: '/order/:id', component: { template: '<div/>' } },
     { path: '/coupon', component: { template: '<div/>' } },
     { path: '/coupon/mine', component: { template: '<div/>' } },
+    { path: '/account/customer-service', component: { template: '<div/>' } },
   ],
 })
 
@@ -45,10 +46,10 @@ beforeEach(async () => {
 })
 
 describe('AccountSidebar —— 按主题分三组', () => {
-  it('**渲染三个分组标题**：账户资料 / 我的交易 / 我的权益', async () => {
+  it('**渲染四个分组标题**：账户资料 / 我的交易 / 我的权益 / 客户服务', async () => {
     const w = await mountAt('/account')
     const titles = w.findAll('.s-group-title').map((t) => t.text().trim())
-    expect(titles).toEqual(['账户资料', '我的交易', '我的权益'])
+    expect(titles).toEqual(['账户资料', '我的交易', '我的权益', '客户服务'])
   })
 
   it('**入口归属正确**（这是"整理排布"的实质）', async () => {
@@ -56,6 +57,7 @@ describe('AccountSidebar —— 按主题分三组', () => {
     expect(labelsOf('账户资料', w)).toEqual(['个人中心', '收货地址', '发票抬头'])
     expect(labelsOf('我的交易', w)).toEqual(['我的订单', '我的售后'])
     expect(labelsOf('我的权益', w)).toEqual(['我的券', '领券中心', '积分与等级'])
+    expect(labelsOf('客户服务', w)).toEqual(['投诉咨询', '在线维修'])
   })
 
   it('**两个新入口都在**，且指向新的两条路由', async () => {
@@ -63,6 +65,16 @@ describe('AccountSidebar —— 按主题分三组', () => {
     const hrefs = w.findAll('.s-item').map((a) => a.attributes('href'))
     expect(hrefs).toContain('/account/after-sale')
     expect(hrefs).toContain('/account/points')
+    expect(hrefs).toContain('/account/customer-service?tab=ticket')
+    expect(hrefs).toContain('/account/customer-service?tab=repair')
+  })
+
+  it('客户服务两个页签按 ?tab= 分别高亮', async () => {
+    const ticket = await mountAt('/account/customer-service')
+    expect(ticket.findAll('.s-item.active').map((a) => a.text().trim())).toEqual(['投诉咨询'])
+
+    const repair = await mountAt('/account/customer-service?tab=repair')
+    expect(repair.findAll('.s-item.active').map((a) => a.text().trim())).toEqual(['在线维修'])
   })
 
   it('**进入子页后侧栏仍在**，且对应项高亮（SC-024）', async () => {

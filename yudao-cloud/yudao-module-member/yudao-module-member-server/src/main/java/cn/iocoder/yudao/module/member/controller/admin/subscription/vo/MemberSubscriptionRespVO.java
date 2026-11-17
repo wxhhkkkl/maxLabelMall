@@ -21,6 +21,8 @@ public class MemberSubscriptionRespVO {
     private Long remainingDays;
     private Long sourceOrderId;
     private String sourceOrderNo;
+    /** 赠送来源编号：非空 = 这一行是运营赠送（020，此时来源订单为空） */
+    private Long licenseGrantId;
     private Boolean refunded;
     private LocalDateTime createTime;
 

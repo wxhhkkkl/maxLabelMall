@@ -56,6 +56,13 @@ const cartStore = useCartStore()
 const loginOpen = ref(false)
 const loggingOut = ref(false)
 const memberLevel = computed(() => userStore.member?.level?.name || '暂无等级')
+/** 等级徽标样式（2026-11-17 所有者要求）：银牌保持现状，金牌金色，钻石用钻石质感 */
+const memberLevelClass = computed(() => {
+  const name = userStore.member?.level?.name || ''
+  if (name.includes('钻石')) return 'is-diamond'
+  if (name.includes('金牌') || name.includes('黄金')) return 'is-gold'
+  return ''
+})
 
 // 只有企业 OWNER/ADMIN 才显示「企业中心」入口；普通会员/未加入企业的用户不显示
 const enterpriseAdmin = ref(false)
@@ -280,6 +287,7 @@ function isActive(name: string): boolean {
         </div>
         <RouterLink
           class="header-member-level"
+          :class="memberLevelClass"
           to="/account/points"
           :title="`会员等级：${memberLevel}`"
         >
@@ -342,6 +350,7 @@ function isActive(name: string): boolean {
         </RouterLink>
         <RouterLink
           class="header-member-level"
+          :class="memberLevelClass"
           to="/account/points"
         >
           {{ memberLevel }}

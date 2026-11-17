@@ -70,4 +70,11 @@ public interface LogRecordConstants {
     String MEMBER_LABELSHOP_START_SUCCESS_ORG = "发起了历史模板导入（企业【{{#reqVO.orgId}}】）";
     String MEMBER_LABELSHOP_START_SUCCESS_MEMBER = "发起了历史模板导入（会员【{{#reqVO.memberId}}】）";
 
+    // ======================= 授权赠送（020） =======================
+
+    String MEMBER_LICENSE_GRANT_TYPE = "授权赠送";
+    String MEMBER_LICENSE_GRANT_SUB_TYPE = "赠送授权";
+    String MEMBER_LICENSE_GRANT_SUCCESS =
+            "给{}【{{#reqVO.targetId}}】赠送了{}：{}（理由：{{#reqVO.reason}}）";
+
 }

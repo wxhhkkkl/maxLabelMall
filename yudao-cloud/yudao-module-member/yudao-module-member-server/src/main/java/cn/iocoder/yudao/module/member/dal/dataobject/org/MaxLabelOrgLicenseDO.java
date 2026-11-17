@@ -45,6 +45,12 @@ public class MaxLabelOrgLicenseDO extends BaseDO {
     private Long sourceOrderId;
     private Long sourceOrderItemId;
     private String sourceOrderNo;
+    /**
+     * 赠送来源：{@link cn.iocoder.yudao.module.member.dal.dataobject.license.MemberLicenseGrantDO#getId()}
+     *
+     * 非空 = 本批次是**运营赠送**产生的（没有订单与套餐快照，相关列全为 NULL）。
+     */
+    private Long licenseGrantId;
     /** 来源订单或订单项是否已全额退款（仅标记，不回收） */
     private Boolean refunded;
     /**

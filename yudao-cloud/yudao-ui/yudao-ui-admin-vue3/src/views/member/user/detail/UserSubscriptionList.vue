@@ -14,7 +14,13 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="来源订单" prop="sourceOrderNo" min-width="180" />
+      <el-table-column label="来源" min-width="180">
+        <template #default="{ row }">
+          <!-- 运营赠送的行没有订单号（020），不能显示成空白 -->
+          <span v-if="row.licenseGrantId" class="text-gray-500">运营赠送</span>
+          <span v-else>{{ row.sourceOrderNo }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="退款" width="100">
         <template #default="{ row }">
           <el-tag v-if="row.refunded" type="warning">来源已退款</el-tag>

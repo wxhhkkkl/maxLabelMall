@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TradeOrderStatusEnum } from '@/utils/constants'
 
 /**
  * 后台订单详情 —— 物流信息（010 / US36 / US37）。
@@ -439,5 +440,23 @@ describe('后台订单详情 —— 发票详情', () => {
       .findAll('.el-descriptions')
       .find((section) => section.text().includes('发票详情'))
     expect(invoiceSection!.findAll('button')).toHaveLength(0)
+  })
+})
+
+describe('后台订单详情 —— 修改地址入口（2026-11-17 所有者要求）', () => {
+  it('待发货快递单：修改地址在「收货信息」里、紧跟收货地址（不再放顶部操作区）', async () => {
+    const w = await mountDetail(order({ status: TradeOrderStatusEnum.UNDELIVERED.status }))
+
+    const receiverSection = w
+      .findAll('.el-descriptions')
+      .find((section) => section.text().includes('收货信息'))!
+    expect(receiverSection.text()).toContain('收货地址')
+    expect(receiverSection.text()).toContain('修改地址')
+  })
+
+  it('已发货订单不显示修改地址', async () => {
+    const w = await mountDetail(order({ status: TradeOrderStatusEnum.DELIVERED.status }))
+
+    expect(w.text()).not.toContain('修改地址')
   })
 })

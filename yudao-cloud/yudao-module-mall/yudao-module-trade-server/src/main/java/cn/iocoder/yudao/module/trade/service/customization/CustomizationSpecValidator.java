@@ -43,9 +43,11 @@ public class CustomizationSpecValidator {
                 throw exception(CUSTOMIZATION_SPEC_OUT_OF_RANGE);
             }
         }
+        // 2026-11-17 所有者裁定：定制数量**不设上限**（只校验最小数量），
+        // 材质的 maxQuantity 保留给后台参考，不再参与前台报价 / 下单校验。
         if (spec.getWidth() < material.getMinWidth() || spec.getWidth() > material.getMaxWidth()
                 || spec.getHeight() < material.getMinHeight() || spec.getHeight() > material.getMaxHeight()
-                || spec.getQuantity() < material.getMinQuantity() || spec.getQuantity() > material.getMaxQuantity()) {
+                || spec.getQuantity() < material.getMinQuantity()) {
             throw exception(CUSTOMIZATION_SPEC_OUT_OF_RANGE);
         }
         if (spec.getRemark() != null && spec.getRemark().length() > 500) {

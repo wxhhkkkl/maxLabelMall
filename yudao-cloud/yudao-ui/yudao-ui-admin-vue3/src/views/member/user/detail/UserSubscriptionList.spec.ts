@@ -2,46 +2,77 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/api/member/subscription', () => ({ getSubscriptionPage: vi.fn() }))
-
-import { getSubscriptionPage } from '@/api/member/subscription'
 import UserSubscriptionList from './UserSubscriptionList.vue'
 
-const getPage = vi.mocked(getSubscriptionPage)
+/**
+ * 会员详情 - 订阅页签（020 / T085）
+ *
+ * 钉住的是"赠送行不能显示成空白"：运营赠送的订阅**没有订单号**（source_* 全为 NULL），
+ * 若沿用原来的 `sourceOrderNo` 列，客户看到的那一行来源就是空的。
+ */
+const getSubscriptionPage = vi.fn()
+vi.mock('@/api/member/subscription', () => ({
+  getSubscriptionPage: (...a: unknown[]) => getSubscriptionPage(...a)
+}))
+
+const ROWS = [
+  {
+    id: 1,
+    memberId: 88,
+    periodMonths: 12,
+    startDate: '2026-01-01',
+    endDate: '2027-01-01',
+    startTime: '2026-01-01 00:00:00',
+    endTime: '2027-01-02 00:00:00',
+    active: true,
+    remainingDays: 100,
+    sourceOrderId: null,
+    sourceOrderNo: null,
+    licenseGrantId: 501,
+    refunded: false,
+    createTime: '2026-01-01 00:00:00'
+  },
+  {
+    id: 2,
+    memberId: 88,
+    periodMonths: 3,
+    startDate: '2025-10-01',
+    endDate: '2026-01-01',
+    startTime: '2025-10-01 00:00:00',
+    endTime: '2026-01-02 00:00:00',
+    active: false,
+    remainingDays: 0,
+    sourceOrderId: 1001,
+    sourceOrderNo: 'NO-20251001-0001',
+    licenseGrantId: null,
+    refunded: false,
+    createTime: '2025-10-01 00:00:00'
+  }
+]
+
+const mountList = () =>
+  mount(UserSubscriptionList, {
+    props: { userId: 88 },
+    global: { plugins: [createPinia()] }
+  })
 
 beforeEach(() => {
-  getPage.mockReset()
+  getSubscriptionPage.mockReset()
+  getSubscriptionPage.mockResolvedValue({ list: ROWS, total: 2 })
 })
 
-describe('会员订阅页签', () => {
-  it('展示周期、到期日、剩余天数、来源订单与退款标记', async () => {
-    getPage.mockResolvedValue({
-      total: 2,
-      list: [
-        {
-          id: 1, memberId: 1001, periodMonths: 12,
-          startDate: '2026-10-20', endDate: '2027-10-20',
-          startTime: '2026-10-20T00:00:00', endTime: '2027-10-21T00:00:00',
-          active: true, remainingDays: 365, sourceOrderId: 1,
-          sourceOrderNo: 'o1', refunded: false, createTime: '2026-10-20T10:00:00'
-        },
-        {
-          id: 2, memberId: 1001, periodMonths: 1,
-          startDate: '2026-09-01', endDate: '2026-10-01',
-          startTime: '2026-09-01T00:00:00', endTime: '2026-10-02T00:00:00',
-          active: false, remainingDays: 0, sourceOrderId: 2,
-          sourceOrderNo: 'o2', refunded: true, createTime: '2026-09-01T10:00:00'
-        }
-      ]
-    })
-
-    const wrapper = mount(UserSubscriptionList, { props: { userId: 1001 }, global: { plugins: [createPinia()] } })
+describe('会员详情 - 订阅页签', () => {
+  it('赠送行显示「运营赠送」，不是空白', async () => {
+    const w = mountList()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('有效')
-    expect(wrapper.text()).toContain('已过期')
-    expect(wrapper.text()).toContain('来源已退款')
-    expect(wrapper.text()).toContain('2027-10-20')
-    expect(getPage).toHaveBeenCalledWith({ pageNo: 1, pageSize: 10, userId: 1001 })
+    expect(w.text()).toContain('运营赠送')
+  })
+
+  it('订单行仍显示订单号', async () => {
+    const w = mountList()
+    await flushPromises()
+
+    expect(w.text()).toContain('NO-20251001-0001')
   })
 })

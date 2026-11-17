@@ -75,6 +75,8 @@ public class AppTradeOrderController {
     private TradeConfigService tradeConfigService;
     @Resource
     private TradeOrderOfflinePaymentService tradeOrderOfflinePaymentService;
+    @Resource
+    private cn.iocoder.yudao.module.trade.service.customerservice.CustomerServiceRepairOrderService customerServiceRepairOrderService;
 
     @GetMapping("/settlement")
     @Operation(summary = "获得订单结算信息")
@@ -101,7 +103,17 @@ public class AppTradeOrderController {
     @Operation(summary = "更新订单为已支付") // 由 pay-module 支付服务，进行回调，可见 PayNotifyJob
     @PermitAll
     public CommonResult<Boolean> updateOrderPaid(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
-        tradeOrderUpdateService.updateOrderPaid(Long.valueOf(notifyReqDTO.getMerchantOrderId()),
+        String merchantOrderId = notifyReqDTO.getMerchantOrderId();
+        // 021：维修支付单用 `repair:<id>` 前缀，与纯数字的交易订单号不会冲突
+        if (cn.iocoder.yudao.module.trade.service.customerservice.CustomerServiceRepairOrderService
+                .isRepairMerchantOrderId(merchantOrderId)) {
+            customerServiceRepairOrderService.updateOrderPaid(
+                    cn.iocoder.yudao.module.trade.service.customerservice.CustomerServiceRepairOrderService
+                            .parseRepairOrderId(merchantOrderId),
+                    notifyReqDTO.getPayOrderId());
+            return success(true);
+        }
+        tradeOrderUpdateService.updateOrderPaid(Long.valueOf(merchantOrderId),
                 notifyReqDTO.getPayOrderId());
         return success(true);
     }

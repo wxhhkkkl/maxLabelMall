@@ -121,4 +121,15 @@ public interface ErrorCodeConstants {
     ErrorCode MEMBER_LABELSHOP_TASK_REJECTED = new ErrorCode(1_004_018_008, "导入任务繁忙，请稍后重试");
     ErrorCode MEMBER_LABELSHOP_SUBJECT_REQUIRED = new ErrorCode(1_004_018_009, "请指定企业或会员");
 
+    //========== MaxLabel 授权看板 / 赠送 1-004-019-000 ==========
+    ErrorCode LICENSE_TARGET_NOT_FOUND = new ErrorCode(1_004_019_001, "赠送对象不存在");
+    ErrorCode LICENSE_ORG_DISABLED = new ErrorCode(1_004_019_002, "企业已停用，请先启用后再赠送");
+    ErrorCode LICENSE_GIFT_MONTHS_INVALID = new ErrorCode(1_004_019_003, "赠送时长只能选择 1 / 3 / 6 / 12 个月");
+    /** 占位符是"最多还能送几个月" */
+    ErrorCode LICENSE_GIFT_LIMIT_EXCEEDED = new ErrorCode(1_004_019_004, "赠送后剩余时长不能超过 12 个月，当前最多还能赠送 {} 个月");
+    ErrorCode LICENSE_GIFT_SEATS_INVALID = new ErrorCode(1_004_019_005, "赠送席位数必须大于 0");
+    ErrorCode LICENSE_GIFT_MONTHS_REQUIRED = new ErrorCode(1_004_019_006, "该企业当前没有有效授权，赠送席位时必须同时填写时长");
+    ErrorCode LICENSE_GIFT_REASON_REQUIRED = new ErrorCode(1_004_019_007, "请填写赠送理由");
+    ErrorCode LICENSE_GIFT_CONTENT_INVALID = new ErrorCode(1_004_019_008, "个人会员只能赠送时长；企业可赠送席位或时长");
+
 }

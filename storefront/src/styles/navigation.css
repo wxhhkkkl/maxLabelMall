@@ -23,6 +23,11 @@
 .header-member-menu a:hover,
 .header-member-menu a:focus-visible { background: #f2f7fe; color: #2e7cd6; }
 .header-member-level { display: inline-block; flex: none; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #6483a7; background: #edf4fd; padding: 4px 8px; border-radius: 4px; }
+/* 会员等级徽标（2026-11-17 所有者要求）：银牌保持默认样式；金牌金色；钻石用钻石质感 */
+.header-member-level.is-gold { color: #8a5a00; background: linear-gradient(135deg, #fff7d9, #ffe49a); box-shadow: inset 0 0 0 1px #f0cf6b; }
+.header-member-level.is-diamond { position: relative; color: #1f5f96; background: linear-gradient(135deg, #f2fbff, #d4ecff 38%, #e9e9ff 68%, #ffffff); box-shadow: inset 0 0 0 1px #a9d3f2, 0 1px 6px rgba(53, 165, 255, .22); }
+.header-member-level.is-diamond::before { content: '◆'; margin-right: 3px; font-size: 8px; vertical-align: 1px; color: #35a5ff; }
+.header-member-level.is-diamond::after { content: ''; position: absolute; top: -60%; left: -35%; width: 36%; height: 220%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .9), transparent); transform: rotate(20deg); pointer-events: none; }
 .header-logout { flex: none; padding: 4px 0; background: none; border: 0; color: #8292a7; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .header-logout:hover { color: #2e7cd6; }
 .header-logout:disabled { opacity: .6; cursor: wait; }

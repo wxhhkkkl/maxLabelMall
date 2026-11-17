@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderItemDO;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleLogService;
 import cn.iocoder.yudao.module.trade.service.aftersale.AfterSaleService;
+import cn.iocoder.yudao.module.trade.service.customerservice.CustomerServiceRepairOrderService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderQueryService;
 import cn.iocoder.yudao.module.trade.service.order.TradeOrderUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,6 +47,8 @@ public class AfterSaleController {
 
     @Resource
     private AfterSaleService afterSaleService;
+    @Resource
+    private CustomerServiceRepairOrderService customerServiceRepairOrderService;
     @Resource
     private TradeOrderQueryService tradeOrderQueryService;
     @Resource
@@ -148,6 +151,12 @@ public class AfterSaleController {
     @PermitAll // 无需登录，安全由 AfterSaleService 内部校验实现
     public CommonResult<Boolean> updateAfterSaleRefunded(@RequestBody PayRefundNotifyReqDTO notifyReqDTO) {
         log.info("[updateAfterRefund][notifyReqDTO({})]", notifyReqDTO);
+        // 维修订单复用同一个支付应用：按 merchantOrderId 前缀分流
+        if (CustomerServiceRepairOrderService.isRepairMerchantOrderId(notifyReqDTO.getMerchantOrderId())) {
+            customerServiceRepairOrderService.updateRefunded(notifyReqDTO.getMerchantOrderId(),
+                    notifyReqDTO.getMerchantRefundId(), notifyReqDTO.getPayRefundId());
+            return success(true);
+        }
         if (StrUtil.startWithAny(notifyReqDTO.getMerchantRefundId(), "order-")) {
             Long orderId = Long.parseLong(StrUtil.subAfter(notifyReqDTO.getMerchantRefundId(), "order-", true));
             tradeOrderUpdateService.updatePaidOrderRefunded(orderId, notifyReqDTO.getPayRefundId());

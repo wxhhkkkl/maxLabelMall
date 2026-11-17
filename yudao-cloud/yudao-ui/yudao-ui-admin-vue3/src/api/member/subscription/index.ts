@@ -12,6 +12,8 @@ export interface MemberSubscriptionVO {
   remainingDays: number
   sourceOrderId: number
   sourceOrderNo: string
+  /** 赠送来源编号：非空 = 运营赠送（020） */
+  licenseGrantId?: number
   refunded: boolean
   createTime: string
 }

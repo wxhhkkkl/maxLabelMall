@@ -27,7 +27,7 @@ const issues = computed(() => supportIssueTabs.find((tab) => tab.id === issueTab
 const guides = ['load-labels', 'paper-size', 'first-print'].map((slug) => findSupportArticle(slug)!)
 const materials = supportArticles.filter((article) => article.category === 'materials')
 const quickLinks = [
-  { title: '设备与驱动', text: '先核对型号，再找适用资料', to: '#device-resources', icon: 'M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6v-7Z' },
+  { title: '驱动下载', text: '按型号与系统选择安装包', to: '/support/driver-install', icon: 'M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6v-7Z' },
   { title: '使用指南', text: '从基础安装到首次测试', to: '#basic-guides', icon: 'M6 2h9l4 4v16H6V2ZM14 2v5h5M9 11h7M9 15h7M9 19h4' },
   { title: '打印问题', text: '按现象查找排查方向', to: '#printing-issues', icon: 'm12 3 10 18H2L12 3ZM12 9v5M12 17v1' },
   { title: '联系支持', text: '电话与微信，直接联系', to: '#contact-support', icon: 'M3 4h18v13H9l-5 4v-4H3V4ZM7 10h1M11 10h1M15 10h1' },

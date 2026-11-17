@@ -130,6 +130,16 @@
             icon="ep:document-copy"
             type="primary"
           />
+          <!-- 修改地址紧跟在收货地址后面（仅待发货、有修改权限时） -->
+          <el-link
+            v-if="formData.status! === TradeOrderStatusEnum.UNDELIVERED.status"
+            v-hasPermi="['trade:order:update']"
+            class="ml-8px"
+            type="primary"
+            @click="updateAddress"
+          >
+            修改地址
+          </el-link>
         </el-descriptions-item>
         <el-descriptions-item v-if="formData.logisticsId" label="物流公司: ">
           {{ deliveryExpressList.find((item) => item.id === formData.logisticsId)?.name }}
@@ -423,13 +433,6 @@
             @click="delivery"
           >
             发货
-          </el-button>
-          <el-button
-            v-if="formData.deliveryType === DeliveryTypeEnum.EXPRESS.type"
-            type="primary"
-            @click="updateAddress"
-          >
-            修改地址
           </el-button>
           <!-- 到店自提 -->
           <el-button

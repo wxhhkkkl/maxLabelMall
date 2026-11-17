@@ -72,7 +72,7 @@ beforeEach(() => {
 async function pickAll(w: ReturnType<typeof mountView>): Promise<void> {
   // 单页渐进：依次点选第一步 / 第二步 / 第三步
   await w.get('#customizationMode-2').trigger('click')
-  await w.get('#customizationMaterial-3').trigger('click')
+  await w.get('#customizationMaterial').setValue('3')
   await w.get('#customizationForm-2').trigger('click')
   await flushPromises()
 }
@@ -83,7 +83,7 @@ describe('CustomizationView（014 / US48）', () => {
     const w = mountView()
     await flushPromises()
     // 未选第一步时，第二步不出现
-    expect(w.find('#customizationMaterial-3').exists()).toBe(false)
+    expect(w.find('#customizationMaterial').exists()).toBe(false)
 
     await pickAll(w)
     await vi.advanceTimersByTimeAsync(300)
@@ -96,6 +96,34 @@ describe('CustomizationView（014 / US48）', () => {
     expect(w.get('#customizationQuoteTotal').text()).toContain('463.20')
     w.unmount()
     vi.useRealTimers()
+  })
+
+  it('材质改为下拉选择：选中后只展示这一种材质的示意，不再平铺全部', async () => {
+    listCustomizationMaterials.mockResolvedValue([
+      material,
+      {
+        id: 4, name: '透明PET', description: '适合耐久性标签',
+        minQuantity: 1, maxQuantity: 1000, minWidth: 10, maxWidth: 200, minHeight: 10, maxHeight: 200,
+      },
+    ])
+    const w = mountView()
+    await flushPromises()
+    await w.get('#customizationMode-2').trigger('click')
+    await flushPromises()
+
+    // 未选材质：只有下拉，没有示意
+    expect(w.find('.material-preview').exists()).toBe(false)
+
+    await w.get('#customizationMaterial').setValue('4')
+    await flushPromises()
+
+    const preview = w.get('.material-preview')
+    expect(preview.text()).toContain('透明PET')
+    expect(preview.text()).toContain('适合耐久性标签')
+    expect(preview.find('svg').exists()).toBe(true)
+    // 材质不再平铺成卡片
+    expect(w.findAll('.material-item')).toHaveLength(0)
+    w.unmount()
   })
 
   it('超过 16MB 的文件在上传前被拦下', async () => {
@@ -205,6 +233,28 @@ describe('CustomizationView（014 / US48）', () => {
     vi.useRealTimers()
   })
 
+  it('定制数量不设上限：超过材质配置的上限也能正常报价（2026-11-17 所有者要求）', async () => {
+    vi.useFakeTimers()
+    const w = mountView()
+    await flushPromises()
+    await pickAll(w)
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+    quoteCustomization.mockClear()
+
+    // fixture 里材质的 maxQuantity 是 100000
+    await w.get('#customizationQuantity').setValue(500000)
+    await w.get('#customizationQuantity').trigger('blur')
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(w.text()).not.toContain('数量需在')
+    expect(w.text()).not.toContain('数量不得少于')
+    expect(quoteCustomization).toHaveBeenCalledWith(expect.objectContaining({ quantity: 500000 }))
+    w.unmount()
+    vi.useRealTimers()
+  })
+
   it('白名单之外的文件格式在上传前被拦下', async () => {
     const w = mountView()
     await flushPromises()
@@ -263,7 +313,7 @@ describe('CustomizationView（014 / US48）', () => {
       query: expect.objectContaining({ login: '1' }),
     }))
     // 选中的材质仍在页面上
-    expect(w.get('#customizationMaterial-3').classes()).toContain('is-active')
+    expect((w.get('#customizationMaterial').element as HTMLSelectElement).value).toBe('3')
     w.unmount()
     vi.useRealTimers()
   })
@@ -334,7 +384,7 @@ describe('报价登录权限', () => {
     await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
     expect(w.get('.quote-actions #customizationQuoteTotal').text()).toContain('463.20')
-    expect(w.get('#customizationMaterial-3').attributes('aria-pressed')).toBe('true')
+    expect((w.get('#customizationMaterial').element as HTMLSelectElement).value).toBe('3')
     await user.logout()
     await flushPromises()
     expect(w.find('#customizationQuoteTotal').exists()).toBe(false)

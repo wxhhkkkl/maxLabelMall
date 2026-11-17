@@ -49,6 +49,13 @@ public class MemberSubscriptionDO extends BaseDO {
     private Long sourceOrderItemId;
     private String sourceOrderNo;
     /**
+     * 赠送来源：{@link cn.iocoder.yudao.module.member.dal.dataobject.license.MemberLicenseGrantDO#getId()}
+     *
+     * 非空 = 本段是**运营赠送**（没有订单与套餐快照，相关列全为 NULL）；
+     * 订单来源为 NULL。读取方靠本列区分"买来的"与"送的"（020）。
+     */
+    private Long licenseGrantId;
+    /**
      * 来源订单或会员订单项是否已全额退款（仅标记，不回收）
      */
     private Boolean refunded;

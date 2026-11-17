@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.trade.service.customization;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.module.trade.dal.dataobject.customization.CustomizationMaterialDO;
 import cn.iocoder.yudao.module.trade.service.customization.bo.CustomizationFileBO;
+import cn.iocoder.yudao.module.trade.service.customization.bo.CustomizationSpecBO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -10,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.CUSTOMIZATION_FILE_INVALID;
+import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.CUSTOMIZATION_SPEC_OUT_OF_RANGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -74,6 +77,27 @@ public class CustomizationSpecValidatorTest {
     public void testExtensionFromUrlWhenNameMissing() {
         CustomizationFileBO file = file(null, "https://img.yuwangchenfa.com/20261101/artwork.PNG?sig=1");
         validator.validateFiles(List.of(file));
+    }
+
+    @Test
+    public void testQuantityHasNoUpperLimit() {
+        CustomizationMaterialDO material = CustomizationMaterialDO.builder()
+                .minQuantity(1).maxQuantity(100000)
+                .minWidth(10).maxWidth(2000).minHeight(10).maxHeight(2000)
+                .build();
+        CustomizationSpecBO spec = new CustomizationSpecBO();
+        spec.setWidth(60);
+        spec.setHeight(40);
+        spec.setMode(2);
+
+        // 超过材质配置的 maxQuantity 仍然通过（2026-11-17 所有者裁定：数量不设上限）
+        spec.setQuantity(500000);
+        validator.validate(spec, material);
+
+        // 下限仍然生效
+        spec.setQuantity(0);
+        ServiceException ex = assertThrows(ServiceException.class, () -> validator.validate(spec, material));
+        assertEquals(CUSTOMIZATION_SPEC_OUT_OF_RANGE.getCode(), ex.getCode());
     }
 
 }

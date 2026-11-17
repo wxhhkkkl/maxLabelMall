@@ -40,6 +40,13 @@ const GROUPS = [
       { to: '/account/points', label: '积分与等级' },
     ],
   },
+  {
+    title: '客户服务',
+    items: [
+      { to: '/account/customer-service?tab=ticket', label: '投诉咨询' },
+      { to: '/account/customer-service?tab=repair', label: '在线维修' },
+    ],
+  },
 ] as const
 
 const route = useRoute()
@@ -54,7 +61,19 @@ const route = useRoute()
 const EXACT_MATCH = new Set(['/account', '/coupon'])
 
 function isActive(to: string): boolean {
-  return EXACT_MATCH.has(to) ? route.path === to : route.path.startsWith(to)
+  const [path, queryString] = to.split('?')
+  const pathMatched = EXACT_MATCH.has(path) ? route.path === path : route.path.startsWith(path)
+  if (!pathMatched) return false
+  if (!queryString) return true
+  // 客户服务拆成两个页签入口：按 query.tab 区分高亮；无 tab 时默认「投诉咨询」
+  for (const [key, value] of new URLSearchParams(queryString)) {
+    const actual = route.query[key]
+    const actualValue = Array.isArray(actual) ? actual[0] : actual
+    if ((actualValue ?? '') !== value) {
+      if (!(key === 'tab' && value === 'ticket' && actualValue == null)) return false
+    }
+  }
+  return true
 }
 </script>
 

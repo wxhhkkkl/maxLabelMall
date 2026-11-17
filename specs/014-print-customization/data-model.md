@@ -20,8 +20,8 @@
 | `base_price` | int | NOT NULL | 材质基价，单位 **分/㎡**（截图 11.38 元/㎡ → 1138） |
 | `print_coefficient` | decimal(10,4) | NOT NULL | 材质打印系数（截图 2 / 4） |
 | `printing_coefficient` | decimal(10,4) | NOT NULL | 印刷系数（截图 1.0 ~ 1.5） |
-| `min_quantity` | int | NOT NULL | 数量下限 |
-| `max_quantity` | int | NOT NULL | 数量上限 |
+| `min_quantity` | int | NOT NULL | 数量下限（校验生效） |
+| `max_quantity` | int | NOT NULL | 数量上限（Q164 起仅后台留存，**不参与前台报价 / 下单校验**） |
 | `min_width` / `max_width` | int | NOT NULL | 成品宽度上下限，mm |
 | `min_height` / `max_height` | int | NOT NULL | 成品高度上下限，mm |
 | `status` | tinyint | NOT NULL DEFAULT 0 | 0 启用 / 1 停用 |

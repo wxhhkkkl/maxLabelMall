@@ -115,7 +115,7 @@ const currentMaterial = computed(() => materials.value.find((m) => m.id === mate
 const loggedIn = computed(() => userStore.isLogin)
 const materialHint = computed(() => {
   const m = currentMaterial.value
-  return m ? `尺寸 ${m.minWidth}~${m.maxWidth} mm，数量 ${m.minQuantity}~${m.maxQuantity}` : ''
+  return m ? `尺寸 ${m.minWidth}~${m.maxWidth} mm，数量不少于 ${m.minQuantity}` : ''
 })
 const modeLabel = computed(() => MODE_OPTIONS.find((m) => m.value === mode.value)?.label ?? '')
 const formLabel = computed(() => FORM_OPTIONS.find((f) => f.value === form.value)?.label ?? '')
@@ -140,7 +140,7 @@ const configComplete = computed(() => {
     && Number.isFinite(width.value) && Number.isFinite(height.value) && Number.isInteger(quantity.value)
     && (width.value ?? 0) >= m.minWidth && (width.value ?? 0) <= m.maxWidth
     && (height.value ?? 0) >= m.minHeight && (height.value ?? 0) <= m.maxHeight
-    && (quantity.value ?? 0) >= m.minQuantity && (quantity.value ?? 0) <= m.maxQuantity
+    && (quantity.value ?? 0) >= m.minQuantity
     && Number.isInteger(columnCount.value) && columnCount.value >= 1 && columnCount.value <= 8
     && (form.value !== 2 || (Number.isInteger(rowCount.value) && rowCount.value >= 1 && !sheetOverflow.value))
 })
@@ -171,9 +171,9 @@ async function load(): Promise<void> {
   }
 }
 
-function pickMaterial(id: number): void {
-  materialId.value = id
-  const material = materials.value.find((m) => m.id === id)
+/** 下拉选中材质后，把空着的规格预填为该材质的上下限起点 */
+function handleMaterialChange(): void {
+  const material = currentMaterial.value
   if (material) {
     if (width.value === null) width.value = material.minWidth
     if (height.value === null) height.value = material.minHeight
@@ -203,8 +203,9 @@ function validateQuantity(): boolean {
     quantityError.value = '请填写定制数量'
     return false
   }
-  if (quantity.value < m.minQuantity || quantity.value > m.maxQuantity) {
-    quantityError.value = `数量需在 ${m.minQuantity}~${m.maxQuantity} 之间`
+  // 2026-11-17 所有者裁定：定制数量**不设上限**，只保留最小数量下限
+  if (quantity.value < m.minQuantity) {
+    quantityError.value = `数量不得少于 ${m.minQuantity}`
     return false
   }
   return true
@@ -450,25 +451,26 @@ onMounted(load)
           </div>
         </div>
 
-        <!-- 第二步：材质 -->
+        <!-- 第二步：材质（下拉选择，选中后只展示这一种材质的示意，不把全部材质平铺） -->
         <div v-if="showStep2" class="ml-card customization-step">
           <div class="step-head">选择适合使用场景的材质</div>
-          <div class="material-list">
-            <button
-              v-for="m in materials"
-              :id="`customizationMaterial-${m.id}`"
-              :key="m.id"
-              type="button"
-              class="material-item"
-              :class="{ 'is-active': m.id === materialId }"
-              :aria-pressed="materialId === m.id"
-              @click="pickMaterial(m.id)"
+          <MlField label="标签材质" required>
+            <select
+              id="customizationMaterial"
+              v-model="materialId"
+              class="ml-select material-select"
+              @change="handleMaterialChange"
             >
-              <CustomizationDiagram kind="material" :material="m.name" />
-              <b>{{ m.name }}</b>
-              <span>{{ m.minWidth }}~{{ m.maxWidth }}mm</span>
-              <em v-if="m.description">{{ m.description }}</em>
-            </button>
+              <option :value="null" disabled>请选择材质</option>
+              <option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}</option>
+            </select>
+          </MlField>
+          <div v-if="currentMaterial" class="material-preview">
+            <CustomizationDiagram kind="material" :material="currentMaterial.name" />
+            <div class="material-preview-copy">
+              <b>{{ currentMaterial.name }}</b>
+              <p v-if="currentMaterial.description">{{ currentMaterial.description }}</p>
+            </div>
           </div>
           <p class="section-help">材质示意用于区分外观，实际颜色与质感以实物为准。选中材质后可查看可定制范围。</p>
           <p v-if="materialHint" class="ml-hint">{{ materialHint }}</p>
@@ -710,16 +712,13 @@ onMounted(load)
   border-radius: 4px; background: #0e7490; color: #fff; font-style: normal; font-size: 14px;
 }
 .mode-list { display: flex; flex-wrap: wrap; gap: 10px; }
-.mode-item, .material-item {
+.mode-item {
   display: flex; flex-direction: column; gap: 4px; padding: 12px 16px;
   border: 1px solid #d9e2f0; border-radius: 8px; background: #fff; cursor: pointer; text-align: left;
 }
 .mode-item { min-width: 180px; }
-.mode-item.is-active, .material-item.is-active { border-color: #0e7490; box-shadow: 0 0 0 1px #0e7490 inset; }
-.mode-item span, .material-item span { font-size: 12px; color: #5b6c8f; }
-.material-list { display: flex; flex-wrap: wrap; gap: 10px; }
-.material-item { min-width: 170px; max-width: 260px; }
-.material-item em { font-style: normal; font-size: 12px; color: #8a97b5; line-height: 1.4; }
+.mode-item.is-active { border-color: #0e7490; box-shadow: 0 0 0 1px #0e7490 inset; }
+.mode-item span { font-size: 12px; color: #5b6c8f; }
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .seg-row { display: flex; gap: 10px; }
 .seg-item { padding: 8px 18px; border: 1px solid #d9e2f0; border-radius: 8px; background: #fff; cursor: pointer; }
@@ -768,16 +767,18 @@ onMounted(load)
 .customization-step { padding: 24px; border: 1px solid #e3e9f4; box-shadow: none; border-radius: 12px; margin-bottom: 20px; }
 .step-head { color: #16233f; font-size: 18px; margin-bottom: 22px; }
 .step-head i { background: #eaf1ff; color: #2e7cd6; font-size: 12px; padding: 0 10px; }
-.mode-list, .material-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.mode-item, .material-item { min-width: 0; max-width: none; padding: 12px 16px 18px; color: #16233f; position: relative; transition: border-color .15s, background .15s; }
-.mode-item:hover, .material-item:hover, .seg-item:hover { border-color: #2e7cd6; background: #f5f8ff; }
-.mode-item.is-active, .material-item.is-active, .seg-item.is-active { border-color: #2e7cd6; box-shadow: 0 0 0 1px #2e7cd6 inset; background: #f5f8ff; color: #2e7cd6; }
-.mode-item.is-active::after, .material-item.is-active::after { content: '✓'; position: absolute; right: 12px; top: 12px; background: #2e7cd6; color: #ffffff; width: 20px; height: 20px; border-radius: 50%; text-align: center; }
+.mode-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mode-item { min-width: 0; max-width: none; padding: 12px 16px 18px; color: #16233f; position: relative; transition: border-color .15s, background .15s; }
+.mode-item:hover, .seg-item:hover { border-color: #2e7cd6; background: #f5f8ff; }
+.mode-item.is-active, .seg-item.is-active { border-color: #2e7cd6; box-shadow: 0 0 0 1px #2e7cd6 inset; background: #f5f8ff; color: #2e7cd6; }
+.mode-item.is-active::after { content: '✓'; position: absolute; right: 12px; top: 12px; background: #2e7cd6; color: #ffffff; width: 20px; height: 20px; border-radius: 50%; text-align: center; }
 .mode-item .customization-diagram { max-height: 125px; }
 .mode-item small, .form-choices small { font-size: 11px; color: #8a97b5; font-weight: 400; }
-.material-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.material-item .customization-diagram { max-height: 100px; }
-.material-item em { color: #5b6c8f; }
+.material-select { max-width: 360px; }
+.material-preview { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 14px 16px; background: #f5f8ff; border-radius: 8px; }
+.material-preview .customization-diagram { width: 140px; flex-shrink: 0; }
+.material-preview-copy b { color: #16233f; font-size: 14px; }
+.material-preview-copy p { margin: 6px 0 0; color: #5b6c8f; font-size: 12px; line-height: 1.8; }
 .section-help { color: #5b6c8f; font-size: 12px; line-height: 1.8; margin: 14px 0; }
 .form-choices .seg-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px; gap: 6px; }
 .form-choices .customization-diagram { max-height: 140px; }
@@ -800,9 +801,9 @@ onMounted(load)
 .order-guide { display: grid; grid-template-columns: 1.1fr 1fr 1fr 1fr; gap: 30px; padding: 30px 0; margin-top: 16px; border-top: 1px solid #e3e9f4; }
 .order-guide span { color: #2e7cd6; font-size: 12px; }.order-guide h2 { color: #16233f; font-size: 20px; line-height: 1.5; }.order-guide b { color: #16233f; font-size: 13px; }.order-guide p { color: #5b6c8f; font-size: 12px; line-height: 1.9; }
 button:focus-visible { outline: 3px solid #35a5ff; outline-offset: 3px; }
-@media (max-width: 1100px) { .customization-layout { grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }.customization-step { padding: 18px; }.material-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .customization-layout { grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }.customization-step { padding: 18px; } }
 @media (max-width: 768px) { .custom-hero { grid-template-columns: 1fr; padding: 24px; gap: 8px; }.hero-copy h1 { font-size: 26px; }.hero-art { display: none; }.customization-layout { grid-template-columns: 1fr; }.quote-panel { position: static; }.custom-progress { grid-template-columns: repeat(2, 1fr); }.custom-progress > span { padding: 12px; }.order-guide { grid-template-columns: repeat(2, 1fr); gap: 20px; }.step-head { font-size: 16px; }.spec-guide { gap: 12px; }.spec-guide .customization-diagram { width: 120px; } }
-@media (max-width: 480px) { .mode-list { grid-template-columns: 1fr; }.mode-item { display: grid; grid-template-columns: 110px 1fr; align-items: center; column-gap: 12px; }.mode-item .customization-diagram { grid-row: span 3; }.hero-points { gap: 10px; }.customization-step { padding: 16px; }.spec-guide { flex-direction: column; }.form-grid { grid-template-columns: 1fr; }.order-guide { grid-template-columns: 1fr; }.form-choices small { line-height: 1.6; } }
+@media (max-width: 480px) { .mode-list { grid-template-columns: 1fr; }.mode-item { display: grid; grid-template-columns: 110px 1fr; align-items: center; column-gap: 12px; }.mode-item .customization-diagram { grid-row: span 3; }.hero-points { gap: 10px; }.customization-step { padding: 16px; }.material-preview { flex-direction: column; align-items: flex-start; gap: 10px; }.spec-guide { flex-direction: column; }.form-grid { grid-template-columns: 1fr; }.order-guide { grid-template-columns: 1fr; }.form-choices small { line-height: 1.6; } }
 </style>
 
 <style scoped>

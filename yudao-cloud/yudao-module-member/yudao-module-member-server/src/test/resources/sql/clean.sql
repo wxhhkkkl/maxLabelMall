@@ -13,3 +13,4 @@ DELETE FROM "maxlabel_print_record";
 DELETE FROM "maxlabel_shared_template";
 DELETE FROM "maxlabel_label_template";
 DELETE FROM "member_subscription";
+DELETE FROM "member_license_grant";

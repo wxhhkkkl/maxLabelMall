@@ -68,7 +68,8 @@
 ```
 
 **错误**：材质不存在 / 已停用（`CUSTOMIZATION_MATERIAL_NOT_AVAILABLE`）；
-宽高或数量越界（`CUSTOMIZATION_SPEC_OUT_OF_RANGE`，`msg` 里带该材质的允许范围）；
+宽高越界或数量低于下限（`CUSTOMIZATION_SPEC_OUT_OF_RANGE`，`msg` 里带该材质的允许范围；
+**数量不设上限**，Q164）；
 整单总面积匹配不到区间（`CUSTOMIZATION_AREA_NOT_MATCHED`）。
 
 ---

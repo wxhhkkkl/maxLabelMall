@@ -283,6 +283,27 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     expect(w.get('.mobile-member .header-member-level').text()).toBe('黄金会员')
   })
 
+  it('金牌等级用金色徽标（桌面与移动端一致）', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '', level: { id: 3, name: '金牌会员' } })
+    const w = await mountLoggedIn()
+    expect(w.get('.header-member-level').classes()).toContain('is-gold')
+    expect(w.get('.mobile-member .header-member-level').classes()).toContain('is-gold')
+  })
+
+  it('钻石等级用钻石质感徽标', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '', level: { id: 4, name: '钻石会员' } })
+    const w = await mountLoggedIn()
+    expect(w.get('.header-member-level').classes()).toContain('is-diamond')
+    expect(w.get('.mobile-member .header-member-level').classes()).toContain('is-diamond')
+  })
+
+  it('银牌等级保持默认徽标样式', async () => {
+    getMemberUser.mockResolvedValue({ id: 1, nickname: '张三', mobile: '', level: { id: 1, name: '银牌会员' } })
+    const w = await mountLoggedIn()
+    expect(w.get('.header-member-level').classes()).not.toContain('is-gold')
+    expect(w.get('.header-member-level').classes()).not.toContain('is-diamond')
+  })
+
   it('未配置等级如实展示，可通过头部文字按钮退出并清空登录状态', async () => {
     const w = await mountLoggedIn()
     expect(w.get('.header-member-level').text()).toBe('暂无等级')

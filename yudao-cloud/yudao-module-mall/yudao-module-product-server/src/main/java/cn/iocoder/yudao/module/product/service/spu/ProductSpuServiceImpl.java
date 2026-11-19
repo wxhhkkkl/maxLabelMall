@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageRe
 import cn.iocoder.yudao.module.product.dal.dataobject.category.ProductCategoryDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.subscriptionplan.MaxLabelSubscriptionPlanDO;
+import cn.iocoder.yudao.module.product.dal.mysql.software.SoftwareMapper;
 import cn.iocoder.yudao.module.product.dal.mysql.spu.ProductSpuMapper;
 import cn.iocoder.yudao.module.product.dal.mysql.subscriptionplan.MaxLabelSubscriptionPlanMapper;
 import cn.iocoder.yudao.module.product.enums.subscriptionplan.MaxLabelSubscriptionScopeEnum;
@@ -59,6 +60,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
     @Resource
     private ProductBrandService brandService;
     @Resource
+    private SoftwareMapper softwareMapper;
+    @Resource
     private ProductCategoryService categoryService;
     /**
      * 筛选标签的辖域规则（特性 003）。
@@ -88,6 +91,8 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         createReqVO.setBrowseLevelType(ObjectUtil.defaultIfNull(createReqVO.getBrowseLevelType(), 0));
         createReqVO.setBrowseLevelIds(normalizeBrowseLevelIds(
                 createReqVO.getBrowseLevelType(), createReqVO.getBrowseLevelIds()));
+        // 关联驱动/软件：必须存在（2026-11-18）
+        validateDriverSoftware(createReqVO.getDriverSoftwareId());
 
         ProductSpuDO spu = BeanUtils.toBean(createReqVO, ProductSpuDO.class);
         // 初始化 SPU 中 SKU 相关属性
@@ -120,11 +125,17 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         updateReqVO.setBrowseLevelType(ObjectUtil.defaultIfNull(updateReqVO.getBrowseLevelType(), 0));
         updateReqVO.setBrowseLevelIds(normalizeBrowseLevelIds(
                 updateReqVO.getBrowseLevelType(), updateReqVO.getBrowseLevelIds()));
+        // 关联驱动/软件：必须存在；传空 = 取消关联（2026-11-18）
+        validateDriverSoftware(updateReqVO.getDriverSoftwareId());
 
         // 更新 SPU
         ProductSpuDO updateObj = BeanUtils.toBean(updateReqVO, ProductSpuDO.class).setStatus(spu.getStatus());
         initSpuFromSkus(updateObj, skuSaveReqList);
         productSpuMapper.updateById(updateObj);
+        if (updateReqVO.getDriverSoftwareId() == null) {
+            // updateById 会忽略 null 字段，取消关联必须显式置空
+            productSpuMapper.clearDriverSoftwareId(updateObj.getId());
+        }
         // 批量更新 SKU
         productSkuService.updateSkuList(updateObj.getId(), updateReqVO.getSkus());
         // 保存筛选标签：同样是**全量替换**。
@@ -216,6 +227,13 @@ public class ProductSpuServiceImpl implements ProductSpuService {
         // 校验层级
         if (categoryService.getCategoryLevel(id) < CATEGORY_LEVEL) {
             throw exception(SPU_SAVE_FAIL_CATEGORY_LEVEL_ERROR);
+        }
+    }
+
+    /** 关联驱动/软件：不为空时必须存在（2026-11-18） */
+    private void validateDriverSoftware(Long driverSoftwareId) {
+        if (driverSoftwareId != null && softwareMapper.selectById(driverSoftwareId) == null) {
+            throw exception(SOFTWARE_NOT_EXISTS);
         }
     }
 

@@ -4,7 +4,9 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.dal.dataobject.software.SoftwareDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.software.SoftwareVersionDO;
 import cn.iocoder.yudao.module.product.dal.mysql.software.SoftwareMapper;
+import cn.iocoder.yudao.module.product.dal.mysql.software.SoftwareVersionMapper;
 import cn.iocoder.yudao.module.product.enums.software.SoftwareTypeEnum;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import jakarta.annotation.Resource;
@@ -30,6 +32,8 @@ public class SoftwareServiceImpl implements SoftwareService {
 
     @Resource
     private SoftwareMapper softwareMapper;
+    @Resource
+    private SoftwareVersionMapper softwareVersionMapper;
     @Resource
     private SoftwareCategoryService categoryService;
 
@@ -104,6 +108,16 @@ public class SoftwareServiceImpl implements SoftwareService {
         List<SoftwareDO> list = softwareMapper.selectListByTypeAndStatus(
                 SoftwareTypeEnum.DESKTOP.getType(), 0);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    @Override
+    public List<SoftwareDO> getSimpleList() {
+        return softwareMapper.selectListAll();
+    }
+
+    @Override
+    public SoftwareVersionDO getLatestCurrentVersion(Long softwareId) {
+        return softwareId == null ? null : softwareVersionMapper.selectLatestCurrent(softwareId);
     }
 
     private void validateSoftwareExists(Long id) {

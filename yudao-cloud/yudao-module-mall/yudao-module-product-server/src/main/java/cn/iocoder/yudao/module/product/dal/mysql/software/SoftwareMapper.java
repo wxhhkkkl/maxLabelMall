@@ -27,6 +27,13 @@ public interface SoftwareMapper extends BaseMapperX<SoftwareDO> {
         return selectCount(SoftwareDO::getCategoryId, categoryId);
     }
 
+    /** 商品关联驱动用的精简列表：全部未删除（含停用），驱动在前、软件在后，各自按 id 升序 */
+    default List<SoftwareDO> selectListAll() {
+        return selectList(new LambdaQueryWrapperX<SoftwareDO>()
+                .orderByAsc(SoftwareDO::getType)
+                .orderByAsc(SoftwareDO::getId));
+    }
+
     /** 服务支持页：启用的分类下、启用的、标记为可展示的软件 */
     default List<SoftwareDO> selectListForSupport(Collection<Long> categoryIds) {
         return selectList(new LambdaQueryWrapperX<SoftwareDO>()

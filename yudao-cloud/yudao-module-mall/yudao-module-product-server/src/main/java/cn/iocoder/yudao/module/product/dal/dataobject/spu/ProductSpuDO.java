@@ -44,6 +44,12 @@ public class ProductSpuDO extends BaseDO {
      */
     private String name;
     /**
+     * 商品内部编码（选填）
+     *
+     * 运营自定义的型号 / 内部料号；后台与 C 端商品详情都会展示（C 端文案为「商品编码」）。
+     */
+    private String internalCode;
+    /**
      * 关键字
      */
     private String keyword;
@@ -159,6 +165,14 @@ public class ProductSpuDO extends BaseDO {
      */
     @TableField(typeHandler = LongListTypeHandler.class)
     private List<Long> browseLevelIds;
+
+    /**
+     * 关联软件/驱动编号
+     *
+     * 对应「软件分发」的 {@link cn.iocoder.yudao.module.product.dal.dataobject.software.SoftwareDO#getId()}；
+     * NULL = 商品详情页不显示下载入口。商品页下载该软件的**当前发布版本**。
+     */
+    private Long driverSoftwareId;
 
     // ========== 营销相关字段 =========
 

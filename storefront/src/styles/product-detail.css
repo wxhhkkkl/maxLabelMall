@@ -23,6 +23,12 @@
 .product-page .spec.active { border: 1px solid #2e7cd6; background: #f2f7fe; }
 .product-page .spec:disabled { color: #acb5c3; background: #f7f8fa; border-style: dashed; cursor: default; }
 .product-page .qty-row { margin-top: 4px; }
+/* 商品编码（运营填的商品内部编码）：只在有值时渲染 */
+.product-page .product-code { margin: 4px 0 12px; font-size: 12px; color: #5b6c8f; }
+/* 关联驱动/软件下载（2026-11-18）：与购买数量同一行，靠右 */
+/* 高度与右侧购买数量的输入框（36px）对齐，字号与主按钮同一量级（2026-11-18 所有者要求调大） */
+.product-page .driver-download { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 26px; border: 1px solid #d8e2ef; border-radius: 8px; background: #ffffff; color: #2e7cd6; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.product-page .driver-download:hover { border-color: #2e7cd6; background: #f2f7fe; }
 .product-page .qty-box { border: 1px solid #e1e7f0; border-radius: 6px; }
 .product-page .qty-btn { border: 0; background: #f6f8fb; font-size: 16px; }
 .product-page .qty-btn:disabled { color: #c5ccd6; cursor: default; }
@@ -69,6 +75,8 @@
   .product-page .g-thumb { width: 54px; height: 54px; }
   .product-page .pd-info { padding: 0; }
   .product-page .pd-name { font-size: 20px; }
+  .product-page .driver-download { margin-left: 0; }
+  .product-page .qty-row { flex-wrap: wrap; row-gap: 10px; }
   .product-page .price-box { padding: 16px; }
   .product-page .btn-buy, .product-page .btn-cart { padding: 12px 8px; font-size: 13px; }
   .product-consult { gap: 10px; align-items: flex-start; }

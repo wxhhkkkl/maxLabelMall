@@ -62,6 +62,22 @@ export const updateSoftware = (data: Partial<SoftwareVO>) =>
 export const deleteSoftware = (id: number) =>
   request.delete<boolean>({ url: '/software/info/delete', params: { id } })
 
+/**
+ * 商品「其他设置 → 关联驱动下载」的选项（2026-11-18）
+ *
+ * 权限按 `product:spu:query` 校验（商品运营不一定有软件分发权限）。
+ * 返回全部未删除的软件/驱动，含停用项（停用项用于回显已关联的商品）。
+ */
+export interface SoftwareSimpleVO {
+  id: number
+  title: string
+  type: number // 1 桌面端软件 2 打印驱动
+  status: number // 0 启用 1 停用
+}
+
+export const getSoftwareSimpleList = () =>
+  request.get<SoftwareSimpleVO[]>({ url: '/software/info/simple-list' })
+
 // ==================== 软件版本 ====================
 
 export interface SoftwareVersionVO {

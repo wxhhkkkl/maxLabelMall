@@ -39,6 +39,15 @@
     <el-form-item label="商品关键字" prop="keyword">
       <el-input v-model="formData.keyword" class="w-80!" placeholder="请输入商品关键字" />
     </el-form-item>
+    <!-- 商品内部编码（2026-11-18）：选填；后台与 C 端商品详情展示 -->
+    <el-form-item label="商品内部编码" prop="internalCode">
+      <el-input
+        v-model="formData.internalCode"
+        class="w-80!"
+        maxlength="64"
+        placeholder="选填，例如：SPU-001（C 端详情显示为「商品编码」）"
+      />
+    </el-form-item>
     <el-form-item label="商品简介" prop="introduction">
       <el-input
         v-model="formData.introduction"
@@ -107,6 +116,7 @@ const formData = reactive<Spu>({
   name: '', // 商品名称
   categoryId: undefined, // 商品分类
   keyword: '', // 关键字
+  internalCode: '', // 商品内部编码（选填，2026-11-18）
   picUrl: '', // 商品封面图
   sliderPicUrls: [], // 商品轮播图
   introduction: '', // 商品简介

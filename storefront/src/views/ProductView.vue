@@ -398,6 +398,17 @@ watch(() => props.id, load)
                 +
               </button>
             </div>
+            <!-- 关联驱动/软件（2026-11-18）：运营在商品「其他设置」里关联后显示，直接下当前发布版本 -->
+            <a
+              v-if="spu?.driverDownloadUrl"
+              class="driver-download"
+              :href="spu.driverDownloadUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              :aria-label="`${spu.driverType === 1 ? '下载软件' : '下载驱动'} ${spu.driverTitle ?? ''}`"
+            >
+              {{ spu.driverType === 1 ? '下载软件' : '下载驱动' }}
+            </a>
           </div>
 
           <p class="product-selection">
@@ -487,7 +498,10 @@ watch(() => props.id, load)
             v-else-if="shownTab === 'specs'"
             class="product-specifications"
           >
-            <h2>规格与库存</h2><p>选择适合的规格，价格和库存以当前商品信息为准。</p><div class="product-spec-table">
+            <h2>规格与库存</h2><p>选择适合的规格，价格和库存以当前商品信息为准。</p>
+            <!-- 商品内部编码（2026-11-18）：运营填了才展示，对客户叫「商品编码」 -->
+            <p v-if="spu?.internalCode" class="product-code">商品编码：{{ spu.internalCode }}</p>
+            <div class="product-spec-table">
               <div class="product-spec-table-head">
                 <span>商品规格</span><span>售价</span><span>库存</span>
               </div><div

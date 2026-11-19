@@ -33,6 +33,7 @@ export interface GiveCouponTemplate {
 export interface Spu {
   id?: number
   name?: string // 商品名称
+  internalCode?: string // 商品内部编码（选填；后台与 C 端商品详情展示）
   categoryId?: number // 商品分类
   keyword?: string // 关键字
   unit?: number | undefined // 单位
@@ -44,6 +45,7 @@ export interface Spu {
   enterpriseOnly?: boolean // 是否企业专享（不在公开商城展示）
   browseLevelType?: number // 浏览等级：0 公开 1 全部登录会员 2 指定等级会员
   browseLevelIds?: number[] // 指定等级会员的等级编号数组（仅 type=2 生效）
+  driverSoftwareId?: number // 关联软件/驱动编号（maxlabel_software.id）；空 = 商品页不显示下载入口
   brandId?: number // 商品品牌编号
   specType?: boolean // 商品规格
   subCommissionType?: boolean // 分销类型

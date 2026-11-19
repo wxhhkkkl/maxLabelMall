@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.product.controller.admin.software;
 
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.product.controller.admin.software.vo.*;
@@ -37,6 +38,21 @@ public class AdminSoftwareControllerTest {
     private SoftwareDO software() {
         return SoftwareDO.builder().id(10L).categoryId(1L).title("MaxLabel")
                 .introduction("介绍").type(1).showInSupport(true).status(0).build();
+    }
+
+    /** 商品「其他设置 → 关联驱动下载」的选项（2026-11-18） */
+    @Test
+    void simpleListMapsIdTitleTypeStatus() {
+        when(softwareService.getSimpleList()).thenReturn(List.of(software()));
+
+        CommonResult<List<AdminSoftwareSimpleRespVO>> result = controller.getSimpleList();
+
+        assertEquals(0, result.getCode());
+        assertEquals(1, result.getData().size());
+        assertEquals(10L, result.getData().get(0).getId());
+        assertEquals("MaxLabel", result.getData().get(0).getTitle());
+        assertEquals(1, result.getData().get(0).getType());
+        assertEquals(0, result.getData().get(0).getStatus());
     }
 
     @Test

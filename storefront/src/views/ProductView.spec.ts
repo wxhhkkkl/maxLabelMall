@@ -491,6 +491,16 @@ describe('ProductView —— 选购信息', () => {
     expect(w.find('.product-service').exists()).toBe(true)
     expect(w.get('.product-service a').attributes('href')).toBe('/support/contact')
   })
+  it('有商品编码时在规格页展示；没填则不渲染（2026-11-18）', async () => {
+    const w = await mountDetail(spu({ internalCode: 'SPU-20261118' }))
+    await w.get('#product-tab-specs').trigger('click')
+    expect(w.get('.product-code').text()).toBe('商品编码：SPU-20261118')
+
+    const w2 = await mountDetail(spu())
+    await w2.get('#product-tab-specs').trigger('click')
+    expect(w2.find('.product-code').exists()).toBe(false)
+  })
+
   it('数量不能超过当前规格库存', async () => {
     const w = await mountDetail(spu({ skus: [sku(1, { stock: 2 })] }))
     await w.get('.qty-btn.plus').trigger('click')
@@ -530,5 +540,40 @@ describe('ProductView —— 立即购买（T102 / FR-024）', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).not.toBe('/checkout')
     expect(useToasts().items.value.map((t) => t.text).join()).toContain('规格')
+  })
+})
+
+/**
+ * 关联驱动下载（2026-11-18）
+ *
+ * 运营在商品「其他设置」里关联软件/驱动后，详情页在购买数量右侧出现下载入口，
+ * 点击直达对象存储上的**当前发布版本**；没关联 / 后端解析不到时不显示。
+ */
+describe('ProductView —— 关联驱动下载', () => {
+  it('关联打印驱动 → 显示「下载驱动」，链接指向下载直链', async () => {
+    const w = await mountDetail(
+      spu({
+        driverType: 2,
+        driverTitle: 'zenpert4T530',
+        driverVersion: '7.4.2',
+        driverDownloadUrl: 'https://img.example.com/software/zenpert-7.4.2.zip',
+      }),
+    )
+    const link = w.get('.driver-download')
+    expect(link.text()).toBe('下载驱动')
+    expect(link.attributes('href')).toBe('https://img.example.com/software/zenpert-7.4.2.zip')
+    expect(link.attributes('target')).toBe('_blank')
+  })
+
+  it('关联桌面端软件 → 按钮文案为「下载软件」', async () => {
+    const w = await mountDetail(
+      spu({ driverType: 1, driverTitle: 'MaxLabel', driverDownloadUrl: 'https://img.example.com/maxlabel.exe' }),
+    )
+    expect(w.get('.driver-download').text()).toBe('下载软件')
+  })
+
+  it('没有关联（无直链）→ 不显示下载入口', async () => {
+    const w = await mountDetail(spu())
+    expect(w.find('.driver-download').exists()).toBe(false)
   })
 })

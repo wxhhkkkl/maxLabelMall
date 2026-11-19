@@ -18,6 +18,9 @@ public class AppProductSpuDetailRespVO {
     @Schema(description = "商品名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "芋道")
     private String name;
 
+    @Schema(description = "商品编码（运营填写的内部编码；为空则不展示）", example = "SPU-20261118")
+    private String internalCode;
+
     @Schema(description = "商品简介", requiredMode = Schema.RequiredMode.REQUIRED, example = "我是一个快乐简介")
     private String introduction;
 
@@ -53,6 +56,23 @@ public class AppProductSpuDetailRespVO {
      * SKU 数组
      */
     private List<Sku> skus;
+
+    // ========== 关联驱动/软件（2026-11-18） =========
+
+    @Schema(description = "关联软件/驱动：软件编号；为空 = 商品页不展示下载入口", example = "2")
+    private Long driverSoftwareId;
+
+    @Schema(description = "关联软件/驱动：名称", example = "zenpert4T530")
+    private String driverTitle;
+
+    @Schema(description = "关联软件/驱动：类型 1 桌面端软件 2 打印驱动", example = "2")
+    private Integer driverType;
+
+    @Schema(description = "关联软件/驱动：当前发布版本号", example = "7.4.2")
+    private String driverVersion;
+
+    @Schema(description = "关联软件/驱动：下载直链（对象存储）")
+    private String driverDownloadUrl;
 
     // ========== 统计相关字段 =========
 

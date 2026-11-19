@@ -36,6 +36,22 @@ public interface SoftwareVersionMapper extends BaseMapperX<SoftwareVersionDO> {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 该软件「最新的一条当前发布」（2026-11-18）
+     *
+     * 商品详情页只有一个下载按钮：多平台/多架构时取 release_time 最新的一条（NULL 排最后），
+     * 再按 id 兜底，保证结果稳定。
+     */
+    default SoftwareVersionDO selectLatestCurrent(Long softwareId) {
+        return selectOne(new LambdaQueryWrapperX<SoftwareVersionDO>()
+                .eq(SoftwareVersionDO::getSoftwareId, softwareId)
+                .eq(SoftwareVersionDO::getCurrentFlag, 1)
+                .eq(SoftwareVersionDO::getStatus, 0)
+                .orderByDesc(SoftwareVersionDO::getReleaseTime)
+                .orderByDesc(SoftwareVersionDO::getId)
+                .last("LIMIT 1"));
+    }
+
     /** 该软件全部当前发布版本（用于服务支持页详情，每平台/架构一条） */
     default List<SoftwareVersionDO> selectListCurrent(Collection<Long> softwareIds) {
         return selectList(new LambdaQueryWrapperX<SoftwareVersionDO>()

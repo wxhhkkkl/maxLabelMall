@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * 商品保存链路（特性 003 / US14）—— **本次上线出问题后补的**。
@@ -111,6 +112,22 @@ public class ProductSpuServiceImplSaveTest extends BaseDbUnitTest {
         assertDoesNotThrow(() -> spuService.updateSpu(reqVO(spuId, CATEGORY_WAX, null)));
     }
 
+    /**
+     * 取消关联驱动/软件（2026-11-18）：updateById 会忽略 null，服务必须显式置空 ——
+     * 否则运营把下拉清掉、保存后商品页还挂着下载按钮。
+     */
+    @Test
+    public void testUpdateSpu_clearDriverSoftwareId() {
+        Long spuId = insertSpu("打印机", CATEGORY_WAX);
+        spuMapper.updateById(ProductSpuDO.builder().id(spuId).driverSoftwareId(2L).build());
+        assertEquals(2L, spuMapper.selectById(spuId).getDriverSoftwareId());
+
+        // reqVO 不带 driverSoftwareId = 取消关联
+        spuService.updateSpu(reqVO(spuId, CATEGORY_WAX, null));
+
+        assertNull(spuMapper.selectById(spuId).getDriverSoftwareId());
+    }
+
     /** 改商品：带一个**不属于任何维度**的值（应被静默丢弃，不该炸） */
     @Test
     public void testUpdateSpu_withUnknownFilterValue() {
@@ -132,6 +149,18 @@ public class ProductSpuServiceImplSaveTest extends BaseDbUnitTest {
 
         ServiceException exception = assertThrows(ServiceException.class, () -> spuService.updateSpu(reqVO));
         assertEquals(MEMBER_SUBSCRIPTION_PLAN_SCOPE_SPU_MISMATCH.getCode(), exception.getCode());
+    }
+
+    /** 商品内部编码（2026-11-18）：选填，填了就落库，不填允许为空 */
+    @Test
+    public void testCreateSpu_internalCodeOptional() {
+        ProductSpuSaveReqVO withCode = reqVO(null, CATEGORY_WAX, null);
+        withCode.setInternalCode("SPU-20261118");
+        Long id = spuService.createSpu(withCode);
+        assertEquals("SPU-20261118", spuMapper.selectById(id).getInternalCode());
+
+        Long id2 = spuService.createSpu(reqVO(null, CATEGORY_WAX, null));
+        assertNull(spuMapper.selectById(id2).getInternalCode());
     }
 
     /** 新建商品：同样不该炸 */

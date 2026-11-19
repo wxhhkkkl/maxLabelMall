@@ -9,6 +9,14 @@ vi.mock('@/api/member/level', () => ({
   getSimpleLevelList: vi.fn().mockResolvedValue([{ id: 5, name: '金卡' }])
 }))
 
+// 关联驱动下载的选项（2026-11-18）
+vi.mock('@/api/mall/software', () => ({
+  getSoftwareSimpleList: vi.fn().mockResolvedValue([
+    { id: 2, title: 'zenpert4T530', type: 2, status: 0 },
+    { id: 1, title: 'MaxLabel', type: 1, status: 1 }
+  ])
+}))
+
 // OtherForm 依赖 unplugin-auto-import 注入的 `required`，vitest 下手工补上
 ;(globalThis as any).required = { required: true, message: '必填', trigger: 'blur' }
 
@@ -69,5 +77,35 @@ describe('商品编辑 - 浏览等级', () => {
     await (wrapper.vm as any).validate()
     expect(data.browseLevelType).toBe(2)
     expect(data.browseLevelIds).toEqual([3, 5])
+  })
+})
+
+describe('商品编辑 - 关联驱动下载（2026-11-18）', () => {
+  it('展示入口与说明，关联值可回填到表单', async () => {
+    const data: any = { driverSoftwareId: 2 }
+    const wrapper = mount(OtherForm, { props: { propFormData: data } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('关联驱动下载')
+    expect(wrapper.text()).toContain('下载驱动 / 下载软件')
+    // 已关联的软件以标题回显（下拉未展开时显示在选中项上）
+    expect(wrapper.text()).toContain('zenpert4T530')
+    await (wrapper.vm as any).validate()
+    expect(data.driverSoftwareId).toBe(2)
+  })
+
+  it('已关联但已删除的软件用占位项回显，不显示裸 ID', async () => {
+    const wrapper = mount(OtherForm, {
+      props: { propFormData: { driverSoftwareId: 99 } }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('软件 #99（已删除）')
+  })
+
+  it('未关联时不校验、不阻塞保存', async () => {
+    const data: any = {}
+    const wrapper = mount(OtherForm, { props: { propFormData: data } })
+    await flushPromises()
+    await (wrapper.vm as any).validate()
+    expect(data.driverSoftwareId).toBeUndefined()
   })
 })

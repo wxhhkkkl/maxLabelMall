@@ -45,6 +45,19 @@ public class AdminSoftwareController {
         return success(BeanUtils.toBean(pageResult, AdminSoftwareRespVO.class));
     }
 
+    /**
+     * 商品「其他设置 → 关联驱动下载」的选项（2026-11-18）
+     *
+     * ⚠️ 权限故意用 `product:spu:query` 而不是 `software:info:query` —— 选驱动是**编辑商品**的
+     * 前置动作，商品运营不一定被授予「软件分发」的查询权限。
+     */
+    @GetMapping("/simple-list")
+    @Operation(summary = "获得软件/驱动精简列表（商品关联驱动用）")
+    @PreAuthorize("@ss.hasPermission('product:spu:query')")
+    public CommonResult<List<AdminSoftwareSimpleRespVO>> getSimpleList() {
+        return success(BeanUtils.toBean(softwareService.getSimpleList(), AdminSoftwareSimpleRespVO.class));
+    }
+
     @GetMapping("/get")
     @Operation(summary = "获得软件详情（含全部版本）")
     @Parameter(name = "id", description = "编号", required = true)

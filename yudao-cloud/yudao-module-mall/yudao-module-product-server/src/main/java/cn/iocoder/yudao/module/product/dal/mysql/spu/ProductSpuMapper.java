@@ -230,4 +230,15 @@ public interface ProductSpuMapper extends BaseMapperX<ProductSpuDO> {
         update(null, updateWrapper);
     }
 
+    /**
+     * 取消关联驱动/软件（2026-11-18）
+     *
+     * ⚠️ 不能用 updateById —— 它默认忽略 null 字段，取消关联时字段清不掉。
+     */
+    default void clearDriverSoftwareId(Long id) {
+        update(null, new LambdaUpdateWrapper<ProductSpuDO>()
+                .eq(ProductSpuDO::getId, id)
+                .set(ProductSpuDO::getDriverSoftwareId, null));
+    }
+
 }

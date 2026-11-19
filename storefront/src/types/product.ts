@@ -8,6 +8,8 @@
 export interface ProductSpu {
   id: number
   name: string
+  /** 商品内部编码（仅详情返回；为空则不展示） */
+  internalCode?: string
   introduction: string
   categoryId: number
   picUrl: string
@@ -24,6 +26,14 @@ export interface ProductSpu {
   description?: string
   /** 仅详情返回 */
   skus?: ProductSku[]
+  /** 关联软件/驱动（2026-11-18，仅详情返回；无关联时为空） */
+  driverSoftwareId?: number
+  driverTitle?: string
+  /** 1 桌面端软件 2 打印驱动 */
+  driverType?: number
+  driverVersion?: string
+  /** 对象存储直链；有值才显示下载入口 */
+  driverDownloadUrl?: string
 }
 
 /** 规格项（AppProductSpuDetailRespVO.skus[]） */

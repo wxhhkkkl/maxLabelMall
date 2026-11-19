@@ -25,6 +25,9 @@ public class ProductSpuRespVO {
     @ExcelProperty("商品名称")
     private String name;
 
+    @Schema(description = "商品内部编码（选填）", example = "SPU-20261118")
+    private String internalCode;
+
     @Schema(description = "关键字", requiredMode = Schema.RequiredMode.REQUIRED, example = "清凉丝滑不出汗")
     @ExcelProperty("关键字")
     private String keyword;
@@ -109,6 +112,11 @@ public class ProductSpuRespVO {
 
     @Schema(description = "指定等级会员的会员等级编号数组；仅 type=2 时生效", example = "[3,5]")
     private List<Long> browseLevelIds;
+
+    // ========== 关联驱动/软件（2026-11-18） =========
+
+    @Schema(description = "关联软件/驱动编号（maxlabel_software.id）", example = "2")
+    private Long driverSoftwareId;
 
     // ========== 营销相关字段 =========
 

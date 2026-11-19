@@ -1,9 +1,17 @@
 <!-- 商品发布 - 商品详情 -->
 <template>
   <el-form ref="formRef" :model="formData" :rules="rules" label-width="120px" :disabled="isDetail">
-    <!--富文本编辑器组件-->
+    <!--
+      富文本编辑器组件
+      商品详情不提供「视频」与「网络图片」（2026-11-18 所有者要求）：
+      只保留本地图片上传，避免详情里出现外链图片/视频导致商城页加载与合规问题。
+    -->
     <el-form-item label="商品详情" prop="description">
-      <Editor :readonly="isDetail" v-model:modelValue="formData.description" />
+      <Editor
+        :exclude-keys="['group-video', 'insertImage']"
+        :readonly="isDetail"
+        v-model:modelValue="formData.description"
+      />
     </el-form-item>
   </el-form>
 </template>

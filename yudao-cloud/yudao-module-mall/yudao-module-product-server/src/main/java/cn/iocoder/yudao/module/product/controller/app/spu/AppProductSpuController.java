@@ -10,10 +10,13 @@ import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuDetail
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuPageReqVO;
 import cn.iocoder.yudao.module.product.controller.app.spu.vo.AppProductSpuRespVO;
 import cn.iocoder.yudao.module.product.dal.dataobject.sku.ProductSkuDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.software.SoftwareDO;
+import cn.iocoder.yudao.module.product.dal.dataobject.software.SoftwareVersionDO;
 import cn.iocoder.yudao.module.product.dal.dataobject.spu.ProductSpuDO;
 import cn.iocoder.yudao.module.product.enums.spu.ProductSpuStatusEnum;
 import cn.iocoder.yudao.module.product.service.history.ProductBrowseHistoryService;
 import cn.iocoder.yudao.module.product.service.sku.ProductSkuService;
+import cn.iocoder.yudao.module.product.service.software.SoftwareService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuBrowseLevelService;
 import cn.iocoder.yudao.module.product.service.spu.ProductSpuService;
 import cn.iocoder.yudao.module.product.service.subscriptionplan.MaxLabelSubscriptionPlanService;
@@ -58,6 +61,8 @@ public class AppProductSpuController {
     private MaxLabelSubscriptionPlanService subscriptionPlanService;
     @Resource
     private ProductSpuBrowseLevelService browseLevelService;
+    @Resource
+    private SoftwareService softwareService;
 
     @GetMapping("/list-by-ids")
     @Operation(summary = "获得商品 SPU 列表")
@@ -138,7 +143,33 @@ public class AppProductSpuController {
         spu.setSalesCount(spu.getSalesCount() + spu.getVirtualSalesCount());
         AppProductSpuDetailRespVO spuVO = BeanUtils.toBean(spu, AppProductSpuDetailRespVO.class)
                 .setSkus(BeanUtils.toBean(skus, AppProductSpuDetailRespVO.Sku.class));
+        fillDriverDownload(spu, spuVO);
         return success(spuVO);
+    }
+
+    /**
+     * 商品页「下载驱动 / 下载软件」（2026-11-18）
+     *
+     * 关联软件必须**启用**且存在**当前发布版本**；任一条件不满足就保持为空，前端据此不展示按钮。
+     * 下载目标取该软件最新的一条当前发布（多平台/架构不并列）。
+     */
+    private void fillDriverDownload(ProductSpuDO spu, AppProductSpuDetailRespVO spuVO) {
+        if (spu.getDriverSoftwareId() == null) {
+            return;
+        }
+        SoftwareDO software = softwareService.getSoftware(spu.getDriverSoftwareId());
+        if (software == null || !Integer.valueOf(0).equals(software.getStatus())) {
+            return;
+        }
+        SoftwareVersionDO version = softwareService.getLatestCurrentVersion(software.getId());
+        if (version == null) {
+            return;
+        }
+        spuVO.setDriverSoftwareId(software.getId());
+        spuVO.setDriverTitle(software.getTitle());
+        spuVO.setDriverType(software.getType());
+        spuVO.setDriverVersion(version.getVersion());
+        spuVO.setDriverDownloadUrl(version.getFileUrl());
     }
 
     /** 当前登录会员是否是启用企业的 OWNER/ADMIN */

@@ -62,11 +62,30 @@
         />
       </el-select>
     </el-form-item>
+    <el-form-item label="关联驱动下载" prop="driverSoftwareId">
+      <el-select
+        v-model="formData.driverSoftwareId"
+        clearable
+        placeholder="不关联"
+        class="w-80!"
+      >
+        <el-option
+          v-for="item in softwareOptions"
+          :key="item.id"
+          :label="softwareOptionLabel(item)"
+          :value="item.id"
+        />
+      </el-select>
+      <span class="ml-10px text-12px text-gray-500">
+        关联后商品详情页显示「下载驱动 / 下载软件」，直接下载该软件的当前发布版本
+      </span>
+    </el-form-item>
   </el-form>
 </template>
 <script lang="ts" setup>
 import type { Spu } from '@/api/mall/product/spu'
 import * as LevelApi from '@/api/member/level'
+import * as SoftwareApi from '@/api/mall/software'
 import { PropType } from 'vue'
 import { propTypes } from '@/utils/propTypes'
 import { copyValueToTarget } from '@/utils'
@@ -91,7 +110,8 @@ const formData = ref<Spu>({
   virtualSalesCount: 0, // 虚拟销量
   enterpriseOnly: false, // 是否企业专享
   browseLevelType: 0, // 浏览等级：默认公开
-  browseLevelIds: [] // 指定等级会员的等级编号
+  browseLevelIds: [], // 指定等级会员的等级编号
+  driverSoftwareId: undefined // 关联软件/驱动（2026-11-18）
 })
 // 表单规则
 const rules = reactive({
@@ -129,7 +149,27 @@ const levelOptions = computed<LevelApi.LevelVO[]>(() => {
 const getLevelList = async () => {
   loadedLevels.value = await LevelApi.getSimpleLevelList()
 }
-onMounted(getLevelList)
+
+// 关联驱动/软件选项（2026-11-18）：全部未删除的软件/驱动，含停用项
+const loadedSoftware = ref<SoftwareApi.SoftwareSimpleVO[]>([])
+// 回显时把「已关联但已删除」的软件补成占位项，避免下拉只剩裸 ID
+const softwareOptions = computed<SoftwareApi.SoftwareSimpleVO[]>(() => {
+  const options = [...loadedSoftware.value]
+  const selectedId = formData.value.driverSoftwareId
+  if (selectedId && !options.some((item) => item.id === selectedId)) {
+    options.push({ id: selectedId, title: `软件 #${selectedId}（已删除）`, type: 2, status: 1 })
+  }
+  return options
+})
+const softwareOptionLabel = (item: SoftwareApi.SoftwareSimpleVO) =>
+  `${item.title}（${item.type === 1 ? '桌面端软件' : '打印驱动'}${item.status === 1 ? '，已停用' : ''}）`
+const getSoftwareList = async () => {
+  loadedSoftware.value = await SoftwareApi.getSoftwareSimpleList()
+}
+onMounted(() => {
+  getLevelList()
+  getSoftwareList()
+})
 
 /** 将传进来的值赋值给 formData */
 watch(

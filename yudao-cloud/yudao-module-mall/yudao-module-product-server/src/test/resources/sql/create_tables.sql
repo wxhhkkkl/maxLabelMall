@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     -- 若将来要彻底对齐，应当整体按 `sql/mysql/mall-2026-04-18.sql` 重建它。
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商品 SPU 编号，自增',
     `name` varchar(128) NOT NULL COMMENT '商品名称',
+    `internal_code` varchar(64) DEFAULT NULL COMMENT '商品内部编码（049）',
     `keyword` varchar(256) NOT NULL COMMENT '关键字',
     `introduction` varchar(256) NOT NULL COMMENT '商品简介',
     `description` text NOT NULL COMMENT '商品详情',
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS `product_spu` (
     `delivery_template_id` bigint NOT NULL COMMENT '物流配置模板编号',
     `browse_level_type` tinyint NOT NULL DEFAULT 0 COMMENT '浏览等级：0 公开 1 全部登录会员 2 指定等级会员',
     `browse_level_ids` varchar(512) DEFAULT '' COMMENT '指定等级会员的会员等级编号数组，逗号分隔；仅 type=2 有意义',
+    `driver_software_id` bigint DEFAULT NULL COMMENT '关联软件/驱动编号（048）',
     `enterprise_only` bit(1) NOT NULL DEFAULT FALSE COMMENT '是否企业专享：0 否 1 是',
     `recommend_hot` bit(1) DEFAULT NULL COMMENT '是否热卖推荐（生产库无此列）',
     `recommend_benefit` bit(1) DEFAULT NULL COMMENT '是否优惠推荐（生产库无此列）',

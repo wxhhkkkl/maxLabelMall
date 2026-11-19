@@ -28,7 +28,17 @@ const props = defineProps({
   },
   readonly: propTypes.bool.def(false),
   modelValue: propTypes.string.def(''),
-  directory: propTypes.string.def('editor-default')
+  directory: propTypes.string.def('editor-default'),
+  /**
+   * 需要从工具栏隐藏的菜单项（wangEditor 的 excludeKeys）
+   *
+   * 例：商品详情不要「视频」与「网络图片」→ `['group-video', 'insertImage']`。
+   * 分组里的菜单项也能单独排除（如 insertImage 只去掉网络图片、保留上传图片）。
+   */
+  excludeKeys: {
+    type: Array as PropType<string[]>,
+    default: () => []
+  }
 })
 
 const emit = defineEmits(['change', 'update:modelValue'])
@@ -211,6 +221,7 @@ defineExpose({
     <Toolbar
       :editor="editorRef"
       :editorId="editorId"
+      :defaultConfig="{ excludeKeys: excludeKeys }"
       class="border-0 b-b-1 border-solid border-[var(--tags-view-border-color)]"
     />
     <!-- 编辑器 -->

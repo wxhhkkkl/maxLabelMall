@@ -92,48 +92,21 @@
       @selection-change="handleSelectionChange"
     >
       <el-table-column type="selection" width="55" />
+      <!--
+        列口径（2026-11-18 所有者要求）：只保留 用户编号 / 手机号 / 昵称 / 公司名称 /
+        订阅状态 / 登录时间 / 注册时间（精确到天）/ 状态。
+        头像、邮箱、等级、分组、用户标签、积分、订阅到期日 不再展示。
+      -->
       <el-table-column align="center" label="用户编号" prop="id" width="120px" />
-      <el-table-column align="center" label="头像" prop="avatar" width="80px">
-        <template #default="scope">
-          <img :src="scope.row.avatar" style="width: 40px" />
-        </template>
-      </el-table-column>
       <el-table-column align="center" label="手机号" prop="mobile" width="120px" />
-      <el-table-column align="center" label="邮箱" prop="email" width="180px" />
-      <el-table-column align="center" label="昵称" prop="nickname" width="80px" />
+      <el-table-column align="center" label="昵称" prop="nickname" width="120px" />
       <!-- 公司名称：微信扫码登录的补全页采集，选填 —— 存量会员全为空，别显示成异常（Q24） -->
-      <el-table-column align="center" label="公司名称" prop="company" width="140px" show-overflow-tooltip />
-      <el-table-column align="center" label="等级" prop="levelName" width="100px" />
-      <el-table-column align="center" label="分组" prop="groupName" width="100px" />
-      <el-table-column
-        :show-overflow-tooltip="false"
-        align="center"
-        label="用户标签"
-        prop="tagNames"
-      >
-        <template #default="scope">
-          <el-tag v-for="(tagName, index) in scope.row.tagNames" :key="index" class="mr-5px">
-            {{ tagName }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column align="center" label="积分" prop="point" width="100px" />
+      <el-table-column align="center" label="公司名称" prop="company" width="160px" show-overflow-tooltip />
       <el-table-column align="center" label="订阅状态" width="110px">
         <template #default="scope">
           <el-tag v-if="scope.row.subscriptionActive" type="success">有效</el-tag>
           <el-tag v-else-if="scope.row.subscriptionEndDate" type="info">已过期</el-tag>
           <span v-else>未订阅</span>
-        </template>
-      </el-table-column>
-      <el-table-column
-        align="center"
-        label="订阅到期日"
-        prop="subscriptionEndDate"
-        width="130px"
-      />
-      <el-table-column align="center" label="状态" prop="status" width="100px">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.COMMON_STATUS" :value="scope.row.status" />
         </template>
       </el-table-column>
       <el-table-column
@@ -144,12 +117,17 @@
         width="180px"
       />
       <el-table-column
-        :formatter="dateFormatter"
+        :formatter="dateFormatter2"
         align="center"
         label="注册时间"
         prop="createTime"
-        width="180px"
+        width="120px"
       />
+      <el-table-column align="center" label="状态" prop="status" width="100px">
+        <template #default="scope">
+          <dict-tag :type="DICT_TYPE.COMMON_STATUS" :value="scope.row.status" />
+        </template>
+      </el-table-column>
       <el-table-column
         :show-overflow-tooltip="false"
         align="center"
@@ -227,7 +205,7 @@
   <CouponSendForm ref="couponSendFormRef" />
 </template>
 <script lang="ts" setup>
-import { dateFormatter } from '@/utils/formatTime'
+import { dateFormatter, dateFormatter2 } from '@/utils/formatTime'
 import * as UserApi from '@/api/member/user'
 import { DICT_TYPE } from '@/utils/dict'
 import UserForm from './UserForm.vue'

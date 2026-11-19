@@ -12,10 +12,12 @@ import PendingText from './base/PendingText.vue'
   <footer class="footer">
     <div class="footer-main">
       <div class="brand-col">
-        <RouterLink class="f-logo" to="/" aria-label="赋签 MaxLabel 首页">
-          <img class="f-logo-img" src="/assets/logo.png" alt="赋签 MaxLabel" />
-          <span class="f-cn">赋签</span>
-          <span class="f-en">MaxLabel</span>
+        <RouterLink class="f-logo" to="/" aria-label="宸发科技 首页">
+          <img class="f-logo-img" src="/assets/logo.png" alt="宸发科技" />
+          <span class="f-text">
+            <span class="f-cn">宸发科技</span>
+            <span class="f-tagline">亿签赋能 万企腾飞</span>
+          </span>
         </RouterLink>
         <p class="f-desc">
           一站式标签打印解决方案：软件、打印机与耗材，让每一枚标签精准呈现。

@@ -327,7 +327,7 @@ watch([() => route.query.category, () => route.query.view], ([value, view]) => {
 <template>
   <div class="mall-page">
     <div class="mall-container mall-topline">
-      <div><h1>标签商城</h1><p>打印设备与标签耗材，按需挑选。</p></div>
+      <div><h1>欢迎走进赋签商城</h1><p>一站式企业采购服务</p></div>
       <div class="mall-search-wrap" @focusout="onSearchFocusOut">
         <form
           id="mallSearchBox"

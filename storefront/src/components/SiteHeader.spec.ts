@@ -102,11 +102,11 @@ describe('SiteHeader —— 静态结构', () => {
     vi.useRealTimers()
   })
 
-  it('渲染 logo 图片与中英文品牌名', () => {
+  it('渲染 logo 图片与品牌名（大字 + 标语小字）', () => {
     const w = mountHeader()
     expect(w.get('img.logo-img').attributes('src')).toBe('/assets/logo.png')
-    expect(w.get('.logo-cn').text()).toBe('赋签')
-    expect(w.get('.logo-en').text()).toBe('MaxLabel')
+    expect(w.get('.logo-cn').text()).toBe('宸发科技')
+    expect(w.get('.logo-tagline').text()).toBe('亿签赋能 万企腾飞')
   })
 
   it('公共导航包含公司介绍入口', () => {

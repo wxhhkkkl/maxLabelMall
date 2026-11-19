@@ -187,10 +187,12 @@ function isActive(name: string): boolean {
       <img
         class="logo-img"
         src="/assets/logo.png"
-        alt="赋签 MaxLabel"
+        alt="宸发科技"
       >
-      <span class="logo-cn">赋签</span>
-      <span class="logo-en">MaxLabel</span>
+      <span class="logo-text">
+        <span class="logo-cn">宸发科技</span>
+        <span class="logo-tagline">亿签赋能 万企腾飞</span>
+      </span>
     </RouterLink>
 
     <div

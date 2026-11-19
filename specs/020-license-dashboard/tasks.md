@@ -219,3 +219,17 @@ Phase 1 (T053-T058) → Phase 2 (T059-T061) → US67 (T062-T067) → US68 (T068-
 
 - [x] T095 [P] [US67] 后端：总览增加当年分项 `yearNewPersonalCount` / `yearNewOrgSeatCount` / `yearRenewPersonalCount` / `yearRenewOrgSeatCount`，企业席位 = 当年新增有效批次（未退款、未折算）的 `seats_total` 之和；补统计测试
 - [x] T096 [P] [US67] 管理端：个人卡片去掉席位会员；当年卡片改为「新获得 / 延续」两组 × 个人会员 / 企业席位 / 合计；三张卡片统一「标题 + 指标」结构并等高对齐
+
+## Phase 14: 赠送撤回（Q164，2026-11-19）
+
+> 2026-11-19 所有者追加，**推翻 Q154「赠送不可撤销」**：只撤最近一笔、复用 `gift` 权限。
+
+- [x] T097 [P] [US69] SQL：`sql/mysql/050-license-grant-revoke.sql` —— `member_license_grant` 增加
+  `license_id`（企业赠送作用的批次，撤回要精确改回同一批次）/ `revoke_time` / `revoke_operator_id` /
+  `revoke_reason`；不新增权限点与菜单（权限复用 `member:license:gift`）
+- [x] T098 [P] [US69] 后端：`POST /member/license/grant/revoke`；只允许撤该对象**最近一笔**；
+  个人删除赠送产生的订阅行，企业席位回减 `seats_total`、时长回退 `end_time` + `period_months`、
+  赠送新建的批次整批撤回；有已分配席位时拦下；理由必填、与原赠送同一事务；赠送记录页签返回
+  `revokeTime / revokeOperatorName / revokeReason`；补服务层、权限与「空集合不得查 IN ()」回归测试
+- [x] T099 [P] [US69] 管理端：赠送记录增加「状态」「操作」两列与撤回弹窗（理由必填、空值时确认按钮禁用），
+  撤回成功后由父组件统一刷新看板 / 明细 / 记录；补组件测试

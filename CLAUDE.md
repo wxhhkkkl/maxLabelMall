@@ -40,7 +40,14 @@ specs/019-product-browse-level/plan.md
   📌 口径：个人有效 = 订阅未过期；企业有效 = 启用 + 有有效批次（**不看席位是否分配**）；
   当年客户拆成「新获得 / 延续 / 合计」三个数，一律按 `create_time` 判年份，合计按客户去重
   📌 赠送：个人固定专业版、企业固定企业版；单次 ≤ 12 个月且赠送后剩余 ≤ 12 个月；
-  必填理由、不可撤销、原子提交；`member:license:query` 与 `member:license:gift` 分开授
+  必填理由、原子提交；`member:license:query` 与 `member:license:gift` 分开授
+  📌 **2026-11-19 赠送撤回（Q164，推翻 Q154「不可撤销」）**：先执行
+  `sql/mysql/050-license-grant-revoke.sql`（`member_license_grant` 加 `license_id` /
+  `revoke_time` / `revoke_operator_id` / `revoke_reason`），再发后端，最后发管理端；
+  权限**复用 `member:license:gift`**，无新菜单/按钮数据。
+  口径：只能撤该对象**最近一笔**；个人删掉这笔赠送产生的订阅行，企业席位回减 `seats_total`、
+  时长回退 `end_time` + `period_months`，赠送新建的批次整批撤回；批次上有**已分配席位**时拦下
+  （不连带收回成员权益）；记录不删，只写 `revoke_*` 三列，赠送记录显示「已撤回」
   📌 **2026-11-17 赠送独立入口（Q162）**：看板顶部可对**全部个人与企业**发起赠送（按客户类型 /
   关键字筛选，不限是否已有授权），明细行内入口保留；无授权对象从当天起算；
   企业无有效批次时送席位须同时选时长（Q157）
@@ -68,6 +75,33 @@ specs/019-product-browse-level/plan.md
   📌 维修单是**独立服务单**，不进入「我的订单」；支付复用 pay，`merchantOrderId = repair:<id>`，
   支付回调在 `/trade/order/update-paid` 按前缀分流（回滚须前后端同时回滚）
   📌 客户**先支付（或 0 元/对公确认）再寄件**；回收地址由后台维护；客户侧不提供自助退款
+
+📌 **2026-11-18 订单中心一级目录 + 订单列表拆两菜单**（无新表、无加列）：
+- 上线顺序：先执行 `sql/mysql/046-order-center-top-level.sql`（「订单中心」从 MALL 下移到根，
+  path 改 `/trade`），再执行 `sql/mysql/047-order-list-split.sql`（订单列表改名「商品订单」+
+  新增「授权订单」，角色授权跟随）→ 再发后端 → 最后发管理端；**管理员需重新登录**菜单才刷新
+- 两个菜单共用 `mall/trade/order/index`，靠菜单 `component_name` 区分：`TradeOrder`（商品订单）/
+  `TradeOrderLicense`（授权订单，默认标签「全部订单」）
+- 口径：**授权订单 = `maxlabel_subscription = 1`（个人订阅）或 `maxlabel_org_id` 非空（企业授权）**，
+  其余都是商品订单（含 BarTender 这类虚拟软件商品）；后端参数 `TradeOrderPageReqVO.license`，
+  列表与状态统计共用同一实现。原来的「订单类型」「商品类型」筛选都已从列表页移除
+- 会员详情里的订单列表（UserOrderList）仍有「订单类型」筛选，本次不动；导出仍只按时间范围
+
+📌 **2026-11-18 商品关联驱动下载**：先执行 `sql/mysql/048-product-driver-link.sql`
+（`product_spu.driver_software_id`）→ 再发后端 → 最后发管理端 / 门面站。
+- 入口：商品编辑「其他设置 → 关联驱动下载」；选项来自「软件分发」的软件/驱动
+  （`GET /software/info/simple-list`，权限按 **`product:spu:query`** 校验，商品运营不需要软件分发权限）
+- 口径：关联的是**软件**而不是安装包；商品详情页下载该软件**最新的一条当前发布**
+  （`current_flag = 1` 且 `status = 0`，按 `release_time DESC, id DESC` 取一条）。
+  软件停用 / 没有当前发布 / 关联已删除 → 不显示入口（不报错）
+- 按钮文案按类型：`type=2` 显示「下载驱动」、`type=1` 显示「下载软件」
+- 取消关联必须显式置空：`updateById` 会忽略 null，后端用 `clearDriverSoftwareId` 的 `set null` 兜住
+
+📌 **2026-11-18 商品内部编码**：先执行 `sql/mysql/049-product-internal-code.sql`
+（`product_spu.internal_code`，选填）→ 再发后端 → 最后发管理端 / 门面站。
+- 入口：商品编辑「基础设置 → 商品内部编码」；后台商品详情直接可见
+- C 端商品详情「规格与库存」标签显示「商品编码：xxx」，没填不渲染（文案不叫“内部”）
+- 纯展示字段，不参与搜索与下单
 
 上一个特性（018 LabelShop 模板导入：后台按来源白名单迁移模板）：
 - specs/018-labelshop-template-import/{spec,plan,research,data-model,tasks,quickstart}.md

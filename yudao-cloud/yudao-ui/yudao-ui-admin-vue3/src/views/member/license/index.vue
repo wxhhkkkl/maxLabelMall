@@ -11,10 +11,10 @@
 
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <el-tab-pane label="客户授权" name="customer">
-        <CustomerTable ref="customerTableRef" :can-gift="canGift" @grant="openGrant" />
+        <CustomerTable ref="customerTableRef" />
       </el-tab-pane>
       <el-tab-pane label="赠送记录" name="record">
-        <GrantRecordTable ref="grantRecordTableRef" />
+        <GrantRecordTable ref="grantRecordTableRef" @success="handleGrantSuccess" />
       </el-tab-pane>
     </el-tabs>
 
@@ -66,11 +66,6 @@ const handleDrill = (filter: { targetType?: number; rightsType?: number }) => {
   table.queryParams.rightsType = filter.rightsType
   table.queryParams.pageNo = 1
   table.getList()
-}
-
-/** 明细行内赠送：对象来自客户授权列表 */
-const openGrant = (row: LicenseApi.LicenseCustomerVO) => {
-  grantFormRef.value?.open(row)
 }
 
 /** 独立入口：先从全部个人 / 企业中选对象，再走同一个赠送弹窗 */

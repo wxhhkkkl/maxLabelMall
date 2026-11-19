@@ -131,5 +131,12 @@ public interface ErrorCodeConstants {
     ErrorCode LICENSE_GIFT_MONTHS_REQUIRED = new ErrorCode(1_004_019_006, "该企业当前没有有效授权，赠送席位时必须同时填写时长");
     ErrorCode LICENSE_GIFT_REASON_REQUIRED = new ErrorCode(1_004_019_007, "请填写赠送理由");
     ErrorCode LICENSE_GIFT_CONTENT_INVALID = new ErrorCode(1_004_019_008, "个人会员只能赠送时长；企业可赠送席位或时长");
+    ErrorCode LICENSE_GRANT_NOT_FOUND = new ErrorCode(1_004_019_009, "赠送记录不存在");
+    ErrorCode LICENSE_GRANT_ALREADY_REVOKED = new ErrorCode(1_004_019_010, "这笔赠送已经撤回过了");
+    ErrorCode LICENSE_GRANT_NOT_LATEST = new ErrorCode(1_004_019_011, "只能撤回该客户最近一笔赠送（之后已有新的权益变动）");
+    /** 占位符是"已分配的席位数" */
+    ErrorCode LICENSE_GRANT_SEATS_IN_USE = new ErrorCode(1_004_019_012, "该企业还有 {} 个席位已分配，请先在企业管理里撤销席位分配再撤回");
+    ErrorCode LICENSE_GRANT_REVOKE_CONFLICT = new ErrorCode(1_004_019_013, "这笔赠送之后的权益已发生变化，无法撤回");
+    ErrorCode LICENSE_GRANT_REVOKE_REASON_REQUIRED = new ErrorCode(1_004_019_014, "请填写撤回理由");
 
 }

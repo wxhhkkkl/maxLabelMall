@@ -69,11 +69,6 @@
           <el-tag :type="row.active ? 'success' : 'info'">{{ row.active ? '有效' : '已过期' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column v-if="canGift" label="操作" width="110" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="emit('grant', row)">赠送授权</el-button>
-        </template>
-      </el-table-column>
     </el-table>
     <Pagination
       v-model:page="queryParams.pageNo"
@@ -95,9 +90,6 @@ const SOURCE_LABEL: Record<string, string> = {
   GRANT: '运营赠送',
   ORG_SEAT: '企业席位'
 }
-
-defineProps<{ canGift?: boolean }>()
-const emit = defineEmits<{ (e: 'grant', row: LicenseApi.LicenseCustomerVO): void }>()
 
 const loading = ref(false)
 const list = ref<LicenseApi.LicenseCustomerVO[]>([])

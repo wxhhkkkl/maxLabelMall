@@ -57,4 +57,10 @@ public class LicenseDashboardControllerPermissionTest {
         assertEquals(GIFT, permissionOf("getGiftTargetPage"));
     }
 
+    @Test
+    public void testRevoke_usesGiftPermission() throws Exception {
+        // 撤回是收回权益，所有者 2026-11-19 明确复用 gift 权限、不新增权限点（Q164）
+        assertEquals(GIFT, permissionOf("revokeGrant"));
+    }
+
 }

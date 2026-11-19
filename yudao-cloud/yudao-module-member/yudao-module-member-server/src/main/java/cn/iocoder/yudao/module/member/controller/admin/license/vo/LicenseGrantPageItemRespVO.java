@@ -56,4 +56,13 @@ public class LicenseGrantPageItemRespVO {
     @Schema(description = "赠送时间")
     private LocalDateTime createTime;
 
+    @Schema(description = "撤回时间；非空 = 已撤回")
+    private LocalDateTime revokeTime;
+
+    @Schema(description = "撤回人昵称", example = "张经理")
+    private String revokeOperatorName;
+
+    @Schema(description = "撤回理由", example = "误送给该客户")
+    private String revokeReason;
+
 }

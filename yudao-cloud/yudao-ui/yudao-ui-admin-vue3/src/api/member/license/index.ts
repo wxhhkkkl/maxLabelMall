@@ -83,6 +83,15 @@ export interface LicenseGrantVO {
   operatorId: number
   operatorName?: string
   createTime?: Date
+  // 撤回（Q164）：非空 = 已撤回
+  revokeTime?: Date
+  revokeOperatorName?: string
+  revokeReason?: string
+}
+
+export interface LicenseGrantRevokeReqVO {
+  id: number
+  reason: string
 }
 
 /** 总览 */
@@ -121,6 +130,11 @@ export const getLicenseGiftTargetPage = async (params: {
 /** 赠送授权 */
 export const grantLicense = async (data: LicenseGrantReqVO) => {
   return await request.post({ url: '/member/license/grant', data })
+}
+
+/** 撤回赠送（复用 member:license:gift 权限；只能撤该对象最近一笔） */
+export const revokeLicenseGrant = async (data: LicenseGrantRevokeReqVO) => {
+  return await request.post({ url: '/member/license/grant/revoke', data })
 }
 
 /** 赠送记录 */

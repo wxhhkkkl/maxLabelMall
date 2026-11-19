@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
 /**
  * 授权赠送记录（020）
  *
- * **一次赠送一行，不可修改、不可删除**（Q154：赠送不可撤销，填错只能再赠送对冲）。
+ * **一次赠送一行，不可删除**；赠送内容不可改，撤回只追加 `revoke_*` 三列
+ * （2026-11-19 / Q164 起允许撤回，推翻原 Q154「不可撤销」）。
  * 它同时回答两个问题：这笔授权是怎么来的（理由），以及赠送前后的到期日各是多少。
  *
  * ⚠️ 本表**只是留痕**：授权的实际变更落在 `member_subscription`（个人）或
@@ -92,8 +93,27 @@ public class MemberLicenseGrantDO extends BaseDO {
      */
     private Integer afterSeats;
     /**
+     * 企业赠送作用的授权批次编号（maxlabel_org_license.id）；个人赠送为 null
+     *
+     * 撤回要精确改回**同一批次**——靠"再算一遍 MAX(seats_total)"猜是不可靠的。
+     * 由这笔赠送新建的批次可以只靠 {@code license_grant_id} 反查，但一并记下来更稳。
+     */
+    private Long licenseId;
+    /**
      * 操作人编号，关联 system_users.id
      */
     private Long operatorId;
+    /**
+     * 撤回时间；非空 = 已撤回（2026-11-19 新增，推翻原「不可撤销」口径）
+     */
+    private LocalDateTime revokeTime;
+    /**
+     * 撤回人编号，关联 system_users.id
+     */
+    private Long revokeOperatorId;
+    /**
+     * 撤回理由（必填，≤255 字）
+     */
+    private String revokeReason;
 
 }

@@ -33,7 +33,11 @@
 | `after_end_time` | datetime NOT NULL | 赠送后的到期时间 |
 | `before_seats` | int NULL | 赠送前的席位数（企业席位赠送才有） |
 | `after_seats` | int NULL | 赠送后的席位数 |
+| `license_id` | bigint NULL | **050 新增**：企业赠送作用到的批次（`maxlabel_org_license.id`）；个人为 NULL。撤回要改回**同一批次**，不能靠重算 `MAX(seats_total)` 猜 |
 | `operator_id` | bigint NOT NULL | 操作人（`system_users.id`） |
+| `revoke_time` | datetime NULL | **050 新增**：撤回时间；非空 = 已撤回（Q164） |
+| `revoke_operator_id` | bigint NULL | **050 新增**：撤回人（`system_users.id`） |
+| `revoke_reason` | varchar(255) NULL | **050 新增**：撤回理由（必填） |
 | `creator` / `create_time` / `updater` / `update_time` / `deleted` / `tenant_id` | | 沿用 `BaseDO` 约定 |
 
 索引：
@@ -41,7 +45,19 @@
 - `idx_operator(tenant_id, operator_id, create_time)` —— 记录页按操作人筛
 - `idx_create_time(tenant_id, create_time)` —— 记录页按时间范围筛、当年统计
 
-**不变式**：一次赠送一行，**不可修改、不可删除**（Q154 不可撤销）。`reason` 非空。
+**不变式**：一次赠送一行，**不可删除**；`reason` 非空。撤回**不删行、不改赠送内容**，
+只写 `revoke_*` 三列（2026-11-19 / Q164，推翻原「不可撤销」口径）。
+
+**撤回的反向操作**（Q164 / FR-559~562）：
+
+| 赠送内容 | 撤回时改什么 | 拦下条件 |
+|---|---|---|
+| 个人时长 | 删除这笔赠送产生的 `member_subscription` 行（`license_grant_id = grant.id`） | 该行之后又插入过新订阅（购买 / 再次赠送） |
+| 企业席位（改现有批次） | 该批次 `seats_total` −= `seats` | `seats_total − seats <` 已分配席位数 |
+| 企业时长（改现有批次） | 批次 `end_time` 回到 `before_end_time`、`period_months` −= `months` | 批次 `end_time` 已不是 `after_end_time`（之后又被顺延） |
+| 新建批次（无既有批次时） | 整批逻辑删除 | 已分配席位数 > 0 |
+
+**「最近一笔」判定**：同 `(target_type, target_id)` 下 `MAX(id)` 的那一行；更早的一律拒绝（Q164 ②）。
 
 ---
 

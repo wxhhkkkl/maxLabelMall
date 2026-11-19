@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -90,6 +91,18 @@ public class LicenseDashboardController {
         return success(licenseGrantService.grant(reqVO, getLoginUserId()));
     }
 
+    /**
+     * 撤回赠送（Q164，2026-11-19）
+     *
+     * 权限**复用** `member:license:gift`：所有者在 2026-11-19 明确不为撤回单开权限点。
+     */
+    @PostMapping("/grant/revoke")
+    @Operation(summary = "撤回赠送")
+    @PreAuthorize("@ss.hasPermission('member:license:gift')")
+    public CommonResult<Boolean> revokeGrant(@Valid @RequestBody LicenseGrantRevokeReqVO reqVO) {
+        return success(licenseGrantService.revoke(reqVO, getLoginUserId()));
+    }
+
     @GetMapping("/grant/page")
     @Operation(summary = "赠送记录分页")
     @PreAuthorize("@ss.hasPermission('member:license:query')")
@@ -106,13 +119,19 @@ public class LicenseDashboardController {
         Collection<Long> orgIds = convertSet(page.getList().stream()
                 .filter(row -> Objects.equals(MemberLicenseGrantDO.TARGET_TYPE_ORG, row.getTargetType()))
                 .toList(), MemberLicenseGrantDO::getTargetId);
-        Map<Long, String> memberNameMap = memberUserMapper.selectBatchIds(memberIds).stream()
+        // 空集合必须短路：`selectBatchIds(空)` 会拼出 `id IN ()`，MySQL 直接语法错（2026-11-19
+        // 首次赠送后「赠送记录」页签 500 —— 当时只有个人赠送，企业 id 集合为空）
+        Map<Long, String> memberNameMap = memberIds.isEmpty() ? Map.of()
+                : memberUserMapper.selectBatchIds(memberIds).stream()
                 .collect(Collectors.toMap(MemberUserDO::getId,
                         user -> user.getNickname() == null ? "" : user.getNickname(), (a, b) -> a));
-        Map<Long, String> orgNameMap = orgMapper.selectBatchIds(orgIds).stream()
+        Map<Long, String> orgNameMap = orgIds.isEmpty() ? Map.of()
+                : orgMapper.selectBatchIds(orgIds).stream()
                 .collect(Collectors.toMap(MaxLabelOrgDO::getId, MaxLabelOrgDO::getName, (a, b) -> a));
-        Map<Long, String> operatorMap = adminUserApi.getUserList(
-                        convertSet(page.getList(), MemberLicenseGrantDO::getOperatorId)).getCheckedData()
+        // 赠送人与撤回人都要回填昵称（撤回记录不删，同一页里两种人可能同时出现）
+        Set<Long> operatorIds = convertSet(page.getList(), MemberLicenseGrantDO::getOperatorId);
+        operatorIds.addAll(convertSet(page.getList(), MemberLicenseGrantDO::getRevokeOperatorId));
+        Map<Long, String> operatorMap = adminUserApi.getUserList(operatorIds).getCheckedData()
                 .stream().collect(Collectors.toMap(AdminUserRespDTO::getId,
                         user -> user.getNickname() == null ? "" : user.getNickname(), (a, b) -> a));
         return success(new PageResult<>(
@@ -142,6 +161,11 @@ public class LicenseDashboardController {
         vo.setOperatorId(row.getOperatorId());
         vo.setOperatorName(operatorMap.get(row.getOperatorId()));
         vo.setCreateTime(row.getCreateTime());
+        // 撤回（Q164）：记录不删，页面上标出来
+        vo.setRevokeTime(row.getRevokeTime());
+        vo.setRevokeOperatorName(row.getRevokeOperatorId() == null ? null
+                : operatorMap.get(row.getRevokeOperatorId()));
+        vo.setRevokeReason(row.getRevokeReason());
         return vo;
     }
 

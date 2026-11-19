@@ -27,7 +27,17 @@
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="loading" :data="list" class="mt-16px" row-key="rowKey">
+    <!--
+      max-height 让表格内部滚动（2026-11-18）：10 行 + 搜索 + 分页会把弹窗撑得比视口还高，
+      小屏（或浏览器缩放）下分页被裁到屏幕外，看起来就是"错乱"。留出头部/搜索/表头/分页的高度。
+    -->
+    <el-table
+      v-loading="loading"
+      :data="list"
+      class="mt-16px"
+      max-height="calc(100vh - 320px)"
+      row-key="rowKey"
+    >
       <el-table-column label="客户" min-width="220">
         <template #default="{ row }">
           <span>{{ row.targetName || '—' }}</span>

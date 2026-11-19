@@ -77,4 +77,7 @@ public interface LogRecordConstants {
     String MEMBER_LICENSE_GRANT_SUCCESS =
             "给{}【{{#reqVO.targetId}}】赠送了{}：{}（理由：{{#reqVO.reason}}）";
 
+    String MEMBER_LICENSE_REVOKE_SUB_TYPE = "撤回赠送";
+    String MEMBER_LICENSE_REVOKE_SUCCESS = "撤回了赠送记录【{{#reqVO.id}}】（理由：{{#reqVO.reason}}）";
+
 }

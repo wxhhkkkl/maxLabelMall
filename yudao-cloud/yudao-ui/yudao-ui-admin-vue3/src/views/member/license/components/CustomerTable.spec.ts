@@ -14,7 +14,7 @@ const mountTable = (props: Record<string, unknown> = {}) =>
  * 钉三件事：
  * · 双来源会员同时显示两种来源（不把"只有企业席位"的人显示成未订阅）
  * · 已过期行显示「已过期 N 天」，剩余天数不塞负数
- * · 有权限时才出现「赠送授权」按钮
+ * · **明细行不再有操作列**（2026-11-18）：赠送只保留看板右上角一个入口
  */
 const getLicenseCustomerPage = vi.fn()
 vi.mock('@/api/member/license', () => ({
@@ -77,20 +77,15 @@ describe('客户授权明细', () => {
     expect(w.text()).toContain('已过期 3 天')
   })
 
-  it('无赠送权限时不显示「赠送授权」按钮', async () => {
-    const w = mountTable({ canGift: false })
+  it('明细行没有「操作」列，也没有行内赠送按钮（2026-11-18）', async () => {
+    const w = mountTable()
     await flushPromises()
 
-    expect(w.text()).not.toContain('赠送授权')
-  })
-
-  it('有权限时出现「赠送授权」，点击抛出 grant 事件', async () => {
-    const w = mountTable({ canGift: true })
-    await flushPromises()
-
-    const button = w.findAll('button').find((b) => b.text().includes('赠送授权'))!
-    expect(button).toBeTruthy()
-    await button.trigger('click')
-    expect(w.emitted('grant')).toHaveLength(1)
+    const headers = w
+      .findAll('.el-table__header th')
+      .map((th) => th.text())
+      .filter(Boolean)
+    expect(headers).not.toContain('操作')
+    expect(w.findAll('button').some((b) => b.text().includes('赠送'))).toBe(false)
   })
 })

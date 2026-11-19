@@ -65,6 +65,14 @@ describe('赠送对象选择弹窗', () => {
     expect(w.text()).toContain('无授权')
   })
 
+  it('表格限高、内部滚动（2026-11-18）：弹窗不能被 10 行撑到视口外、分页被裁', async () => {
+    const w = await mountPicker()
+
+    const table = w.findComponent({ name: 'ElTable' })
+    expect(table.exists()).toBe(true)
+    expect(table.props('maxHeight')).toBe('calc(100vh - 320px)')
+  })
+
   it('停用企业照常列出并标注「已停用」（赠送时由服务端提示先启用）', async () => {
     const w = await mountPicker()
 

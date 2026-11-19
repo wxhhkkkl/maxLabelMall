@@ -17,6 +17,11 @@ public interface MaxLabelOrgLicenseMapper extends BaseMapperX<MaxLabelOrgLicense
         return selectOne(MaxLabelOrgLicenseDO::getSourceOrderItemId, sourceOrderItemId);
     }
 
+    /** 赠送新建的批次（撤回时用它反查，老数据没有 license_id 也能找到） */
+    default MaxLabelOrgLicenseDO selectByLicenseGrantId(Long licenseGrantId) {
+        return selectOne(MaxLabelOrgLicenseDO::getLicenseGrantId, licenseGrantId);
+    }
+
     default List<MaxLabelOrgLicenseDO> selectListByOrgId(Long orgId) {
         return selectList(new LambdaQueryWrapperX<MaxLabelOrgLicenseDO>()
                 .eq(MaxLabelOrgLicenseDO::getOrgId, orgId)

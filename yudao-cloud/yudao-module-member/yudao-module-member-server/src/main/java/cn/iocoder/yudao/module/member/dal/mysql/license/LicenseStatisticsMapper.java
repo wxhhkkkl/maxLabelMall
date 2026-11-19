@@ -216,19 +216,28 @@ public interface LicenseStatisticsMapper {
      * 赠送本来就要能送给从未购买过的客户（FR-548 最后一条）。
      * 个人到期取全部订阅的 MAX(end_time)（与赠送服务顺延口径一致）；
      * 企业只取有效批次（未过期、未退款、未折算，与 {@code grantToOrg} 一致）。
+     *
+     * ⚠️ 字符串列**必须 CAST AS CHAR 统一排序规则**：`member_user.nickname/mobile` 是
+     * utf8mb4_general_ci，`maxlabel_org.name` 是 utf8mb4_unicode_ci，UNION 两个分支
+     * 没有胜出者，线上会直接报 `Illegal mix of collations for operation 'UNION'`
+     * （500 系统异常）。CAST 后两分支都用连接级的字符集/排序规则。
+     * 不能用 `COLLATE` —— H2（单测库）不支持这个位置，单测会语法错。
+     * H2 本身也复现不出 collation 冲突，**改这段 SQL 要拿真库跑一遍**。
      */
     @Select("<script>"
             + "SELECT t.target_type AS targetType, t.target_id AS targetId,"
             + "       t.target_name AS targetName, t.target_mobile AS targetMobile,"
             + "       t.status AS status, t.end_time AS endTime"
             + " FROM ("
-            + "  SELECT 1 AS target_type, u.id AS target_id, u.nickname AS target_name,"
-            + "         u.mobile AS target_mobile, u.status AS status,"
+            + "  SELECT 1 AS target_type, u.id AS target_id,"
+            + "         CAST(u.nickname AS CHAR(255)) AS target_name,"
+            + "         CAST(u.mobile AS CHAR(255)) AS target_mobile, u.status AS status,"
             + "         (SELECT MAX(s.end_time) FROM member_subscription s"
             + "            WHERE s.deleted = 0 AND s.member_id = u.id) AS end_time"
             + "  FROM member_user u WHERE u.deleted = 0"
             + "  UNION ALL"
-            + "  SELECT 2 AS target_type, o.id AS target_id, o.name AS target_name,"
+            + "  SELECT 2 AS target_type, o.id AS target_id,"
+            + "         CAST(o.name AS CHAR(255)) AS target_name,"
             + "         NULL AS target_mobile, o.status AS status,"
             + "         (SELECT MAX(l.end_time) FROM maxlabel_org_license l"
             + "            WHERE l.deleted = 0 AND l.org_id = o.id AND l.refunded = 0"
@@ -251,10 +260,12 @@ public interface LicenseStatisticsMapper {
     /** 与上面**同一套筛选**的计数 */
     @Select("<script>"
             + "SELECT COUNT(*) FROM ("
-            + "  SELECT 1 AS target_type, u.nickname AS target_name, u.mobile AS target_mobile"
+            + "  SELECT 1 AS target_type, CAST(u.nickname AS CHAR(255)) AS target_name,"
+            + "         CAST(u.mobile AS CHAR(255)) AS target_mobile"
             + "  FROM member_user u WHERE u.deleted = 0"
             + "  UNION ALL"
-            + "  SELECT 2 AS target_type, o.name AS target_name, NULL AS target_mobile"
+            + "  SELECT 2 AS target_type, CAST(o.name AS CHAR(255)) AS target_name,"
+            + "         NULL AS target_mobile"
             + "  FROM maxlabel_org o WHERE o.deleted = 0"
             + ") t WHERE 1 = 1"
             + "  <if test='targetType != null'> AND t.target_type = #{targetType}</if>"

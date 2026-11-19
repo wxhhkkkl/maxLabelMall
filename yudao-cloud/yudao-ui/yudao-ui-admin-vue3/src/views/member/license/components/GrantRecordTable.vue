@@ -58,6 +58,32 @@
       </el-table-column>
       <el-table-column label="理由" prop="reason" min-width="200" show-overflow-tooltip />
       <el-table-column label="操作人" prop="operatorName" width="120" />
+      <!-- 撤回（Q164）：记录不删，撤回后在这里留痕 -->
+      <el-table-column label="状态" width="170">
+        <template #default="{ row }">
+          <el-tag v-if="row.revokeTime" type="danger">已撤回</el-tag>
+          <el-tag v-else type="success">已生效</el-tag>
+          <div v-if="row.revokeTime" class="text-12px text-gray-500">
+            {{ formatDate(row.revokeTime) }} {{ row.revokeOperatorName || '' }}
+          </div>
+          <div v-if="row.revokeTime" class="text-12px text-gray-500">
+            理由：{{ row.revokeReason }}
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="!row.revokeTime"
+            v-hasPermi="['member:license:gift']"
+            link
+            type="danger"
+            @click="openRevoke(row)"
+          >
+            撤回
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
     <Pagination
       v-model:page="queryParams.pageNo"
@@ -66,6 +92,39 @@
       @pagination="getList"
     />
   </ContentWrap>
+
+  <!-- 撤回必须填理由：权益收回去，留痕不能少 -->
+  <Dialog v-model="revokeVisible" title="撤回赠送" width="520px">
+    <el-form label-width="90px">
+      <el-form-item label="赠送内容">
+        {{ revokeTarget ? describe(revokeTarget) : '—' }}
+      </el-form-item>
+      <el-form-item label="撤回理由" required>
+        <el-input
+          v-model="revokeReason"
+          :rows="3"
+          maxlength="255"
+          placeholder="必填：为什么要撤回这笔赠送"
+          show-word-limit
+          type="textarea"
+        />
+      </el-form-item>
+    </el-form>
+    <div class="text-12px text-gray-500">
+      只能撤回该客户最近一笔赠送；客户之后又购买或赠送过的，请找当时操作人核对。
+    </div>
+    <template #footer>
+      <el-button @click="revokeVisible = false">取消</el-button>
+      <el-button
+        :disabled="!revokeReason.trim()"
+        :loading="revoking"
+        type="primary"
+        @click="submitRevoke"
+      >
+        确认撤回
+      </el-button>
+    </template>
+  </Dialog>
 </template>
 
 <script lang="ts" setup>
@@ -73,6 +132,8 @@ import * as LicenseApi from '@/api/member/license'
 import { formatDate } from '@/utils/formatTime'
 
 defineOptions({ name: 'LicenseGrantRecordTable' })
+const message = useMessage()
+const emit = defineEmits(['success'])
 
 const loading = ref(false)
 const list = ref<LicenseApi.LicenseGrantVO[]>([])
@@ -99,6 +160,42 @@ const getList = async () => {
     total.value = data.total
   } finally {
     loading.value = false
+  }
+}
+
+// ==================== 撤回（Q164） ====================
+
+const revokeVisible = ref(false)
+const revoking = ref(false)
+const revokeReason = ref('')
+const revokeTarget = ref<LicenseApi.LicenseGrantVO>()
+
+const describe = (row: LicenseApi.LicenseGrantVO) =>
+  `${row.targetName || row.targetId}：` +
+  (row.contentType === 1 ? `${row.months} 个月` : `${row.seats} 个席位`)
+
+const openRevoke = (row: LicenseApi.LicenseGrantVO) => {
+  revokeTarget.value = row
+  revokeReason.value = ''
+  revokeVisible.value = true
+}
+
+const submitRevoke = async () => {
+  if (!revokeTarget.value || !revokeReason.value.trim() || revoking.value) {
+    return
+  }
+  revoking.value = true
+  try {
+    await LicenseApi.revokeLicenseGrant({
+      id: revokeTarget.value.id,
+      reason: revokeReason.value.trim()
+    })
+    message.success('已撤回，权益已收回')
+    revokeVisible.value = false
+    // 由父组件统一刷新看板 / 明细 / 记录，避免同一份数据请求两遍
+    emit('success')
+  } finally {
+    revoking.value = false
   }
 }
 

@@ -17,6 +17,11 @@ public interface MemberSubscriptionMapper extends BaseMapperX<MemberSubscription
         return selectOne(MemberSubscriptionDO::getSourceOrderItemId, sourceOrderItemId);
     }
 
+    /** 赠送产生的订阅行（撤回时删它即精确还原到赠送前） */
+    default MemberSubscriptionDO selectByLicenseGrantId(Long licenseGrantId) {
+        return selectOne(MemberSubscriptionDO::getLicenseGrantId, licenseGrantId);
+    }
+
     default List<MemberSubscriptionDO> selectListByMemberId(Long memberId) {
         return selectList(new LambdaQueryWrapperX<MemberSubscriptionDO>()
                 .eq(MemberSubscriptionDO::getMemberId, memberId)

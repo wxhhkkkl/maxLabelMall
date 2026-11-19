@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.member.service.license;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.member.controller.admin.license.vo.LicenseGrantPageReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.license.vo.LicenseGrantReqVO;
+import cn.iocoder.yudao.module.member.controller.admin.license.vo.LicenseGrantRevokeReqVO;
 import cn.iocoder.yudao.module.member.controller.admin.license.vo.LicenseGrantRespVO;
 import cn.iocoder.yudao.module.member.dal.dataobject.license.MemberLicenseGrantDO;
 
@@ -30,5 +31,16 @@ public interface LicenseGrantService {
      * 赠送记录分页（看板「赠送记录」页签）
      */
     PageResult<MemberLicenseGrantDO> getGrantPage(LicenseGrantPageReqVO reqVO);
+
+    /**
+     * 撤回赠送（Q164，2026-11-19）
+     *
+     * 只允许撤回该对象**最近一笔**、且之后没有新的权益变动；撤回与原赠送在同一事务里，
+     * 失败不留痕。记录本身不删，只写 `revoke_*` 三列。
+     *
+     * @param reqVO      赠送记录编号 + 撤回理由
+     * @param operatorId 操作人（后台登录用户）
+     */
+    Boolean revoke(LicenseGrantRevokeReqVO reqVO, Long operatorId);
 
 }

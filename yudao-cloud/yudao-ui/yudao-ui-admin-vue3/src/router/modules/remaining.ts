@@ -453,7 +453,7 @@ const remainingRouter: AppRouteRecordRaw[] = [
     ]
   },
   {
-    path: '/mall/trade', // 交易中心
+    path: '/mall/trade', // 交易中心（订单中心已提为一级菜单，这里只挂隐藏的详情/代客下单页）
     component: Layout,
     name: 'TradeCenter',
     meta: {
@@ -464,19 +464,19 @@ const remainingRouter: AppRouteRecordRaw[] = [
         path: 'order/agent',
         component: () => import('@/views/mall/trade/order/agent/index.vue'),
         name: 'TradeOrderAgentCreate',
-        meta: { title: '代客下单', icon: 'ep:plus', hidden: true, activeMenu: '/mall/trade/order' }
+        meta: { title: '代客下单', icon: 'ep:plus', hidden: true, activeMenu: '/trade/order' }
       },
       {
         path: 'order/detail/:id(\\d+)',
         component: () => import('@/views/mall/trade/order/detail/index.vue'),
         name: 'TradeOrderDetail',
-        meta: { title: '订单详情', icon: 'ep:view', activeMenu: '/mall/trade/order' }
+        meta: { title: '订单详情', icon: 'ep:view', activeMenu: '/trade/order' }
       },
       {
         path: 'after-sale/detail/:id(\\d+)',
         component: () => import('@/views/mall/trade/afterSale/detail/index.vue'),
         name: 'TradeAfterSaleDetail',
-        meta: { title: '退款详情', icon: 'ep:view', activeMenu: '/mall/trade/after-sale' }
+        meta: { title: '退款详情', icon: 'ep:view', activeMenu: '/trade/after-sale' }
       }
     ]
   },

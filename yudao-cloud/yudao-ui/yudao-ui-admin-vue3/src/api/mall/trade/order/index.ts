@@ -79,6 +79,12 @@ export interface OrderVO {
    * **未申请时后端不给值（null）** —— 列上显示「否」。
    */
   invoiceStatus?: number | null
+  /**
+   * 票种（订单列表「发票」列）：1 普票 / 2 增票 / 3 收据；未申请为 null
+   *
+   * 显示名用 `utils/invoice` 的 `invoiceTypeLabel` 取简称（列表格子窄，不用后端的全称）。
+   */
+  invoiceType?: number | null
   /** 开票申请详情（006）；未申请为 null */
   invoice?: TradeOrderInvoiceVO | null
   /** 是否已在ERP系统开单（运营手工维护；2026-11-10） */

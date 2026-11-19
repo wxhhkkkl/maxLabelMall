@@ -84,6 +84,44 @@ public class TradeOrderMapperTest extends BaseDbUnitTest {
         tradeOrderMapper.updateById(update);
     }
 
+    private void markOrgLicense(Long orderId) {
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(orderId);
+        update.setMaxlabelOrgId(1L);
+        tradeOrderMapper.updateById(update);
+    }
+
+    private void markSubscription(Long orderId) {
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(orderId);
+        update.setMaxlabelSubscription(true);
+        tradeOrderMapper.updateById(update);
+    }
+
+    private List<Long> selectIdsByLicense(Boolean license) {
+        TradeOrderPageReqVO reqVO = new TradeOrderPageReqVO();
+        reqVO.setLicense(license);
+        PageResult<TradeOrderDO> page = tradeOrderMapper.selectPage(reqVO, (java.util.Set<Long>) null);
+        return page.getList().stream().map(TradeOrderDO::getId).toList();
+    }
+
+    @Test
+    public void testSelectPage_license_filter() {
+        // 授权订单 = 个人订阅（maxlabel_subscription）或 企业授权（maxlabel_org_id）；
+        // 其余都是商品订单 —— 虚拟软件商品（barTender 等）没有授权标记，也算商品订单
+        TradeOrderDO goods = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        TradeOrderDO orgLicense = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        markOrgLicense(orgLicense.getId());
+        TradeOrderDO subscription = createOrder(null, TradeOrderStatusEnum.UNPAID.getStatus());
+        markSubscription(subscription.getId());
+
+        assertEquals(java.util.Set.of(orgLicense.getId(), subscription.getId()),
+                new java.util.HashSet<>(selectIdsByLicense(true)));
+        assertEquals(java.util.Set.of(goods.getId()),
+                new java.util.HashSet<>(selectIdsByLicense(false)));
+        assertEquals(3, selectIdsByLicense(null).size()); // 不传 = 不筛
+    }
+
     @Test
     public void testSelectPage_payChannelCodeOffline_foundBySubTable() {
         // 对公**待收款**单：子表有行，而 `pay_channel_code` **还是空的**（确认收款前都这样）

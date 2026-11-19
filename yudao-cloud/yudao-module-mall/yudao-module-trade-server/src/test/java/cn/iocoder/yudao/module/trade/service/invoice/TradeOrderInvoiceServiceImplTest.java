@@ -597,6 +597,26 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         assertEquals(2, statusMap.size());
     }
 
+    /** 票种批量查询（2026-11-18）：列表「发票」列显示 普票 / 增票 / 收据 */
+    @Test
+    public void testGetInvoiceTypeMapByOrderIds() {
+        TradeOrderDO normalOrder = createOrder(7800);
+        TradeOrderDO receiptOrder = createOrder(7800);
+        TradeOrderDO withoutInvoice = createOrder(7800);
+        invoiceService.createInvoice(normalOrder, normalInvoice());
+        AppInvoiceApplyBaseVO receipt = normalInvoice();
+        receipt.setType(InvoiceTypeEnum.RECEIPT.getType());
+        invoiceService.createInvoice(receiptOrder, receipt);
+
+        Map<Long, Integer> typeMap = invoiceService.getInvoiceTypeMapByOrderIds(List.of(
+                normalOrder.getId(), receiptOrder.getId(), withoutInvoice.getId()));
+
+        assertEquals(InvoiceTypeEnum.E_NORMAL.getType(), typeMap.get(normalOrder.getId()));
+        assertEquals(InvoiceTypeEnum.RECEIPT.getType(), typeMap.get(receiptOrder.getId()));
+        assertFalse(typeMap.containsKey(withoutInvoice.getId()));
+        assertTrue(invoiceService.getInvoiceTypeMapByOrderIds(List.of()).isEmpty());
+    }
+
     @Test
     public void testGetInvoiceStatusMapByOrderIds_emptyIds() {
         // 空入参返回空 map（而不是抛异常 / 全表查）—— 订单列表为空时会走到

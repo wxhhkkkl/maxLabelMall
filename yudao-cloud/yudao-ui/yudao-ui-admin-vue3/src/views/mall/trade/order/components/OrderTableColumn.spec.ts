@@ -224,6 +224,29 @@ describe('后台订单列表 —— 各列的信息落位', () => {
     expect(canceled.text()).toContain('已作废')
   })
 
+  it('发票列显示票种：普票 / 增票 / 收据（2026-11-18）', async () => {
+    const normal = mountTable([
+      order({ invoiceStatus: INVOICE_STATUS.WAITING, invoiceType: 1 })
+    ])
+    await flushPromises()
+    expect(normal.text()).toContain('普票')
+    expect(normal.text()).toContain('待开票')
+    // 普票 / 增票用红色标签（2026-11-18 所有者要求），收据保持中性色
+    expect(normal.find('.el-tag--danger').exists()).toBe(true)
+
+    const special = mountTable([order({ invoiceStatus: INVOICE_STATUS.ISSUED, invoiceType: 2 })])
+    await flushPromises()
+    expect(special.text()).toContain('增票')
+    expect(special.text()).toContain('已开票')
+    expect(special.find('.el-tag--danger').exists()).toBe(true)
+
+    const receipt = mountTable([order({ invoiceStatus: INVOICE_STATUS.CANCELED, invoiceType: 3 })])
+    await flushPromises()
+    expect(receipt.text()).toContain('收据')
+    expect(receipt.text()).toContain('已作废')
+    expect(receipt.text()).not.toContain('普票')
+  })
+
   it('快递单：收件人信息显示姓名与手机号', async () => {
     const w = mountTable([order()])
     await flushPromises()

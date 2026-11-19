@@ -116,6 +116,8 @@ function order(over: Partial<Row> = {}): Row {
 }
 
 beforeEach(() => {
+  // 默认按「商品订单」菜单（component_name = TradeOrder）挂载
+  currentRoute.value = { name: 'TradeOrder' }
   getOrderPage.mockReset()
   getOrderPage.mockResolvedValue({ list: [], total: 0 })
   getInvoicePage.mockReset()
@@ -175,6 +177,33 @@ describe('后台订单列表 —— 状态标签页', () => {
     expect(lastParams().agentCreated).toBe(true)
   })
 
+  it('商品订单菜单只查商品单（license=false），默认仍是待发货/已发货（2026-11-18）', async () => {
+    const w = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    expect(lastParams().license).toBe(false)
+    expect(lastParams().statuses).toEqual([10, 20])
+    expect(w.findAll('.el-form-item').some((item) => item.text().includes('商品类型'))).toBe(false)
+  })
+
+  it('授权订单菜单只查授权单（license=true），默认「全部订单」（2026-11-18）', async () => {
+    currentRoute.value = { name: 'TradeOrderLicense' }
+    const w = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    expect(lastParams().license).toBe(true)
+    expect(lastParams().statuses).toBeUndefined()
+    expect(w.get('.el-tabs__item.is-active').text()).toBe('全部订单')
+    expect(w.findAll('.el-form-item').some((item) => item.text().includes('商品类型'))).toBe(false)
+  })
+
+  it('订单类型筛选已移除（2026-11-18）', async () => {
+    const w = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    expect(w.findAll('.el-form-item').some((item) => item.text().includes('订单类型'))).toBe(false)
+  })
+
   it('「重置」只清搜索表单，不动当前标签', async () => {
     const w = mount(OrderIndex, { global: { plugins: [createPinia()] } })
     await flushPromises()
@@ -191,24 +220,26 @@ describe('后台订单列表 —— 状态标签页', () => {
 })
 
 /**
- * 订单列表的「更多 → 开票」（2026-11-05）。
+ * 操作列平铺（2026-11-18）
  *
- * 客户在订单详情申请过开票后，运营扫列表时应该能当场开票：
- * · 只有**已申请**（待开票 / 已开票）的订单才出现入口，没申请与已作废都不出现
- * · 点开**弹上传框**，不跳走页面
- * · 上传成功后刷新列表（开票状态从「待开票」变「已开票」由后端返回）
+ * 所有者要求：去掉「更多」下拉，所有操作直接列出来；并新增「开单」（ERP）与「调整价格」。
+ * 开票入口的条件不变：只有客户**已提交申请**的订单才出现。
  */
-describe('后台订单列表 —— 更多里的开票入口', () => {
-  /** 点开某一行的「更多」下拉，返回菜单项元素 */
-  async function openMoreMenu(w: any) {
-    const more = w.findAll('button').find((b: any) => b.text().includes('更多'))
-    expect(more, '找不到「更多」按钮').toBeTruthy()
-    await more!.trigger('click')
-    await flushPromises()
-    return Array.from(document.body.querySelectorAll('.el-dropdown-menu__item')) as HTMLElement[]
-  }
+describe('后台订单列表 —— 操作平铺', () => {
+  const buttonByText = (w: any, text: string) =>
+    w.findAll('button').find((b: any) => b.text() === text)
 
-  it('客户已申请（待开票）→ 出现「开票」，点开弹上传框且不跳页', async () => {
+  it('不再有「更多」下拉，常用操作直接平铺', async () => {
+    getOrderPage.mockResolvedValue({ list: [order()], total: 1 })
+    const w = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    expect(buttonByText(w, '更多')).toBeFalsy()
+    expect(buttonByText(w, '详情')).toBeTruthy()
+    expect(buttonByText(w, '备注')).toBeTruthy()
+  })
+
+  it('客户已申请（待开票）→ 平铺「开票」，点开弹上传框且不跳页', async () => {
     getOrderPage.mockResolvedValue({ list: [order({ invoiceStatus: 0 })], total: 1 })
     getInvoicePage.mockResolvedValue({
       list: [{ id: 77, orderId: 1, orderNo: 'NO-20261105-0001', status: 0 }],
@@ -220,19 +251,15 @@ describe('后台订单列表 —— 更多里的开票入口', () => {
     })
     await flushPromises()
 
-    const items = await openMoreMenu(w)
-    const invoiceItem = items.find((el) => el.textContent?.includes('开票'))
-    expect(invoiceItem, '「更多」里应有开票入口').toBeTruthy()
-
-    invoiceItem!.click()
+    const invoiceButton = buttonByText(w, '开票')
+    expect(invoiceButton, '操作列应有「开票」').toBeTruthy()
+    await invoiceButton!.trigger('click')
     await flushPromises()
 
-    // 按订单号查这条申请（一次一条），再把申请交给弹层
     expect(getInvoicePage).toHaveBeenCalledWith(
       expect.objectContaining({ orderNo: 'NO-20261105-0001' })
     )
     expect(invoiceOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 77 }))
-    // 「不离开列表」：没有发生路由跳转
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -244,8 +271,31 @@ describe('后台订单列表 —— 更多里的开票入口', () => {
     })
     await flushPromises()
 
-    const items = await openMoreMenu(w)
-    expect(items.some((el) => el.textContent?.includes('开票'))).toBe(false)
+    expect(buttonByText(w, '开票')).toBeFalsy()
+  })
+
+  it('未开单 → 出现「开单」；已开单 → 不出现', async () => {
+    getOrderPage.mockResolvedValue({ list: [order({ erpCreated: false })], total: 1 })
+    const notCreated = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+    expect(buttonByText(notCreated, '开单')).toBeTruthy()
+
+    getOrderPage.mockResolvedValue({ list: [order({ erpCreated: true })], total: 1 })
+    const created = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+    expect(buttonByText(created, '开单')).toBeFalsy()
+  })
+
+  it('未支付 → 出现「调整价格」；已支付 → 不出现', async () => {
+    getOrderPage.mockResolvedValue({ list: [order({ status: 0 })], total: 1 })
+    const unpaid = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+    expect(buttonByText(unpaid, '调整价格')).toBeTruthy()
+
+    getOrderPage.mockResolvedValue({ list: [order({ status: 30 })], total: 1 })
+    const paid = mount(OrderIndex, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+    expect(buttonByText(paid, '调整价格')).toBeFalsy()
   })
 })
 

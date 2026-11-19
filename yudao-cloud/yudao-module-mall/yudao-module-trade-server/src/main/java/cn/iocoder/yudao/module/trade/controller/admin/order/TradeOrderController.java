@@ -115,6 +115,10 @@ public class TradeOrderController {
         Map<Long, Integer> invoiceStatusMap = tradeOrderInvoiceService.getInvoiceStatusMapByOrderIds(
                 convertSet(page.getList(), TradeOrderPageItemRespVO::getId));
         page.getList().forEach(item -> item.setInvoiceStatus(invoiceStatusMap.get(item.getId())));
+        // 票种（2026-11-18）：列表「发票」列显示 普票 / 增票 / 收据
+        Map<Long, Integer> invoiceTypeMap = tradeOrderInvoiceService.getInvoiceTypeMapByOrderIds(
+                convertSet(page.getList(), TradeOrderPageItemRespVO::getId));
+        page.getList().forEach(item -> item.setInvoiceType(invoiceTypeMap.get(item.getId())));
 
         // 对公转账「待收款」（008 / FR-209）：**一次 IN 批量查**，与 C 端同一手法
         Set<Long> waitingOrderIds = tradeOrderOfflinePaymentService.getWaitingReceiptOrderIds(

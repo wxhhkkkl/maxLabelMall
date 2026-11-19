@@ -116,15 +116,31 @@
             class="order-cell"
             :style="{ gridColumn: '6', gridRow: spanRow(rowSpan(scope.row)) }"
           >
-            <el-tag v-if="scope.row.invoiceStatus === INVOICE_STATUS.WAITING" type="warning">
-              待开票
-            </el-tag>
-            <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.ISSUED" type="success">
-              已开票
-            </el-tag>
-            <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.CANCELED" type="info">
-              已作废
-            </el-tag>
+            <!-- 票种 + 开票状态（2026-11-18）：运营扫单时要直接看到「普票 / 增票 / 收据」 -->
+            <div v-if="scope.row.invoiceStatus !== null && scope.row.invoiceStatus !== undefined" class="order-invoice-cell">
+              <!-- 普票 / 增票用红色文字（2026-11-18 所有者要求）；收据仍用中性色 -->
+              <el-tag
+                v-if="invoiceTypeLabel(scope.row.invoiceType)"
+                size="small"
+                :type="
+                  scope.row.invoiceType === INVOICE_TYPE.E_NORMAL ||
+                  scope.row.invoiceType === INVOICE_TYPE.E_SPECIAL
+                    ? 'danger'
+                    : 'info'
+                "
+              >
+                {{ invoiceTypeLabel(scope.row.invoiceType) }}
+              </el-tag>
+              <el-tag v-if="scope.row.invoiceStatus === INVOICE_STATUS.WAITING" size="small" type="warning">
+                待开票
+              </el-tag>
+              <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.ISSUED" size="small" type="success">
+                已开票
+              </el-tag>
+              <el-tag v-else-if="scope.row.invoiceStatus === INVOICE_STATUS.CANCELED" size="small" type="info">
+                已作废
+              </el-tag>
+            </div>
             <span v-else class="order-sub-text">否</span>
           </div>
           <div
@@ -192,7 +208,7 @@
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
 import { DeliveryTypeEnum } from '@/utils/constants'
-import { INVOICE_STATUS } from '@/utils/invoice'
+import { INVOICE_STATUS, INVOICE_TYPE, invoiceTypeLabel } from '@/utils/invoice'
 import { formatDate } from '@/utils/formatTime'
 import { floatToFixed2 } from '@/utils'
 import { OrderVO } from '@/api/mall/trade/order'
@@ -231,13 +247,20 @@ const openDetail = (id?: number | null) => {
  */
 .order-grid {
   display: grid;
-  grid-template-columns: 24fr 6fr 8fr 12fr 10fr 9fr 12fr 9fr 10fr;
+  /* 最后一列（操作）给固定宽度：平铺后的按钮要排在一行，其余列仍按原比例分配 */
+  grid-template-columns: 24fr 6fr 8fr 12fr 10fr 9fr 12fr 9fr 190px;
 }
 .order-grid-head {
   font-size: 13px;
   font-weight: 600;
   color: #606266;
   text-align: center;
+}
+.order-invoice-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 /* 「产品」列是左对齐的长商品名，居中的表头会显得漂 */
 .order-grid-head > div:first-child {

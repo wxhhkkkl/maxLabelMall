@@ -27,6 +27,8 @@ const getOrder = vi.fn()
 const getExpressTrackList = vi.fn()
 const getExpressMapUrl = vi.fn()
 const updateOrderRemark = vi.fn()
+const getDeliveryDefaultAddress = vi.fn()
+const deliveryOrder = vi.fn()
 vi.mock('@/api/mall/trade/order', () => ({
   EXPRESS_QUERY_NOT_SUPPORTED: 1_011_004_103,
   EXPRESS_MAP_NOT_CONFIGURED: 1_011_004_104,
@@ -35,6 +37,8 @@ vi.mock('@/api/mall/trade/order', () => ({
   getExpressTrackList: (...a: unknown[]) => getExpressTrackList(...a),
   getExpressMapUrl: (...a: unknown[]) => getExpressMapUrl(...a),
   updateOrderRemark: (...a: unknown[]) => updateOrderRemark(...a),
+  getDeliveryDefaultAddress: (...a: unknown[]) => getDeliveryDefaultAddress(...a),
+  deliveryOrder: (...a: unknown[]) => deliveryOrder(...a),
   cancelOrder: vi.fn(),
   pickUpOrder: vi.fn(),
   updateOrderErp: vi.fn()
@@ -46,14 +50,9 @@ vi.mock('@/api/mall/trade/delivery/express', () => ({
 vi.mock('@/api/mall/trade/delivery/pickUpStore', () => ({
   getDeliveryPickUpStore: vi.fn()
 }))
-// 真实的发货表单在 onMounted 里也会拉精简快递列表；单测里换成桩，
-// 避免它在 T037 的「列表失败」用例里制造第二个未捕获的 rejection。
-vi.mock('@/views/mall/trade/order/form/OrderDeliveryForm.vue', () => ({
-  default: {
-    name: 'OrderDeliveryForm',
-    emits: ['success'],
-    template: '<div />'
-  }
+// 发货表单内联在详情页（2026-11-18），会拉地区树；单测里给空树即可
+vi.mock('@/api/system/area', () => ({
+  getAreaTree: vi.fn().mockResolvedValue([])
 }))
 vi.mock('@/utils/dict', () => ({
   DICT_TYPE: {},
@@ -82,7 +81,7 @@ class ResizeObserverStub {
 ;(globalThis as any).ResizeObserver = ResizeObserverStub
 
 const OrderDetail = (await import('./index.vue')).default
-const OrderDeliveryForm = (await import('@/views/mall/trade/order/form/OrderDeliveryForm.vue')).default
+const OrderDeliveryPanel = (await import('@/views/mall/trade/order/form/OrderDeliveryPanel.vue')).default
 
 const TRACK_AT = new Date(2026, 9, 22, 18, 30, 0).getTime() // 2026-10-22 18:30:00
 
@@ -123,6 +122,10 @@ beforeEach(() => {
   getSimpleDeliveryExpressList.mockResolvedValue([
     { id: 10, name: '顺丰速运', kd100Code: 'shunfeng' }
   ])
+  getDeliveryDefaultAddress.mockReset()
+  getDeliveryDefaultAddress.mockResolvedValue({ areaId: null, address: '' })
+  deliveryOrder.mockReset()
+  deliveryOrder.mockResolvedValue(true)
   getExpressTrackList.mockResolvedValue([])
   getExpressMapUrl.mockReset()
   getExpressMapUrl.mockResolvedValue('')
@@ -239,8 +242,8 @@ describe('后台订单详情 —— 物流信息', () => {
     await flushPromises()
     expect(getExpressTrackList).not.toHaveBeenCalled()
 
-    // 模拟「发货」表单成功 → 模板里的 @success="getDetail"
-    w.findComponent(OrderDeliveryForm).vm.$emit('success')
+    // 模拟内联发货表单成功 → 模板里的 @success="getDetail"
+    w.findComponent(OrderDeliveryPanel).vm.$emit('success')
     await flushPromises()
 
     expect(getExpressTrackList).toHaveBeenCalledWith(1)
@@ -393,23 +396,43 @@ describe('后台订单详情 —— 发票详情', () => {
     expect(w.text()).toContain('78.00')
 
     // 按钮必须落在「发票详情」区块内，而不是还留在「订单状态」里
-    const invoiceSection = w
-      .findAll('.el-descriptions')
-      .find((section) => section.text().includes('发票详情'))
-    expect(invoiceSection, '找不到「发票详情」区块').toBeTruthy()
-    expect(invoiceSection!.findAll('button').some((button) => button.text().includes('开票'))).toBe(
+    const invoiceSection = w.find('.invoice-block')
+    expect(invoiceSection.exists(), '找不到「发票详情」区块').toBe(true)
+    expect(invoiceSection.findAll('button').some((button) => button.text().includes('开票'))).toBe(
       true
     )
+  })
+
+  it('发票信息拆两列、共四列归总，按钮在最下方（2026-11-18）', async () => {
+    const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
+
+    const columns = w.findAll('.invoice-column')
+    expect(columns).toHaveLength(4)
+    // 发票信息：票种 + 抬头主体
+    expect(columns[0]!.text()).toContain('发票信息')
+    expect(columns[0]!.text()).toContain('南京路桥机械有限公司')
+    // 开票资料：注册与开户
+    expect(columns[1]!.text()).toContain('开票资料')
+    expect(columns[1]!.text()).toContain('南京市玄武区 xx 路 1 号')
+    expect(columns[1]!.text()).toContain('招商银行南京分行')
+    expect(columns[2]!.text()).toContain('支付信息')
+    expect(columns[2]!.text()).toContain('订单已退款')
+    expect(columns[3]!.text()).toContain('其他信息')
+    expect(columns[3]!.text()).toContain('finance@example.com')
+
+    // 操作按钮不在任何一列里，而是区块最下方
+    const actions = w.find('.invoice-actions')
+    expect(actions.exists()).toBe(true)
+    expect(actions.findAll('button').some((b) => b.text().includes('开票'))).toBe(true)
   })
 
   it('待开票：「修改发票信息」按钮出现在「发票详情」块里', async () => {
     const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
 
-    const invoiceSection = w
-      .findAll('.el-descriptions')
-      .find((section) => section.text().includes('发票详情'))
+    const invoiceSection = w.find('.invoice-block')
+    expect(invoiceSection.exists()).toBe(true)
     expect(
-      invoiceSection!.findAll('button').some((button) => button.text().includes('修改发票信息'))
+      invoiceSection.findAll('button').some((button) => button.text().includes('修改发票信息'))
     ).toBe(true)
   })
 
@@ -424,7 +447,8 @@ describe('后台订单详情 —— 发票详情', () => {
   it('区块顺序：发票详情、商品详情紧跟在收货信息之后（2026-11-16 所有者要求）', async () => {
     const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
 
-    const sections = w.findAll('.el-descriptions').map((section) => section.text())
+    // 发票详情已从 el-descriptions 换成三列区块（2026-11-18），顺序断言要把它也算进来
+    const sections = w.findAll('.el-descriptions, .invoice-block').map((section) => section.text())
     const indexOf = (title: string) => sections.findIndex((text) => text.includes(title))
     expect(indexOf('收货信息')).toBeGreaterThanOrEqual(0)
     expect(indexOf('收货信息')).toBeLessThan(indexOf('发票详情'))
@@ -436,10 +460,9 @@ describe('后台订单详情 —— 发票详情', () => {
     const w = await mountDetail(order({ invoiceStatus: null, invoice: null }))
 
     expect(w.text()).toContain('该订单未申请开票')
-    const invoiceSection = w
-      .findAll('.el-descriptions')
-      .find((section) => section.text().includes('发票详情'))
-    expect(invoiceSection!.findAll('button')).toHaveLength(0)
+    const invoiceSection = w.find('.invoice-block')
+    expect(invoiceSection.exists()).toBe(true)
+    expect(invoiceSection.findAll('button')).toHaveLength(0)
   })
 })
 
@@ -459,4 +482,43 @@ describe('后台订单详情 —— 修改地址入口（2026-11-17 所有者要
 
     expect(w.text()).not.toContain('修改地址')
   })
+})
+
+/**
+ * 发货表单内联（2026-11-18）
+ *
+ * 待发货订单进详情就能直接填写并发货，不再点「发货」二次打开弹窗。
+ */
+describe('后台订单详情 —— 发货表单内联', () => {
+  it('待发货快递单：页面上直接展示发货表单，且不再有「发货」按钮', async () => {
+    const w = await mountDetail(order({ status: 10, logisticsId: null, logisticsNo: null }))
+
+    expect(w.text()).toContain('订单发货')
+    expect(w.text()).toContain('发货方式')
+    expect(w.text()).toContain('确认发货')
+    // 旧的二次打开入口已移除（页面底部还有「提醒」文案，按按钮精确匹配）
+    expect(w.findAll('button').some((b) => b.text() === '发货')).toBe(false)
+  })
+
+  it('已发货订单：不渲染发货表单', async () => {
+    const w = await mountDetail(order({ status: 20 }))
+
+    expect(w.text()).not.toContain('确认发货')
+  })
+
+  it('待发货自提单：不渲染发货表单（走核销入口）', async () => {
+    const w = await mountDetail(order({ status: 10, deliveryType: 2, logisticsId: null }))
+
+    expect(w.text()).not.toContain('确认发货')
+  })
+
+  it('发货表单排在「商品详情」之后（2026-11-19 所有者要求）', async () => {
+    const w = await mountDetail(order({ status: TradeOrderStatusEnum.UNDELIVERED.status }))
+
+    const sections = w.findAll('.el-descriptions, .invoice-block').map((section) => section.text())
+    const indexOf = (title: string) => sections.findIndex((text) => text.includes(title))
+    expect(indexOf('商品详情')).toBeGreaterThanOrEqual(0)
+    expect(indexOf('商品详情')).toBeLessThan(indexOf('订单发货'))
+  })
+
 })

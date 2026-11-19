@@ -83,4 +83,7 @@ public class TradeOrderPageReqVO extends PageParam {
     @Schema(description = "是否代客下单：true 只看代客单；false 只看客户自助；不传 = 全部", example = "true")
     private Boolean agentCreated;
 
+    @Schema(description = "是否授权订单（个人订阅 / 企业授权）：true 只看授权单；false 只看商品单；不传 = 全部", example = "true")
+    private Boolean license;
+
 }

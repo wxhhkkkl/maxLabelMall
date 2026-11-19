@@ -81,7 +81,8 @@ public class AdminCustomerServiceRepairOrderController {
         List<AdminCustomerServiceRepairOrderRespVO> list = page.getList().stream()
                 .map(order -> toRespVO(order, memberMap.get(order.getMemberId()),
                         requestMap.get(order.getRepairRequestId()),
-                        completeOperatorMap.get(order.getCompleteOperatorId())))
+                        order.getCompleteOperatorId() == null ? null
+                                : completeOperatorMap.get(order.getCompleteOperatorId())))
                 .toList();
         return success(new PageResult<>(list, page.getTotal()));
     }

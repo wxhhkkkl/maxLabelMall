@@ -37,6 +37,14 @@ public class TradeOrderPageItemRespVO extends TradeOrderBaseVO {
     private Integer invoiceStatus;
 
     /**
+     * 票种（006 / 2026-11-18）：1 电子普通发票 / 2 电子增值税专用发票 / 3 收据；未申请为 null
+     *
+     * 列表「发票」列要显示「普票 / 增票 / 收据」，运营扫单时不用点进详情。
+     */
+    @Schema(description = "票种：1 普票，2 增票，3 收据；未申请为 null", example = "1")
+    private Integer invoiceType;
+
+    /**
      * 是不是**待收款**的对公转账单（008 / FR-209）
      *
      * 列表上把它显示成「待收款」而不是「待支付」，财务一眼能看出"这单在等打款"。

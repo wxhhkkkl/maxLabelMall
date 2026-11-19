@@ -58,6 +58,13 @@ public interface TradeOrderInvoiceService {
     Map<Long, Integer> getInvoiceStatusMapByOrderIds(Collection<Long> orderIds);
 
     /**
+     * 按订单编号批量取**票种**（订单列表的「发票」列要显示 普票 / 增票 / 收据）—— 2026-11-18
+     *
+     * 与 {@link #getInvoiceStatusMapByOrderIds} 同一口径：只有"有申请"的订单在 map 里。
+     */
+    Map<Long, Integer> getInvoiceTypeMapByOrderIds(Collection<Long> orderIds);
+
+    /**
      * 订单**取消**（含全额退款）时作废其尚未开具的申请（Q30 / FR-184）
      *
      * 由 `TradeInvoiceOrderHandler` 在既有的 `afterCancelOrder` 扩展点里调用 ——

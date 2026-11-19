@@ -199,85 +199,102 @@
       ></iframe>
     </div>
 
-    <!-- 发票详情（006）：客户申请过开票才有内容；开票按钮也从「订单状态」挪到这里 -->
-    <el-descriptions class="od-section" :column="3" title="发票详情">
+    <!--
+      发票详情（006 / 2026-11-18 四列归总）
+      发票信息字段最多，拆成「发票信息 / 开票资料」两列，与「支付信息 / 其他信息」并排共四列；
+      开票 / 修改发票信息按钮放在整个区块的最下方左侧（不占列宽）。
+    -->
+    <div class="od-section invoice-block">
+      <div class="invoice-block-title">发票详情</div>
       <template v-if="formData.invoice">
-        <el-descriptions-item label="开票状态: ">
-          <el-tag :type="invoiceStatusTagType(formData.invoice.status)">
-            {{ formData.invoice.statusName || '—' }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="发票类型: ">
-          {{ formData.invoice.typeName || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="抬头类型: ">
-          {{ formData.invoice.titleKindName || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="抬头名称: ">
-          {{ formData.invoice.titleName || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="纳税人识别号: ">
-          {{ formData.invoice.taxNo || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="开票金额: ">
-          {{ fenToYuan(formData.invoice.amount || 0) }} 元
-        </el-descriptions-item>
-        <el-descriptions-item label="订单实付: ">
-          {{ fenToYuan(formData.invoice.orderPayPrice || 0) }} 元
-        </el-descriptions-item>
-        <el-descriptions-item label="订单已退款: ">
-          {{ fenToYuan(formData.invoice.orderRefundPrice || 0) }} 元
-        </el-descriptions-item>
-        <el-descriptions-item label="接收邮箱: ">
-          {{ formData.invoice.email || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="注册地址: ">
-          {{ formData.invoice.titleAddress || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="注册电话: ">
-          {{ formData.invoice.titlePhone || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="开户行: ">
-          {{ formData.invoice.bankName || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="银行账户: ">
-          {{ formData.invoice.bankAccount || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="开户行行号: ">
-          {{ formData.invoice.bankCode || '—' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="申请时间: ">
-          {{ formatDate(formData.invoice.createTime) }}
-        </el-descriptions-item>
-        <el-descriptions-item v-if="formData.invoice.issueTime" label="开票时间: ">
-          {{ formatDate(formData.invoice.issueTime) }}
-        </el-descriptions-item>
-        <el-descriptions-item v-if="formData.invoice.cancelTime" label="作废时间: ">
-          {{ formatDate(formData.invoice.cancelTime) }}
-        </el-descriptions-item>
-        <el-descriptions-item v-if="formData.invoice.invoiceFileUrl" label="发票文件: ">
-          <el-link type="primary" :href="formData.invoice.invoiceFileUrl" target="_blank">
-            下载发票
-          </el-link>
-        </el-descriptions-item>
-        <el-descriptions-item
-          v-hasPermi="['trade:order-invoice:issue']"
-          label-class-name="no-colon"
-        >
+        <div class="invoice-columns">
+          <!-- 发票信息：票种与抬头主体 -->
+          <section class="invoice-column">
+            <h4>发票信息</h4>
+            <dl class="invoice-list">
+              <div>
+                <dt>开票状态</dt>
+                <dd>
+                  <el-tag :type="invoiceStatusTagType(formData.invoice.status)">
+                    {{ formData.invoice.statusName || '—' }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div><dt>发票类型</dt><dd>{{ formData.invoice.typeName || '—' }}</dd></div>
+              <div><dt>抬头类型</dt><dd>{{ formData.invoice.titleKindName || '—' }}</dd></div>
+              <div><dt>抬头名称</dt><dd>{{ formData.invoice.titleName || '—' }}</dd></div>
+              <div><dt>纳税人识别号</dt><dd>{{ formData.invoice.taxNo || '—' }}</dd></div>
+            </dl>
+          </section>
+          <!-- 开票资料：注册信息与开户资料（专票用） -->
+          <section class="invoice-column">
+            <h4>开票资料</h4>
+            <dl class="invoice-list">
+              <div><dt>注册地址</dt><dd>{{ formData.invoice.titleAddress || '—' }}</dd></div>
+              <div><dt>注册电话</dt><dd>{{ formData.invoice.titlePhone || '—' }}</dd></div>
+              <div><dt>开户行</dt><dd>{{ formData.invoice.bankName || '—' }}</dd></div>
+              <div><dt>银行账户</dt><dd>{{ formData.invoice.bankAccount || '—' }}</dd></div>
+              <div><dt>开户行行号</dt><dd>{{ formData.invoice.bankCode || '—' }}</dd></div>
+            </dl>
+          </section>
+          <!-- 支付信息 -->
+          <section class="invoice-column">
+            <h4>支付信息</h4>
+            <dl class="invoice-list">
+              <div><dt>订单实付</dt><dd>{{ fenToYuan(formData.invoice.orderPayPrice || 0) }} 元</dd></div>
+              <div><dt>订单已退款</dt><dd>{{ fenToYuan(formData.invoice.orderRefundPrice || 0) }} 元</dd></div>
+              <div><dt>开票金额</dt><dd>{{ fenToYuan(formData.invoice.amount || 0) }} 元</dd></div>
+            </dl>
+          </section>
+          <!-- 其他信息：收票方式、时间与文件 -->
+          <section class="invoice-column">
+            <h4>其他信息</h4>
+            <dl class="invoice-list">
+              <div><dt>接收邮箱</dt><dd>{{ formData.invoice.email || '—' }}</dd></div>
+              <div><dt>申请时间</dt><dd>{{ formatDate(formData.invoice.createTime) }}</dd></div>
+              <div v-if="formData.invoice.issueTime">
+                <dt>开票时间</dt><dd>{{ formatDate(formData.invoice.issueTime) }}</dd>
+              </div>
+              <div v-if="formData.invoice.cancelTime">
+                <dt>作废时间</dt><dd>{{ formatDate(formData.invoice.cancelTime) }}</dd>
+              </div>
+              <div v-if="formData.invoice.invoiceFileUrl">
+                <dt>发票文件</dt>
+                <dd>
+                  <el-link type="primary" :href="formData.invoice.invoiceFileUrl" target="_blank">
+                    下载发票
+                  </el-link>
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+        <!-- 操作按钮固定在区块最下方左侧 -->
+        <div v-hasPermi="['trade:order-invoice:issue']" class="invoice-actions">
           <el-button v-if="invoiceAction" type="primary" @click="openInvoiceIssue">
             {{ invoiceAction }}
           </el-button>
           <!-- 客户打电话说抬头写错时，运营在这里代改（只允许待开票，见后端） -->
           <el-button v-if="canEditInvoice" @click="openInvoiceEdit">修改发票信息</el-button>
-        </el-descriptions-item>
+        </div>
       </template>
-      <el-descriptions-item v-else label-class-name="no-colon">
-        该订单未申请开票
-      </el-descriptions-item>
-    </el-descriptions>
+      <div v-else class="invoice-empty">该订单未申请开票</div>
+    </div>
 
     <!-- 商品详情 -->
     <el-descriptions class="od-section" title="商品详情">
+      <!-- 打印商品明细（2026-11-18）：独立窗口，随货/拣货用，只打商品与数量 -->
+      <template #extra>
+        <el-button
+          v-hasPermi="['trade:order:query']"
+          size="small"
+          type="primary"
+          plain
+          @click="handlePrintItems"
+        >
+          打印商品明细
+        </el-button>
+      </template>
       <el-descriptions-item labelClassName="no-colon">
         <el-row :gutter="20">
           <el-col :span="15">
@@ -311,6 +328,23 @@
         </el-row>
       </el-descriptions-item>
     </el-descriptions>
+
+    <!--
+      订单发货（2026-11-18 所有者要求）：待发货订单**直接在页面上填**，不再点「发货」二次开弹窗。
+      自提订单走另外的核销入口，这里不渲染；虚拟商品（交付完点「无需发货」）照常可用。
+      2026-11-19 所有者要求：从页首移到「商品详情」之后，商品与数量先看、再填发货。
+    -->
+    <el-descriptions
+      v-if="showDeliveryPanel"
+      v-hasPermi="['trade:order:update']"
+      class="od-section"
+      title="订单发货"
+    >
+      <el-descriptions-item :span="3" label-class-name="no-colon">
+        <OrderDeliveryPanel :order="formData" @success="getDetail" />
+      </el-descriptions-item>
+    </el-descriptions>
+
     <el-descriptions :column="4">
       <!-- 第一层 -->
       <el-descriptions-item label="商品总额: ">
@@ -424,17 +458,9 @@
         <!-- 待发货 -->
         <template v-if="formData.status! === TradeOrderStatusEnum.UNDELIVERED.status">
           <!--
-            快递要发货；**虚拟商品（软件等）也要**（007）—— 客服线下交付完，
-            运营点「发货 → 无需发货」把它推进到已发货。自提不走这里（另外的核销入口）。
+            发货表单已内联在上方「订单发货」区块（2026-11-18），这里不再提供「发货」按钮。
+            到店自提仍走核销入口。
           -->
-          <el-button
-            v-if="formData.deliveryType !== DeliveryTypeEnum.PICK_UP.type"
-            type="primary"
-            @click="delivery"
-          >
-            发货
-          </el-button>
-          <!-- 到店自提 -->
           <el-button
             v-if="formData.deliveryType === DeliveryTypeEnum.PICK_UP.type && showPickUp"
             type="primary"
@@ -508,7 +534,6 @@
   </ContentWrap>
 
   <!-- 各种操作的弹窗 -->
-  <OrderDeliveryForm ref="deliveryFormRef" @success="getDetail" />
   <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getDetail" />
   <OrderUpdateAddressForm ref="updateAddressFormRef" @success="getDetail" />
   <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getDetail" />
@@ -521,7 +546,7 @@ import * as TradeOrderApi from '@/api/mall/trade/order'
 import { fenToYuan } from '@/utils'
 import { formatDate } from '@/utils/formatTime'
 import { DICT_TYPE, getDictLabel, getDictObj } from '@/utils/dict'
-import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
+import OrderDeliveryPanel from '@/views/mall/trade/order/form/OrderDeliveryPanel.vue'
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateAddressForm from '@/views/mall/trade/order/form/OrderUpdateAddressForm.vue'
 import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
@@ -535,6 +560,7 @@ import { useTagsViewStore } from '@/store/modules/tagsView'
 import { DeliveryTypeEnum, TradeOrderStatusEnum } from '@/utils/constants'
 import * as DeliveryPickUpStoreApi from '@/api/mall/trade/delivery/pickUpStore'
 import { propTypes } from '@/utils/propTypes'
+import { printOrderItems } from './printOrderItems'
 
 defineOptions({ name: 'TradeOrderDetail' })
 
@@ -568,6 +594,12 @@ const showPayChannelOrderNo = computed(() => {
   return !!formData.value.payChannelOrderNo
     && (code.startsWith('wx_') || code.startsWith('alipay_'))
 })
+
+/** 待发货且不是到店自提 → 页面上直接展示发货表单（2026-11-18） */
+const showDeliveryPanel = computed(() =>
+  formData.value.status === TradeOrderStatusEnum.UNDELIVERED.status
+  && formData.value.deliveryType !== DeliveryTypeEnum.PICK_UP.type
+)
 
 /** 定制工艺摘要（014）：打印是基础项，其余按需出现 */
 const customizationProcesses = computed(() => {
@@ -624,11 +656,14 @@ const saveRemark = async () => {
   }
 }
 
-/** 各种操作 */
-const deliveryFormRef = ref() // 发货表单 Ref
-const delivery = () => {
-  deliveryFormRef.value?.open(formData.value)
+/** 打印商品明细（2026-11-18）：独立窗口，只打商品与数量，防止把成交价带到仓库/物流手上 */
+const handlePrintItems = () => {
+  if (!printOrderItems(formData.value)) {
+    message.warning('打印窗口被浏览器拦截，请允许弹窗后重试')
+  }
 }
+
+/** 各种操作 */
 const updateAddressFormRef = ref() // 收货地址表单 Ref
 const updateAddress = () => {
   updateAddressFormRef.value?.open(formData.value)
@@ -905,6 +940,71 @@ onMounted(async () => {
 })
 </script>
 <style lang="scss" scoped>
+/* 发票详情三列（2026-11-18）：与其它 od-section 一致的顶部分隔线 + 蓝色小竖条标题 */
+.invoice-block {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+.invoice-block-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+
+  &::before {
+    display: inline-block;
+    width: 3px;
+    height: 20px;
+    margin-right: 10px;
+    background-color: #409eff;
+    content: '';
+  }
+}
+.invoice-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.8fr 0.9fr;
+  gap: 24px;
+  align-items: start;
+}
+.invoice-column h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+}
+.invoice-list {
+  margin: 0;
+
+  > div {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  dt {
+    flex: 0 0 96px;
+    color: #909399;
+  }
+
+  dd {
+    margin: 0;
+    color: #303133;
+    word-break: break-all;
+  }
+}
+.invoice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.invoice-empty {
+  color: #909399;
+  font-size: 13px;
+}
 :deep(.el-descriptions) {
   &:not(:nth-child(1)) {
     margin-top: 20px;

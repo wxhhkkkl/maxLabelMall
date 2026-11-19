@@ -14,6 +14,31 @@ export const INVOICE_STATUS = {
   CANCELED: 20,
 } as const
 
+/**
+ * 票种（2026-11-18）：订单列表「发票」列要显示 普票 / 增票 / 收据
+ *
+ * ⚠️ 与"显示名由后端给"的既有口径不同：列表格子窄，所有者要求用**简称**；
+ * 详情页仍用后端返回的 `typeName`（电子普通发票 …）。取值与后端 `InvoiceTypeEnum` 一致。
+ */
+export const INVOICE_TYPE = {
+  E_NORMAL: 1,
+  E_SPECIAL: 2,
+  RECEIPT: 3,
+} as const
+
+export function invoiceTypeLabel(type?: number | null): string {
+  if (type === INVOICE_TYPE.E_NORMAL) {
+    return '普票'
+  }
+  if (type === INVOICE_TYPE.E_SPECIAL) {
+    return '增票'
+  }
+  if (type === INVOICE_TYPE.RECEIPT) {
+    return '收据'
+  }
+  return ''
+}
+
 /** 筛选下拉的选项（顺序即展示顺序） */
 export const INVOICE_STATUS_OPTIONS = [
   { value: INVOICE_STATUS.WAITING, label: '待开票' },

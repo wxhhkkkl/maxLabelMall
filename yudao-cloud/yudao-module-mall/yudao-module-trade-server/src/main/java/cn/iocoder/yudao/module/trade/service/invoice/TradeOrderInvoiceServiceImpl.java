@@ -156,6 +156,13 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
                 TradeOrderInvoiceDO::getOrderId, TradeOrderInvoiceDO::getStatus);
     }
 
+    @Override
+    public Map<Long, Integer> getInvoiceTypeMapByOrderIds(Collection<Long> orderIds) {
+        // 同一次 IN 批量查；列表上要显示票种（2026-11-18）
+        return convertMap(getInvoiceListByOrderIds(orderIds),
+                TradeOrderInvoiceDO::getOrderId, TradeOrderInvoiceDO::getType);
+    }
+
     // ==================== 后台：开具 / 分页 / 作废 ====================
 
     @Override

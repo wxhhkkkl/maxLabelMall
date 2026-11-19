@@ -115,6 +115,41 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
         return query;
     }
 
+    /**
+     * 「授权订单」筛选（2026-11-18）
+     *
+     * 授权订单 = 个人会员订阅单（`maxlabel_subscription = 1`，024）
+     *         或 企业授权单（`maxlabel_org_id` 非空，012）。
+     * 其余都算商品订单 —— 含 BarTender 这类虚拟软件商品（它们没有会员授权标记）。
+     *
+     * ⚠️ 列表与统计**共用同一个实现**（照 008 / 017 的写法），只改一处会出现
+     * 「列表筛得出、状态标签上的统计数不对」。
+     */
+    default LambdaQueryWrapperX<TradeOrderDO> applyLicenseFilter(LambdaQueryWrapperX<TradeOrderDO> query,
+                                                                 Boolean license) {
+        if (Boolean.TRUE.equals(license)) {
+            query.and(w -> w.isNotNull(TradeOrderDO::getMaxlabelOrgId)
+                    .or().eq(TradeOrderDO::getMaxlabelSubscription, true));
+        } else if (Boolean.FALSE.equals(license)) {
+            query.and(w -> w.isNull(TradeOrderDO::getMaxlabelOrgId)
+                    .eq(TradeOrderDO::getMaxlabelSubscription, false));
+        }
+        return query;
+    }
+
+    /** {@link #applyLicenseFilter(LambdaQueryWrapperX, Boolean)} 的联表版本（统计用） */
+    default MPJLambdaWrapper<TradeOrderDO> applyLicenseFilter(MPJLambdaWrapper<TradeOrderDO> query,
+                                                              Boolean license) {
+        if (Boolean.TRUE.equals(license)) {
+            query.and(w -> w.isNotNull(TradeOrderDO::getMaxlabelOrgId)
+                    .or().eq(TradeOrderDO::getMaxlabelSubscription, true));
+        } else if (Boolean.FALSE.equals(license)) {
+            query.and(w -> w.isNull(TradeOrderDO::getMaxlabelOrgId)
+                    .eq(TradeOrderDO::getMaxlabelSubscription, false));
+        }
+        return query;
+    }
+
     default PageResult<TradeOrderDO> selectPage(TradeOrderPageReqVO reqVO, Set<Long> userIds) {
         LambdaQueryWrapperX<TradeOrderDO> query = new LambdaQueryWrapperX<TradeOrderDO>()
                 .likeIfPresent(TradeOrderDO::getNo, reqVO.getNo())
@@ -136,6 +171,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .betweenIfPresent(TradeOrderDO::getCreateTime, reqVO.getCreateTime())
                 .orderByDesc(TradeOrderDO::getId);
         applyAgentCreatedFilter(query, reqVO.getAgentCreated());
+        applyLicenseFilter(query, reqVO.getLicense());
         return selectPage(reqVO, applyPayChannelCodeFilter(query, reqVO.getPayChannelCode()));
     }
 
@@ -165,6 +201,7 @@ public interface TradeOrderMapper extends BaseMapperX<TradeOrderDO> {
                 .betweenIfPresent(TradeOrderDO::getCreateTime, reqVO.getCreateTime())
                 .groupBy(TradeOrderDO::getRefundStatus);
         applyAgentCreatedFilter(query, reqVO.getAgentCreated());
+        applyLicenseFilter(query, reqVO.getLicense());
         return selectMaps(applyPayChannelCodeFilter(query, reqVO.getPayChannelCode()));
     }
 

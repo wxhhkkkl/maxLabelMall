@@ -69,16 +69,6 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="订单类型" prop="type">
-        <el-select v-model="queryParams.type" class="!w-280px" clearable placeholder="全部">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.TRADE_ORDER_TYPE)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
       <el-form-item label="配送方式" prop="deliveryType">
         <el-select v-model="queryParams.deliveryType" class="!w-280px" clearable placeholder="全部">
           <el-option
@@ -209,78 +199,84 @@
     <el-table v-loading="loading" :data="list" row-key="id">
       <OrderTableColumn :list="list" :pick-up-store-list="pickUpStoreList">
         <template #default="{ row }">
-          <div class="flex items-center justify-center">
+          <div class="order-actions">
             <el-button
               v-hasPermi="['trade:order:query']"
               link
               type="primary"
               @click="openDetail(row.id)"
             >
-              <Icon icon="ep:notification" />
               详情
             </el-button>
-            <el-dropdown
+            <!--
+              操作全部平铺（2026-11-18 所有者要求）：原来收在「更多」下拉里，运营每单要多点一次；
+              现在按条件直接列出，并新增「开单」（ERP）与「调整价格」。
+            -->
+            <el-button
+              v-if="
+                row.deliveryType !== DeliveryTypeEnum.PICK_UP.type &&
+                row.status === TradeOrderStatusEnum.UNDELIVERED.status
+              "
               v-hasPermi="['trade:order:update']"
-              @command="(command) => handleCommand(command, row)"
+              link
+              type="primary"
+              @click="openDelivery(row)"
             >
-              <el-button link type="primary">
-                <Icon icon="ep:d-arrow-right" />
-                更多
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <!--
-                    【未发货】时展示【发货】：快递要发货；**虚拟商品（软件等）也要**（007）——
-                    客服线下交付完，运营点「发货 → 无需发货」把它推进到已发货。
-                    自提不走这里（它有专门的核销入口）。
-                  -->
-                  <el-dropdown-item
-                    v-if="
-                      row.deliveryType !== DeliveryTypeEnum.PICK_UP.type &&
-                      row.status === TradeOrderStatusEnum.UNDELIVERED.status
-                    "
-                    command="delivery"
-                  >
-                    <Icon icon="ep:takeaway-box" />
-                    发货
-                  </el-dropdown-item>
-                  <!--
-                    确认收款（008 / FR-203）：只对**待收款**的对公单出现。
-                    ⚠️ 它挂在 `trade:order:update` 的下拉里，所以这里**再加一层权限判断** ——
-                    没有 `trade:order:confirm-paid` 的人不该看到它（资金动作）。
-                    详情页那颗按钮同样是独立权限点。
-                  -->
-                  <el-dropdown-item v-if="canConfirmOfflinePaid(row)" command="confirmOfflinePaid">
-                    <Icon icon="ep:money" />
-                    确认收款
-                  </el-dropdown-item>
-                  <!--
-                    开票（006 / 2026-11-05）：只对**客户已在订单详情申请过**的订单出现
-                    （待开票 → 开票；已开票 → 重新上传）。
-                    点开是弹层，**不离开列表页**；上传成功后刷新列表，状态由后端改为已开票。
-                  -->
-                  <el-dropdown-item v-if="canIssueOrderInvoice(row)" command="invoice">
-                    <Icon icon="ep:tickets" />
-                    {{ orderInvoiceAction(row.invoiceStatus) }}
-                  </el-dropdown-item>
-                  <!--
-                    取消订单（008 / FR-213）：只能取消**未支付**订单；
-                    已支付（含已确认收款）的要走**退款**，取消不改金额、账对不上。
-                  -->
-                  <el-dropdown-item
-                    v-if="row.status === TradeOrderStatusEnum.UNPAID.status"
-                    command="cancel"
-                  >
-                    <Icon icon="ep:circle-close" />
-                    取消订单
-                  </el-dropdown-item>
-                  <el-dropdown-item command="remark">
-                    <Icon icon="ep:chat-line-square" />
-                    备注
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+              发货
+            </el-button>
+            <el-button
+              v-if="canConfirmOfflinePaid(row)"
+              link
+              type="primary"
+              @click="openOfflineConfirm(row)"
+            >
+              确认收款
+            </el-button>
+            <el-button
+              v-if="canIssueOrderInvoice(row)"
+              link
+              type="primary"
+              @click="openInvoiceIssue(row)"
+            >
+              {{ orderInvoiceAction(row.invoiceStatus) }}
+            </el-button>
+            <!-- ERP 开单（2026-11-18）：已开单的订单不再显示 -->
+            <el-button
+              v-if="!row.erpCreated"
+              v-hasPermi="['trade:order:update']"
+              link
+              type="primary"
+              @click="markErpCreated(row)"
+            >
+              开单
+            </el-button>
+            <!-- 调整价格（2026-11-18）：与详情页一致，只对未支付订单开放 -->
+            <el-button
+              v-if="row.status === TradeOrderStatusEnum.UNPAID.status"
+              v-hasPermi="['trade:order:update']"
+              link
+              type="primary"
+              @click="openUpdatePrice(row)"
+            >
+              调整价格
+            </el-button>
+            <el-button
+              v-if="row.status === TradeOrderStatusEnum.UNPAID.status"
+              v-hasPermi="['trade:order:update']"
+              link
+              type="danger"
+              @click="cancelOrder(row)"
+            >
+              取消订单
+            </el-button>
+            <el-button
+              v-hasPermi="['trade:order:update']"
+              link
+              type="primary"
+              @click="openRemark(row)"
+            >
+              备注
+            </el-button>
           </div>
         </template>
       </OrderTableColumn>
@@ -297,6 +293,7 @@
   <!-- 各种操作的弹窗 -->
   <OrderDeliveryForm ref="deliveryFormRef" @success="getList" />
   <OrderUpdateRemarkForm ref="updateRemarkForm" @success="getList" />
+  <OrderUpdatePriceForm ref="updatePriceFormRef" @success="getList" />
   <OrderOfflineConfirmForm ref="offlineConfirmFormRef" @success="getList" />
   <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getList" />
   <OrderExportForm ref="exportFormRef" />
@@ -307,6 +304,7 @@ import type { FormInstance } from 'element-plus'
 import OrderDeliveryForm from '@/views/mall/trade/order/form/OrderDeliveryForm.vue'
 import OrderOfflineConfirmForm from '@/views/mall/trade/order/form/OrderOfflineConfirmForm.vue'
 import OrderUpdateRemarkForm from '@/views/mall/trade/order/form/OrderUpdateRemarkForm.vue'
+import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePriceForm.vue'
 import OrderExportForm from '@/views/mall/trade/order/form/OrderExportForm.vue'
 import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
 import * as TradeOrderApi from '@/api/mall/trade/order'
@@ -351,8 +349,16 @@ const STATUS_TABS: StatusTab[] = [
   { key: 'completed', label: '已完成', statuses: [TradeOrderStatusEnum.COMPLETED.status] },
   { key: 'canceled', label: '已取消', statuses: [TradeOrderStatusEnum.CANCELED.status] }
 ]
-/** 进页面的默认标签（2026-10-23 所有者要求） */
-const DEFAULT_TAB = 'shipping'
+/**
+ * 授权订单菜单（2026-11-18）：与「商品订单」共用本页面，靠菜单的 component_name 区分。
+ *
+ * 授权订单 = 个人会员订阅 + 企业授权（后端 `maxlabel_subscription` / `maxlabel_org_id`），
+ * 全部是支付即完成的虚拟单 —— 默认标签必须是「全部订单」，否则进页面一片空白。
+ */
+const isLicenseMode = computed(() => currentRoute.value?.name === 'TradeOrderLicense')
+
+/** 进页面的默认标签（2026-10-23 所有者要求；授权订单见上） */
+const DEFAULT_TAB = isLicenseMode.value ? 'all' : 'shipping'
 const activeTab = ref<string>(DEFAULT_TAB)
 
 /** 某个标签对应的状态集 */
@@ -371,7 +377,7 @@ const queryParams = ref({
   receiverMobile: undefined, // 收货人手机号（聚合搜索）
   createTime: undefined, // 创建时间
   terminal: undefined, // 订单来源
-  type: undefined, // 订单类型
+  license: isLicenseMode.value, // 授权订单菜单 = true；商品订单菜单 = false
   deliveryType: undefined, // 配送方式
   logisticsId: undefined, // 快递公司
   pickUpStoreId: undefined, // 自提门店
@@ -468,7 +474,7 @@ const resetQuery = () => {
     receiverMobile: undefined, // 收货人手机号（聚合搜索）
     createTime: undefined, // 创建时间
     terminal: undefined, // 订单来源
-    type: undefined, // 订单类型
+    license: isLicenseMode.value, // 授权订单菜单 = true；商品订单菜单 = false
     deliveryType: undefined, // 配送方式
     logisticsId: undefined, // 快递公司
     pickUpStoreId: undefined, // 自提门店
@@ -496,6 +502,7 @@ const openExport = () => {
 /** 操作分发 */
 const deliveryFormRef = ref()
 const updateRemarkForm = ref()
+const updatePriceFormRef = ref() // 订单调价表单 Ref
 const offlineConfirmFormRef = ref() // 确认收款弹层（008）
 const invoiceIssueFormRef = ref() // 开票上传弹层（006）
 
@@ -554,24 +561,37 @@ const cancelOrder = async (row: TradeOrderApi.OrderVO) => {
   await getList()
 }
 
-const handleCommand = (command: string, row: TradeOrderApi.OrderVO) => {
-  switch (command) {
-    case 'remark':
-      updateRemarkForm.value?.open(row)
-      break
-    case 'delivery':
-      deliveryFormRef.value?.open(row)
-      break
-    case 'confirmOfflinePaid':
-      offlineConfirmFormRef.value?.open(row)
-      break
-    case 'invoice':
-      openInvoiceIssue(row)
-      break
-    case 'cancel':
-      cancelOrder(row)
-      break
+/** 操作按钮（2026-11-18 平铺后各自一个方法） */
+const openRemark = (row: TradeOrderApi.OrderVO) => updateRemarkForm.value?.open(row)
+const openDelivery = (row: TradeOrderApi.OrderVO) => deliveryFormRef.value?.open(row)
+const openOfflineConfirm = (row: TradeOrderApi.OrderVO) => offlineConfirmFormRef.value?.open(row)
+const openUpdatePrice = (row: TradeOrderApi.OrderVO) => updatePriceFormRef.value?.open(row)
+
+/**
+ * ERP 开单（2026-11-18）：列表上直接标记，必须填 ERP 单号；撤销仍在详情页。
+ * 与详情页同一口径：独立于订单主状态，仅 `trade:order:update` 可操作。
+ */
+const markErpCreated = async (row: TradeOrderApi.OrderVO) => {
+  let erpNo = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入 ERP 系统里的单号',
+      `标记订单 ${row.no} 已开单`,
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        inputPlaceholder: 'ERP单号（必填）',
+        inputValidator: (value: string) => (value && value.trim() ? true : '请输入 ERP 单号'),
+        type: 'warning'
+      }
+    )
+    erpNo = value.trim()
+  } catch {
+    return // 用户点了取消
   }
+  await TradeOrderApi.updateOrderErp({ id: row.id!, erpCreated: true, erpNo })
+  message.success('已标记为 ERP 已开单')
+  await getList()
 }
 
 // 监听路由变化更新列表，解决订单保存/更新后，列表不刷新的问题。
@@ -591,3 +611,27 @@ onMounted(async () => {
   deliveryExpressList.value = await DeliveryExpressApi.getSimpleDeliveryExpressList()
 })
 </script>
+
+<style lang="scss" scoped>
+/*
+ * 操作按钮（2026-11-18）：平铺后要能排在一行里。
+ * 只作用于本页，不改公共表格组件；Element Plus 默认给相邻按钮加 margin-left，
+ * 换行时会错位，这里用 flex gap 统一间距。
+ */
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+
+  :deep(.el-button) {
+    padding: 0;
+    font-size: 12px;
+  }
+
+  :deep(.el-button + .el-button) {
+    margin-left: 0;
+  }
+}
+</style>

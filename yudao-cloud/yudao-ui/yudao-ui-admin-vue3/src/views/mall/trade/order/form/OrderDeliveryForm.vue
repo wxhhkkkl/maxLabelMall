@@ -1,46 +1,13 @@
 <template>
   <Dialog v-model="dialogVisible" title="订单发货" width="25%">
-    <el-form ref="formRef" v-loading="formLoading" :model="formData" label-width="80px">
-      <el-form-item label="发货方式">
-        <el-radio-group v-model="expressType">
-          <el-radio border value="express">快递物流</el-radio>
-          <el-radio border value="none">无需发货</el-radio>
-        </el-radio-group>
-      </el-form-item>
-      <template v-if="expressType === 'express'">
-        <el-form-item label="物流公司">
-          <el-select v-model="formData.logisticsId" placeholder="请选择" style="width: 100%">
-            <el-option
-              v-for="item in deliveryExpressList"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id!"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="物流单号">
-          <el-input v-model="formData.logisticsNo" />
-        </el-form-item>
-        <el-form-item label="发货地址">
-          <el-tree-select
-            v-model="formData.deliveryFromAreaId"
-            :data="areaList"
-            :props="defaultProps"
-            :render-after-expand="true"
-            placeholder="请选择省/市/区"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="发货详细地址">
-          <el-input
-            v-model="formData.deliveryFromAddress"
-            type="textarea"
-            :rows="2"
-            placeholder="请输入发货详细地址"
-          />
-        </el-form-item>
-      </template>
-    </el-form>
+    <div v-loading="formLoading">
+      <OrderDeliveryFields
+        v-model:express-type="expressType"
+        :area-list="areaList"
+        :delivery-express-list="deliveryExpressList"
+        :form-data="formData"
+      />
+    </div>
     <template #footer>
       <el-button :disabled="formLoading" type="primary" @click="submitForm">确 定</el-button>
       <el-button @click="dialogVisible = false">取 消</el-button>
@@ -52,7 +19,7 @@ import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import * as TradeOrderApi from '@/api/mall/trade/order'
 import { getAreaTree } from '@/api/system/area'
 import { copyValueToTarget } from '@/utils'
-import { defaultProps } from '@/utils/tree'
+import OrderDeliveryFields from './OrderDeliveryFields.vue'
 
 defineOptions({ name: 'OrderDeliveryForm' })
 
@@ -70,7 +37,6 @@ const formData = ref<TradeOrderApi.DeliveryVO>({
   deliveryFromAddress: '' // 发货地址详情
 })
 const areaList = ref([]) // 地区列表
-const formRef = ref() // 表单 Ref
 
 /** 打开弹窗 */
 const open = async (row: TradeOrderApi.OrderVO) => {
@@ -140,7 +106,6 @@ const resetForm = () => {
     deliveryFromAreaId: null, // 发货地址地区
     deliveryFromAddress: '' // 发货地址详情
   }
-  formRef.value?.resetFields()
 }
 const deliveryExpressList = ref<DeliveryExpressApi.DeliveryExpressVO[]>([])
 onMounted(async () => {

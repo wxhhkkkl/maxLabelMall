@@ -24,6 +24,7 @@ import { afterSaleItemStatusText, canApplyRefund, canCancelAfterSale } from '@/u
 import { mapErrorText, trackErrorText } from '@/utils/expressTrack'
 import { invoiceStatusName } from '@/utils/invoice'
 import { formatYuan, reconcile } from '@/utils/money'
+import { canExportOfflinePayPdf, exportOfflinePayPdf } from '@/utils/offlinePayPdf'
 import { OFFLINE_WAITING_TEXT, canCommentItem, orderStatusText } from '@/utils/orderStatus'
 import { buildChannelOptions, type ChannelOption } from '@/utils/payChannel'
 import { formatDateTime, toMillis } from '@/utils/time'
@@ -158,6 +159,13 @@ const selectedChannel = ref('')
  * 与下面 `needsNoPay` 的条件（未支付 + 没有支付单）**正好重合**，这是本页最容易出错的地方（R47）。
  */
 const offlineWaiting = computed(() => order.value?.offlinePay?.waiting === true)
+
+/**
+ * 022：能否导出对公转账单。
+ * 所有**未取消**的对公订单都显示（待收款时用于打款，确认收款后用于留档）。
+ */
+const canExportPdf = computed(() => !!order.value && canExportOfflinePayPdf(order.value))
+const pdfExporting = ref(false)
 
 const statusText = computed(() =>
   order.value
@@ -602,6 +610,21 @@ function onReorder() {
   })
 }
 
+/** 022：生成并下载对公转账单 PDF */
+async function onExportOfflinePdf() {
+  const o = order.value
+  if (!o || pdfExporting.value) return
+  pdfExporting.value = true
+  try {
+    await exportOfflinePayPdf(o)
+    message.value = '对公转账单 PDF 已开始下载'
+  } catch {
+    message.value = '生成 PDF 失败，请稍后重试'
+  } finally {
+    pdfExporting.value = false
+  }
+}
+
 function canComment(it: OrderDetail['items'][number]): boolean {
   return order.value ? canCommentItem(order.value, it) : false
 }
@@ -890,6 +913,23 @@ onMounted(async () => {
             转账后我们核对到账即安排发货。确认到账前订单不会自动取消，有问题请
             <RouterLink to="/support/contact">联系我们</RouterLink>。
           </p>
+        </div>
+
+        <!--
+          022：对公转账单导出 PDF。**所有未取消的对公订单**都显示 ——
+          待收款时用于打款，确认收款后用于留档（US71 / US72）。
+          不能只看 `offlineWaiting`：确认收款后区块会消失，入口就没了。
+        -->
+        <div v-if="canExportPdf" class="od-pdf-actions">
+          <button
+            id="exportOfflinePdf"
+            class="btn-cart"
+            type="button"
+            :disabled="pdfExporting"
+            @click="onExportOfflinePdf"
+          >
+            {{ pdfExporting ? '生成中…' : '导出对公转账单' }}
+          </button>
         </div>
 
         <!--
@@ -1417,6 +1457,14 @@ onMounted(async () => {
 .dl-name { font-size: 12px; }
 .account-order-detail .dl-table { border-radius: 10px; }
 .od-reorder-actions { margin-top: 16px; }
+/* 022：对公转账单导出条。贴在对公账户卡片下方；确认收款后卡片消失，入口仍在 */
+.od-pdf-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 2px 16px;
+}
+.od-pdf-actions .btn-cart { width: auto; font-size: 13px; padding: 10px 20px; }
+.od-pdf-actions .btn-cart:disabled { opacity: .6; cursor: wait; }
 .od-actions {
   display: flex;
   justify-content: flex-end;

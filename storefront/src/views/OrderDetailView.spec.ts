@@ -91,6 +91,14 @@ vi.mock('@/utils/weixin', async (importOriginal) => ({
   redirectTo: (...a: unknown[]) => redirectTo(...a),
 }))
 
+// 022：只换掉「真正生成 PDF」的那一步（会加载 jsPDF/html2canvas），
+// 入口判定 `canExportOfflinePayPdf` 仍走真实实现。
+const exportOfflinePayPdf = vi.fn()
+vi.mock('@/utils/offlinePayPdf', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/offlinePayPdf')>()),
+  exportOfflinePayPdf: (...a: unknown[]) => exportOfflinePayPdf(...a),
+}))
+
 const OrderDetailView = (await import('./OrderDetailView.vue')).default
 const QrPayDialog = (await import('@/components/QrPayDialog.vue')).default
 
@@ -206,6 +214,8 @@ beforeEach(async () => {
   bindSocialUser.mockReset()
   getSocialAuthRedirectUrl.mockReset()
   redirectTo.mockReset()
+  exportOfflinePayPdf.mockReset()
+  exportOfflinePayPdf.mockResolvedValue(undefined)
   clearWxPayPending()
   await router.push('/order/1')
   await router.isReady()
@@ -1617,6 +1627,82 @@ describe('OrderDetailView —— 对公转账「待收款」（008 / FR-200 / FR
 
     expect(w.text()).toContain('无需支付')
     expect(w.find('#payOrder').exists()).toBe(false)
+  })
+
+  // ==================== 022 对公转账单导出 PDF ====================
+
+  const EXPORT_PDF = '#exportOfflinePdf'
+
+  it('待收款的对公订单显示「导出对公转账单」入口（022 / FR-585）', async () => {
+    const w = await mountDetail(waitingOrder())
+
+    expect(w.get(EXPORT_PDF).text()).toContain('导出对公转账单')
+  })
+
+  it('非对公订单**不显示**导出入口（FR-585）', async () => {
+    const w = await mountDetail(detail())
+
+    expect(w.find(EXPORT_PDF).exists()).toBe(false)
+  })
+
+  it('**已取消**的对公订单不显示导出入口（Q168 / SC-222）', async () => {
+    // 取消后后端 waiting 仍可能为 true —— 只看 waiting 会给出「看起来仍可付款」的凭证
+    const w = await mountDetail(waitingOrder({ status: OrderStatus.CANCELED }))
+
+    expect(w.find(EXPORT_PDF).exists()).toBe(false)
+  })
+
+  it('确认收款后（waiting=false）仍可导出留档（US72）', async () => {
+    const w = await mountDetail(
+      detail({
+        status: OrderStatus.UNDELIVERED,
+        payOrderId: 9001,
+        offlinePay: { ...OFFLINE, waiting: false },
+      }),
+    )
+
+    expect(w.find(EXPORT_PDF).exists()).toBe(true)
+  })
+
+  it('点击入口调用导出函数（FR-586）', async () => {
+    const d = waitingOrder()
+    const w = await mountDetail(d)
+
+    await w.get(EXPORT_PDF).trigger('click')
+    await flushPromises()
+
+    expect(exportOfflinePayPdf).toHaveBeenCalledTimes(1)
+    expect(exportOfflinePayPdf.mock.calls[0][0]).toMatchObject({ id: d.id, no: d.no })
+  })
+
+  it('生成期间按钮禁用并显示「生成中…」（FR-595）', async () => {
+    let resolveExport: () => void = () => undefined
+    exportOfflinePayPdf.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { resolveExport = resolve }),
+    )
+    const w = await mountDetail(waitingOrder())
+
+    await w.get(EXPORT_PDF).trigger('click')
+    await Promise.resolve()
+
+    expect(w.get(EXPORT_PDF).attributes('disabled')).toBeDefined()
+    expect(w.get(EXPORT_PDF).text()).toContain('生成中')
+
+    resolveExport()
+    await flushPromises()
+    expect(w.get(EXPORT_PDF).attributes('disabled')).toBeUndefined()
+  })
+
+  it('导出失败时给出可读提示且不崩溃（FR-595）', async () => {
+    exportOfflinePayPdf.mockRejectedValueOnce(new Error('boom'))
+    const w = await mountDetail(waitingOrder())
+
+    await w.get(EXPORT_PDF).trigger('click')
+    await flushPromises()
+
+    expect(w.text()).toContain('生成 PDF 失败，请稍后重试')
+    expect(w.find(EXPORT_PDF).exists()).toBe(true)
+    expect(w.get(EXPORT_PDF).attributes('disabled')).toBeUndefined()
   })
 })
 

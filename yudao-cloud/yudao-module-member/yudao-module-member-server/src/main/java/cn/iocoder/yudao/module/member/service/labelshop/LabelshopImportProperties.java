@@ -30,5 +30,7 @@ public class LabelshopImportProperties {
     private int readTimeoutMs = 60_000;
     /** 每批刷新计数/用量的条数 */
     private int batchSize = 20;
+    /** LabelShop 图片 OSS 前缀（导入时按文件名取图，写入共享空间的图片内容） */
+    private String imageBaseUrl = "https://cvsimg.oss-cn-beijing.aliyuncs.com/li/";
 
 }

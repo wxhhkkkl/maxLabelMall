@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   agentDisplayName,
   buildAgentCreateReq,
+  canUseInvoice,
   payPollingAction,
   paymentModeLabel,
   validateAgentOrder
@@ -65,6 +66,36 @@ describe('agentOrder', () => {
       paymentMode: 'offline'
     })
     expect(offline.payChannelCode).toBe('offline')
+  })
+
+  it('023：开启开票时请求体带 invoice，关闭时不带', () => {
+    const invoice = {
+      type: 1,
+      titleKind: 1,
+      titleName: '南京路桥机械有限公司',
+      taxNo: '91320104660690975E'
+    }
+    const withInvoice = buildAgentCreateReq({
+      userId: 1,
+      items: [{ skuId: 11, count: 1 }],
+      paymentMode: 'wx_native',
+      invoice
+    })
+    expect(withInvoice.invoice).toEqual(invoice)
+
+    const without = buildAgentCreateReq({
+      userId: 1,
+      items: [{ skuId: 11, count: 1 }],
+      paymentMode: 'wx_native'
+    })
+    expect(without.invoice).toBeUndefined()
+  })
+
+  it('023：实付 0 元不能开票', () => {
+    expect(canUseInvoice(undefined)).toBe(false)
+    expect(canUseInvoice(null)).toBe(false)
+    expect(canUseInvoice({ price: { payPrice: 0 } })).toBe(false)
+    expect(canUseInvoice({ price: { payPrice: 1 } })).toBe(true)
   })
 
   it('支付方式文案', () => {

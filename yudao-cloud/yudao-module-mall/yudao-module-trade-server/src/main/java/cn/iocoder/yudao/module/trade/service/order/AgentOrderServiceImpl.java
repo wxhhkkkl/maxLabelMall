@@ -90,6 +90,8 @@ public class AgentOrderServiceImpl implements AgentOrderService {
         createReqVO.setAddressId(settlement.getAddress() != null ? settlement.getAddress().getId() : null);
         createReqVO.setRemark(reqVO.getUserRemark());
         createReqVO.setPayChannelCode(reqVO.getPayChannelCode());
+        // 023：开票申请原样交给 createOrder0 —— 与订单同一事务落库、校验由 InvoiceValidator 裁决
+        createReqVO.setInvoice(reqVO.getInvoice());
         // 3. 创建订单（写 agent_user_id + 来源 40 + ADMIN_AGENT_CREATE 日志）
         TradeOrderDO order = tradeOrderUpdateService.createOrderByAdmin(
                 operatorUserId, reqVO.getUserId(), createReqVO);

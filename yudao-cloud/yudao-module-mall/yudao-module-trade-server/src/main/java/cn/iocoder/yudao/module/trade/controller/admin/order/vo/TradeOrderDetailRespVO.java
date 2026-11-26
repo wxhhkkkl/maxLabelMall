@@ -52,6 +52,14 @@ public class TradeOrderDetailRespVO extends TradeOrderBaseVO {
     private TradeOrderInvoiceRespVO invoice;
 
     /**
+     * 是否企业授权订单（023）：订单快照 `maxlabel_org_id` 非空。
+     *
+     * 后台代申请发票时据此禁用「个人」抬头（FR-296）；服务端仍会独立校验。
+     */
+    @Schema(description = "是否企业授权订单（代申请发票时须用企业抬头）", example = "true")
+    private Boolean enterprise;
+
+    /**
      * 推广用户信息
      */
     private MemberUserRespVO brokerageUser;

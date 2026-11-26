@@ -96,6 +96,8 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
     @Resource
     private LabelshopImportContentWriter contentWriter;
     @Resource
+    private LabelshopImageImporter imageImporter;
+    @Resource
     private ShareSpaceService spaceService;
     @Resource
     private ShareFolderService folderService;
@@ -295,6 +297,8 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
         long personalBytes = 0L;
         long enterpriseBytes = 0L;
         List<String> sourceErrors = new ArrayList<>();
+        List<String> imageWarnings = new ArrayList<>();
+        Map<String, LabelshopImageImporter.ImageData> imageCache = new HashMap<>();
         LabelshopSession session;
         boolean reloginUsed = false;
         try {
@@ -373,7 +377,7 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
                 } else {
                     try {
                         long size = importOne(session, enumeration, item, source,
-                                task.getOwnerMemberId(), task.getOrgId(), folderId);
+                                task.getOwnerMemberId(), task.getOrgId(), folderId, imageCache, imageWarnings);
                         success++;
                         if (Objects.equals(source.getTargetScope(), SCOPE_PERSONAL)) {
                             personalBytes += size;
@@ -389,7 +393,7 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
                         reloginUsed = true;
                         try {
                             long size = importOne(session, enumeration, item, source,
-                                    task.getOwnerMemberId(), task.getOrgId(), folderId);
+                                    task.getOwnerMemberId(), task.getOrgId(), folderId, imageCache, imageWarnings);
                             success++;
                             if (Objects.equals(source.getTargetScope(), SCOPE_PERSONAL)) {
                                 personalBytes += size;
@@ -428,15 +432,17 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
             taskStore.updateCounters(taskId, total, processed, success, skip, fail,
                     personalBytes, enterpriseBytes, PHASE_FINISH);
             refreshUsed(task);
+            List<String> finishErrors = new ArrayList<>(sourceErrors);
+            finishErrors.addAll(imageWarnings);
             if (abortReason != null) {
                 taskStore.finish(taskId, LabelshopImportTaskStore.STATUS_FAILED,
-                        joinErrors(abortReason, sourceErrors));
+                        joinErrors(abortReason, finishErrors));
             } else if (total == 0 && !sourceErrors.isEmpty()) {
                 taskStore.finish(taskId, LabelshopImportTaskStore.STATUS_FAILED,
-                        joinErrors(null, sourceErrors));
+                        joinErrors(null, finishErrors));
             } else {
                 taskStore.finish(taskId, LabelshopImportTaskStore.STATUS_DONE,
-                        sourceErrors.isEmpty() ? null : joinErrors(null, sourceErrors));
+                        finishErrors.isEmpty() ? null : joinErrors(null, finishErrors));
             }
         } catch (LabelshopLoginException ex) {
             taskStore.finish(taskId, LabelshopImportTaskStore.STATUS_FAILED, "历史系统登录失败，请检查账号密码");
@@ -458,7 +464,9 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
 
     private long importOne(LabelshopSession session, LabelshopEnumerationResult enumeration,
                            LabelshopImportItemDO item, LabelshopSourceItem source,
-                           Long ownerMemberId, Long orgId, Long folderId) {
+                           Long ownerMemberId, Long orgId, Long folderId,
+                           Map<String, LabelshopImageImporter.ImageData> imageCache,
+                           List<String> imageWarnings) {
         String content;
         if ("cloud-json".equals(source.getFormat())) {
             LabelshopSts sts = enumeration.getSts();
@@ -479,13 +487,25 @@ public class LabelshopImportServiceImpl implements LabelshopImportService {
             content = cloudConverter.convert(content);
             format = "lsdx";
         }
+        Long targetFolderId = Objects.equals(source.getTargetScope(), SCOPE_ENTERPRISE)
+                ? folderId
+                : folderService.resolvePersonalFolder(ownerMemberId, source.getSourceCategory());
+        // .lsdx 里的 LabelShop 外链图片：写入图片空间并内嵌进模板；图片失败只记警告，不阻断模板
+        if ("lsdx".equals(format)) {
+            LabelshopImageImporter.Result imageResult = imageImporter.rewrite(content,
+                    new LabelshopImageImporter.Target(
+                            source.getTargetScope() == null ? SCOPE_PERSONAL : source.getTargetScope(),
+                            ownerMemberId,
+                            Objects.equals(source.getTargetScope(), SCOPE_ENTERPRISE) ? orgId : null,
+                            targetFolderId, source.getSourceCategory()),
+                    imageCache);
+            content = imageResult.content();
+            imageWarnings.addAll(imageResult.warnings());
+        }
         int size = content.getBytes(StandardCharsets.UTF_8).length;
         if (size > shareProperties.getContentMaxBytes()) {
             throw new LabelshopTemplateException("超过 16 MB");
         }
-        Long targetFolderId = Objects.equals(source.getTargetScope(), SCOPE_ENTERPRISE)
-                ? folderId
-                : folderService.resolvePersonalFolder(ownerMemberId, source.getSourceCategory());
         contentWriter.write(item, source, content, ownerMemberId, orgId, targetFolderId, format);
         return size;
     }

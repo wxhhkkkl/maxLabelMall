@@ -43,6 +43,7 @@
           :step="0.1"
           class="w-100%"
           controls-position="right"
+          @change="onSalesPriceChange(row, $event)"
         />
       </template>
     </el-table-column>
@@ -338,6 +339,23 @@ const imagePreview = (imgUrl: string) => {
     zIndex: 9999999,
     urlList: [imgUrl]
   })
+}
+
+/** 价格是否还没填（空 / null / 0） */
+const isBlankPrice = (value?: number | string | null): boolean => {
+  if (value === null || value === undefined || value === '') return true
+  const num = Number(value)
+  return Number.isFinite(num) && num === 0
+}
+
+/**
+ * 2026-11-25：运营只填销售价时，市场价 / 成本价未填则自动补齐为同价。
+ * ⚠️ 已单独填过的值**不覆盖**：运营可能刻意让市场价更高、成本价更低。
+ */
+const onSalesPriceChange = (row: Sku, value?: number) => {
+  if (value === null || value === undefined) return
+  if (isBlankPrice(row.marketPrice)) row.marketPrice = value
+  if (isBlankPrice(row.costPrice)) row.costPrice = value
 }
 
 /** 批量添加 */

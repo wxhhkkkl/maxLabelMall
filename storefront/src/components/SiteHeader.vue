@@ -348,7 +348,11 @@ function isActive(name: string): boolean {
           class="m-login"
           to="/account"
         >
-          {{ userStore.headerLabel || '个人中心' }}
+          <span class="m-login-title">个人中心</span>
+          <span
+            v-if="userStore.headerLabel"
+            class="m-login-phone"
+          >{{ userStore.headerLabel }}</span>
         </RouterLink>
         <RouterLink
           class="header-member-level"

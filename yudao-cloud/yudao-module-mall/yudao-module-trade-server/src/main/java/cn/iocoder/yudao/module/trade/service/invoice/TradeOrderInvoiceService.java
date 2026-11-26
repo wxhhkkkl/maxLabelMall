@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.trade.service.invoice;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.AdminTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
@@ -36,6 +37,18 @@ public interface TradeOrderInvoiceService {
      * @param reqVO  含 orderId 的开票信息
      */
     Long createInvoiceByMember(Long userId, AppTradeOrderInvoiceCreateReqVO reqVO);
+
+    /**
+     * 后台代客户**补申请**发票（023）—— 适用于所有订单（不限于代客订单）
+     *
+     * 校验与 C 端补开一致（已支付 / 实付 > 0 / 未取消 / 一单一条 / 抬头矩阵），
+     * 额外要求企业授权订单必须使用企业抬头；成功后写一条 `ADMIN_APPLY_INVOICE` 订单日志。
+     *
+     * @param operatorUserId 操作人（后台账号，写审计日志用）
+     * @param reqVO          含 orderId 的开票信息
+     * @return 申请编号
+     */
+    Long createInvoiceByAdmin(Long operatorUserId, AdminTradeOrderInvoiceCreateReqVO reqVO);
 
     /**
      * 按订单查询开票申请（订单详情用）

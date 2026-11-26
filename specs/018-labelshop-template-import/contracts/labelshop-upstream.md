@@ -168,6 +168,22 @@ Headers:
 - HTTP 非 200 → 该条失败；继续其余条目。
 - 正文为 LabelShop 私有 JSON（`docid/lfrm/pfrm/dbs/...`），**原样归档**，不解析成 LabelDoc。
 
+### 4.3 模板外链图片（公开 GET，2026-11-26）
+
+模板正文里的 `<picture type="1" file="labelshop:\\codingv\<name>">` 指向 LabelShop 图片空间。
+**不签名、不依赖 STS**，直接公开读取：
+
+```text
+GET https://cvsimg.oss-cn-beijing.aliyuncs.com/li/<name>
+等价：http://i.codingv.com/li/<name>
+```
+
+- 基地址可配置：`yudao.maxlabel.labelshop.image-base-url`（默认上述 OSS）。
+- 实测 `200 / image/png / 3461 字节 / 92×85`（与 LabelShop 本地缓存缩略图 MD5 一致）；
+  当前 OSS 只有缩略图，原图地址不在本期。
+- 只接受 PNG / JPEG / GIF / BMP / WebP（按魔数判断）；非图片、404、超过 16 MB → 记警告，模板照常导入。
+- 子路径非法（`.` / `..`）→ 视为非 LabelShop 图片，不下载。
+
 ---
 
 ## 5. 会话与错误策略

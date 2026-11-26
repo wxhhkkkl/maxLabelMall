@@ -199,10 +199,59 @@
       ></iframe>
     </div>
 
+    <!-- 商品详情 -->
+    <el-descriptions class="od-section" title="商品详情">
+      <!-- 打印商品明细（2026-11-18）：独立窗口，随货/拣货用，只打商品与数量 -->
+      <template #extra>
+        <el-button
+          v-hasPermi="['trade:order:query']"
+          size="small"
+          type="primary"
+          plain
+          @click="handlePrintItems"
+        >
+          打印商品明细
+        </el-button>
+      </template>
+      <el-descriptions-item labelClassName="no-colon">
+        <el-row :gutter="20">
+          <el-col :span="15">
+            <el-table :data="formData.items" border>
+              <el-table-column label="商品" prop="spuName" width="auto">
+                <template #default="{ row }">
+                  {{ row.spuName }}
+                  <el-tag v-for="property in row.properties" :key="property.propertyId">
+                    {{ property.propertyName }}: {{ property.valueName }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="商品原价" prop="price" width="150">
+                <template #default="{ row }">{{ fenToYuan(row.price) }}元</template>
+              </el-table-column>
+              <el-table-column label="数量" prop="count" width="100" />
+              <el-table-column label="合计" prop="payPrice" width="150">
+                <template #default="{ row }">{{ fenToYuan(row.payPrice) }}元</template>
+              </el-table-column>
+              <el-table-column label="售后状态" prop="afterSaleStatus" width="120">
+                <template #default="{ row }">
+                  <dict-tag
+                    :type="DICT_TYPE.TRADE_ORDER_ITEM_AFTER_SALE_STATUS"
+                    :value="row.afterSaleStatus"
+                  />
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-col>
+          <el-col :span="10" />
+        </el-row>
+      </el-descriptions-item>
+    </el-descriptions>
+
     <!--
       发票详情（006 / 2026-11-18 四列归总）
       发票信息字段最多，拆成「发票信息 / 开票资料」两列，与「支付信息 / 其他信息」并排共四列；
       开票 / 修改发票信息按钮放在整个区块的最下方左侧（不占列宽）。
+      2026-11-20 所有者要求：整块降到「商品详情」之后（先看商品再看发票）。
     -->
     <div class="od-section invoice-block">
       <div class="invoice-block-title">发票详情</div>
@@ -278,56 +327,22 @@
           <el-button v-if="canEditInvoice" @click="openInvoiceEdit">修改发票信息</el-button>
         </div>
       </template>
-      <div v-else class="invoice-empty">该订单未申请开票</div>
-    </div>
-
-    <!-- 商品详情 -->
-    <el-descriptions class="od-section" title="商品详情">
-      <!-- 打印商品明细（2026-11-18）：独立窗口，随货/拣货用，只打商品与数量 -->
-      <template #extra>
+      <div v-else class="invoice-empty">
+        该订单未申请开票
+        <!-- 023：后台代客户补申请（所有订单；已支付 / 未取消 / 实付 > 0 / 尚无申请） -->
         <el-button
-          v-hasPermi="['trade:order:query']"
+          v-if="canApplyInvoiceByAdmin"
+          id="applyInvoiceByAdmin"
+          v-hasPermi="['trade:order:update']"
+          class="ml-10px"
           size="small"
           type="primary"
-          plain
-          @click="handlePrintItems"
+          @click="openInvoiceCreate"
         >
-          打印商品明细
+          代申请发票
         </el-button>
-      </template>
-      <el-descriptions-item labelClassName="no-colon">
-        <el-row :gutter="20">
-          <el-col :span="15">
-            <el-table :data="formData.items" border>
-              <el-table-column label="商品" prop="spuName" width="auto">
-                <template #default="{ row }">
-                  {{ row.spuName }}
-                  <el-tag v-for="property in row.properties" :key="property.propertyId">
-                    {{ property.propertyName }}: {{ property.valueName }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="商品原价" prop="price" width="150">
-                <template #default="{ row }">{{ fenToYuan(row.price) }}元</template>
-              </el-table-column>
-              <el-table-column label="数量" prop="count" width="100" />
-              <el-table-column label="合计" prop="payPrice" width="150">
-                <template #default="{ row }">{{ fenToYuan(row.payPrice) }}元</template>
-              </el-table-column>
-              <el-table-column label="售后状态" prop="afterSaleStatus" width="120">
-                <template #default="{ row }">
-                  <dict-tag
-                    :type="DICT_TYPE.TRADE_ORDER_ITEM_AFTER_SALE_STATUS"
-                    :value="row.afterSaleStatus"
-                  />
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-col>
-          <el-col :span="10" />
-        </el-row>
-      </el-descriptions-item>
-    </el-descriptions>
+      </div>
+    </div>
 
     <!--
       订单发货（2026-11-18 所有者要求）：待发货订单**直接在页面上填**，不再点「发货」二次开弹窗。
@@ -540,6 +555,21 @@
   <OrderAgentAfterSaleForm ref="agentAfterSaleFormRef" @success="getDetail" />
   <InvoiceIssueForm ref="invoiceIssueFormRef" @success="getDetail" />
   <InvoiceEditForm ref="invoiceEditFormRef" @success="getDetail" />
+
+  <!-- 023：后台代客户补申请发票 -->
+  <Dialog v-model="invoiceCreateOpen" title="代客户申请发票" width="620px">
+    <InvoiceFieldsForm
+      ref="invoiceCreateFieldsRef"
+      :form="invoiceCreateForm"
+      :disable-personal="formData.enterprise"
+    />
+    <template #footer>
+      <el-button @click="invoiceCreateOpen = false">取消</el-button>
+      <el-button :loading="invoiceCreateSaving" type="primary" @click="submitInvoiceCreate">
+        提交
+      </el-button>
+    </template>
+  </Dialog>
 </template>
 <script lang="ts" setup>
 import * as TradeOrderApi from '@/api/mall/trade/order'
@@ -553,7 +583,10 @@ import OrderUpdatePriceForm from '@/views/mall/trade/order/form/OrderUpdatePrice
 import OrderAgentAfterSaleForm from '@/views/mall/trade/order/form/OrderAgentAfterSaleForm.vue'
 import InvoiceIssueForm from '@/views/mall/trade/invoice/InvoiceIssueForm.vue'
 import InvoiceEditForm from '@/views/mall/trade/invoice/InvoiceEditForm.vue'
-import { INVOICE_STATUS, orderInvoiceAction } from '@/utils/invoice'
+import InvoiceFieldsForm from '@/views/mall/trade/invoice/InvoiceFieldsForm.vue'
+import type { InvoiceApplyFields } from '@/api/mall/trade/invoice'
+import * as TradeOrderInvoiceApi from '@/api/mall/trade/invoice/index'
+import { INVOICE_STATUS, canAdminApplyInvoice, orderInvoiceAction } from '@/utils/invoice'
 import { checkPermi } from '@/utils/permission'
 import * as DeliveryExpressApi from '@/api/mall/trade/delivery/express'
 import { useTagsViewStore } from '@/store/modules/tagsView'
@@ -695,6 +728,50 @@ const openInvoiceIssue = () => {
     return
   }
   invoiceIssueFormRef.value?.open(formData.value.invoice)
+}
+
+/** 023：后台代客户补申请发票（所有订单；条件见 `canAdminApplyInvoice`） */
+const invoiceCreateOpen = ref(false)
+const invoiceCreateSaving = ref(false)
+const invoiceCreateFieldsRef = ref<InstanceType<typeof InvoiceFieldsForm>>()
+const emptyInvoiceFields = (): InvoiceApplyFields => ({
+  type: 1,
+  titleKind: 1,
+  titleName: '',
+  taxNo: '',
+  titleAddress: '',
+  titlePhone: '',
+  bankName: '',
+  bankAccount: '',
+  bankCode: '',
+  email: ''
+})
+const invoiceCreateForm = ref<InvoiceApplyFields>(emptyInvoiceFields())
+const canApplyInvoiceByAdmin = computed(() => canAdminApplyInvoice(formData.value))
+const openInvoiceCreate = async () => {
+  invoiceCreateForm.value = emptyInvoiceFields()
+  invoiceCreateOpen.value = true
+  await nextTick()
+  invoiceCreateFieldsRef.value?.clearValidate()
+}
+const submitInvoiceCreate = async () => {
+  try {
+    await invoiceCreateFieldsRef.value?.validate()
+  } catch {
+    return
+  }
+  invoiceCreateSaving.value = true
+  try {
+    await TradeOrderInvoiceApi.createInvoiceByAdmin({
+      orderId: formData.value.id!,
+      ...invoiceCreateForm.value
+    })
+    message.success('已代客户申请发票')
+    invoiceCreateOpen.value = false
+    await getDetail()
+  } finally {
+    invoiceCreateSaving.value = false
+  }
 }
 
 /** 改开票信息：只有**待开票**的申请能改（已开票的票面文件已经生成） */

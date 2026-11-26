@@ -45,7 +45,7 @@
 | # | 决策 |
 |---|---|
 | R113 | 管理端代客下单复用 `settlementOrder` + `createOrder(userId=目标客户)`；新增 `createOrderByAdmin(operatorUserId, customerUserId, reqVO)`，订单同时写 `agent_user_id` 与来源 `ADMIN_AGENT` |
-| R114 | 代客下单强制 `couponId=null`、`pointStatus=false`，不传 `customization` / `invoice`；商品范围、库存、企业权限全部沿用现有服务端校验；**隐藏定制 SKU/SPU 显式拒绝**（`CustomizationConstants.HIDDEN_SKU_ID` / `HIDDEN_SPU_ID`），避免落到通用价格错误；实物单无地址抛专用错误 |
+| R114 | 代客下单强制 `couponId=null`、`pointStatus=false`，不传 `customization`；商品范围、库存、企业权限全部沿用现有服务端校验；**隐藏定制 SKU/SPU 显式拒绝**（`CustomizationConstants.HIDDEN_SKU_ID` / `HIDDEN_SPU_ID`），避免落到通用价格错误；实物单无地址抛专用错误。（**`invoice` 已由 023 放开**：下单可带、后台可补申请） |
 | R115 | 支付发起新增 `POST /trade/order/agent-pay`，服务端白名单只允许 `wx_native` / `alipay_pc`；新增 `PayOrderApi#submitOrder`，避免前端直连 `/pay/order/submit` 时误用 `mock` |
 | R116 | 对公转账复用 `payChannelCode=offline`：不建在线支付单，订单进「待收款」，财务走现有确认收款 |
 | R117 | 归属只存 `agent_user_id`（后台用户编号），不冗余昵称；列表/详情用 `AdminUserApi.getUserMap` 解析，账号删除时前端显示 `后台用户#{id}` |

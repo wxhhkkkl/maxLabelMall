@@ -3,8 +3,10 @@ package cn.iocoder.yudao.module.trade.service.invoice;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.AdminTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
@@ -15,8 +17,12 @@ import cn.iocoder.yudao.module.trade.dal.dataobject.invoice.TradeOrderInvoiceDO;
 import cn.iocoder.yudao.module.trade.dal.dataobject.order.TradeOrderDO;
 import cn.iocoder.yudao.module.trade.dal.mysql.invoice.TradeOrderInvoiceMapper;
 import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
+import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderOperateTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
+import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
+import cn.iocoder.yudao.module.trade.service.order.bo.TradeOrderLogCreateReqBO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -58,6 +64,35 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
     private TradeOrderInvoiceMapper invoiceMapper;
     @Resource
     private TradeOrderMapper orderMapper;
+    @Resource
+    private TradeOrderLogService tradeOrderLogService;
+
+    @Override
+    public Long createInvoiceByAdmin(Long operatorUserId, AdminTradeOrderInvoiceCreateReqVO reqVO) {
+        // 1. 订单存在且未删除（后台代申请不分归属，但假删除的订单按不存在处理）
+        TradeOrderDO order = orderMapper.selectById(reqVO.getOrderId());
+        if (order == null || Boolean.TRUE.equals(order.getUserDeleted())) {
+            throw exception(ORDER_NOT_FOUND);
+        }
+        // 2. 与客户补开相同的三道校验（已支付 / 实付 > 0 / 未取消）
+        validateSupplementInvoice(order);
+        // 3. 企业授权订单必须企业抬头（FR-296）。用订单快照 `maxlabel_org_id`，
+        //    不受商品当前配置变化影响；titleKind 为空时交给 InvoiceValidator 报"抬头类型"错误
+        if (order.getMaxlabelOrgId() != null && reqVO.getTitleKind() != null
+                && !InvoiceTitleKindEnum.COMPANY.getKind().equals(reqVO.getTitleKind())) {
+            throw exception(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED);
+        }
+        // 4. 一单一条 + 抬头矩阵 + 落库
+        Long id = doCreateInvoice(order, reqVO);
+        // 5. 审计（FR-607）：直接写订单日志，不依赖 AOP 切面 —— 本方法不改变订单状态
+        tradeOrderLogService.createOrderLog(new TradeOrderLogCreateReqBO()
+                .setUserId(operatorUserId).setUserType(UserTypeEnum.ADMIN.getValue())
+                .setOrderId(order.getId())
+                .setBeforeStatus(order.getStatus()).setAfterStatus(order.getStatus())
+                .setOperateType(TradeOrderOperateTypeEnum.ADMIN_APPLY_INVOICE.getType())
+                .setContent(TradeOrderOperateTypeEnum.ADMIN_APPLY_INVOICE.getContent()));
+        return id;
+    }
 
     @Override
     public Long createInvoice(TradeOrderDO order, AppInvoiceApplyBaseVO invoice) {
@@ -88,21 +123,28 @@ public class TradeOrderInvoiceServiceImpl implements TradeOrderInvoiceService {
                 || Boolean.TRUE.equals(order.getUserDeleted())) {
             throw exception(ORDER_NOT_FOUND);
         }
-        // 2. 已支付
+        // 2. 其余校验与后台代申请共用（已支付 / 实付 > 0 / 未取消）
+        validateSupplementInvoice(order);
+        // 3. 一单一条 + 抬头校验 + 落库（与下单路径共用同一段代码）
+        return doCreateInvoice(order, reqVO);
+    }
+
+    /**
+     * 补开（客户自助 / 后台代申请）共用的三道校验。
+     *
+     * ⚠️ 实付 > 0 与下单路径**刻意不同**：那里是"忽略"（订单照下），这里是"拒绝"
+     *    （订单已经存在了，给个明确理由就好）。
+     */
+    private void validateSupplementInvoice(TradeOrderDO order) {
         if (!Boolean.TRUE.equals(order.getPayStatus())) {
             throw exception(INVOICE_ORDER_NOT_PAID);
         }
-        // 3. 实付 > 0 —— ⚠️ 与下单路径**刻意不同**：那里是"忽略"（订单照下），
-        //    这里是"拒绝"（订单已经存在了，给个明确理由就好）
         if (order.getPayPrice() == null || order.getPayPrice() <= 0) {
             throw exception(INVOICE_ORDER_AMOUNT_ZERO);
         }
-        // 4. 未取消：已支付之后又被取消（全额退款）的订单，票不该再开
         if (TradeOrderStatusEnum.isCanceled(order.getStatus())) {
             throw exception(INVOICE_ORDER_CANCELED);
         }
-        // 5. 一单一条 + 抬头校验 + 落库（与下单路径共用同一段代码）
-        return doCreateInvoice(order, reqVO);
     }
 
     /**

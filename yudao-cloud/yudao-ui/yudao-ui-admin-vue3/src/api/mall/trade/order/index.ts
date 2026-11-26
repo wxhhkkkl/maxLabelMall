@@ -1,5 +1,5 @@
 import request from '@/config/axios'
-import type { TradeOrderInvoiceVO } from '@/api/mall/trade/invoice'
+import type { InvoiceApplyFields, TradeOrderInvoiceVO } from '@/api/mall/trade/invoice'
 
 export interface OrderVO {
   // ========== 订单基本信息 ==========
@@ -87,6 +87,8 @@ export interface OrderVO {
   invoiceType?: number | null
   /** 开票申请详情（006）；未申请为 null */
   invoice?: TradeOrderInvoiceVO | null
+  /** 是否企业授权订单（023）：代申请发票时须用企业抬头 */
+  enterprise?: boolean
   /** 是否已在ERP系统开单（运营手工维护；2026-11-10） */
   erpCreated?: boolean
   /** ERP系统单号；未开单为 null */
@@ -419,6 +421,8 @@ export interface AgentCreateReq extends AgentSettlementReq {
   userRemark?: string
   /** 不传 = 在线支付；offline = 对公转账 */
   payChannelCode?: string | null
+  /** 开票申请（023）：不传 = 不开票 */
+  invoice?: InvoiceApplyFields
 }
 
 export interface AgentCreateResp {

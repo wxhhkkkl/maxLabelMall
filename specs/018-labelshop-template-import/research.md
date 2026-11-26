@@ -150,6 +150,9 @@
 - 登录 `md5Upper(password)`；解析 `datas.token`/`datas.id`，回退 `cvstoken`/`cvsuid` cookie；
 - Exec 只允许 4 个只读过程，签名 `MD5(executetype=0&proc=...&procparams=...&time=... + token)`；
 - STS + OSS V1 签名（HMAC-SHA1）读取 `lp/{uuid}.json`；缩略图 `.png` 不下载（016 无字段）；
+- 模板正文里的外链图片（`labelshop:\\codingv\<name>`）取自公开图片 OSS
+  `https://cvsimg.oss-cn-beijing.aliyuncs.com/li/<name>`（实测 200，无需 STS；基地址可配置），
+  写入 016 图片内容后内嵌回模板正文（2026-11-26，Q148~Q151）；
 - 单条请求超时：连接 30s / 读取 60s；不做自动重试（除会话重登一次）。
 
 **Rationale**：Python 脚本已验证协议；服务端不能依赖 Windows WMI 与本地客户端版本。

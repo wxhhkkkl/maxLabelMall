@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   INVOICE_STATUS,
   INVOICE_STATUS_OPTIONS,
+  canAdminApplyInvoice,
   canIssue,
   hasRefund,
   invoiceFileName,
@@ -23,6 +24,17 @@ describe('管理端 · 开票申请状态', () => {
     expect(INVOICE_STATUS_OPTIONS.map((o) => o.label)).toEqual(['待开票', '已开票', '已作废'])
     // 筛选选项必须覆盖全部三个状态
     expect(INVOICE_STATUS_OPTIONS.map((o) => o.value)).toEqual([0, 10, 20])
+  })
+
+  it('023：只有已支付、未取消、实付 > 0、尚无发票的订单可后台代申请', () => {
+    const ok = { payStatus: true, status: 10, payPrice: 100, invoice: null }
+    expect(canAdminApplyInvoice(ok)).toBe(true)
+    expect(canAdminApplyInvoice({ ...ok, invoice: undefined })).toBe(true)
+    // 已有申请（含已作废）不再给入口：一单一条
+    expect(canAdminApplyInvoice({ ...ok, invoice: { id: 1 } })).toBe(false)
+    expect(canAdminApplyInvoice({ ...ok, payStatus: false })).toBe(false)
+    expect(canAdminApplyInvoice({ ...ok, payPrice: 0 })).toBe(false)
+    expect(canAdminApplyInvoice({ ...ok, status: 40 })).toBe(false)
   })
 
   it('订单退过款 → 要提示（部分退款时申请的金额与订单净额不再一致）', () => {

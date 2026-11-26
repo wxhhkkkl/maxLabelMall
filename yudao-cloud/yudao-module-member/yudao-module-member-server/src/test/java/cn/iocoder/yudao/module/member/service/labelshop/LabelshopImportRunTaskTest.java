@@ -76,6 +76,7 @@ public class LabelshopImportRunTaskTest {
     @Mock private LabelshopClient client;
     @Mock private LabelshopSourceEnumerator enumerator;
     @Mock private LabelshopImportContentWriter contentWriter;
+    @Mock private LabelshopImageImporter imageImporter;
     @Mock private ShareFolderService folderService;
     @Mock private CloudJsonToLsdxConverter cloudConverter;
     @Mock private ShareSpaceService spaceService;
@@ -107,6 +108,8 @@ public class LabelshopImportRunTaskTest {
         lenient().when(orgService.getOrg(ORG_ID)).thenReturn(org(0));
         lenient().when(shareProperties.getContentMaxBytes()).thenReturn(16L * 1024 * 1024);
         lenient().when(labelshopProperties.getBatchSize()).thenReturn(20);
+        lenient().when(imageImporter.rewrite(anyString(), any(), any())).thenAnswer(invocation ->
+                new LabelshopImageImporter.Result(invocation.getArgument(0), List.of()));
         lenient().doAnswer(invocation -> {
             ((Runnable) invocation.getArgument(0)).run();
             return null;
@@ -361,6 +364,29 @@ public class LabelshopImportRunTaskTest {
         verify(contentWriter).write(any(), any(), any(),
                 eq(OWNER_ID), eq(ORG_ID), eq(600L), eq("lsdx"));
         verify(taskStore).finish(eq(TASK_ID), eq(LabelshopImportTaskStore.STATUS_DONE), any());
+    }
+
+    @Test
+    void runTask_surfacesImageWarningsWithoutFailingTemplate() {
+        when(client.login("user", "pwd")).thenReturn(session());
+        LabelshopEnumerationResult result = result(
+                item(12, "p1", "我的模板库", "P1", "lsdx", 1, OWNER_ID));
+        when(enumerator.enumerate(any(), eq(ORG_ID), eq(OWNER_ID))).thenReturn(result);
+        when(client.getTemplate(any(), eq("p1"), eq(12))).thenReturn("<xml/>");
+        when(imageImporter.rewrite(anyString(), any(), any())).thenReturn(
+                new LabelshopImageImporter.Result("<xml/>", List.of("图片 logo.png 导入失败：HTTP 404")));
+        when(folderService.resolvePersonalFolder(OWNER_ID, "我的模板库")).thenReturn(600L);
+        when(contentWriter.write(any(), any(), any(), eq(OWNER_ID), eq(ORG_ID), eq(600L), eq("lsdx")))
+                .thenReturn(1L);
+
+        service.start(ORG_ID, "user", "pwd", true, 1L, "op");
+
+        verify(contentWriter, times(1)).write(any(), any(), any(),
+                eq(OWNER_ID), eq(ORG_ID), eq(600L), eq("lsdx"));
+        verify(taskStore).finish(eq(TASK_ID), eq(LabelshopImportTaskStore.STATUS_DONE),
+                argThat(message -> message != null && message.contains("logo.png")));
+        verify(taskStore).updateCounters(eq(TASK_ID), eq(1), eq(1), eq(1), eq(0), eq(0),
+                anyLong(), anyLong(), eq("FINISH"));
     }
 
     @Test

@@ -4,9 +4,9 @@
       <el-form-item label="应付金额(总)">
         <el-input v-model="formData.payPrice" disabled />
       </el-form-item>
-      <el-form-item label="订单调价">
+      <el-form-item label="累计调价">
         <el-input-number v-model="formData.adjustPrice" :precision="2" :step="0.1" class="w-100%" />
-        <el-tag class="ml-10px" type="warning">订单调价。 正数，加价；负数，减价</el-tag>
+        <el-tag class="ml-10px" type="warning">累计调价金额。 正数，加价；负数，减价</el-tag>
       </el-form-item>
       <el-form-item label="调价后">
         <el-input v-model="formData.newPayPrice" disabled />
@@ -32,18 +32,16 @@ const dialogVisible = ref(false) // 弹窗的是否展示
 const formLoading = ref(false) // 表单的加载中：1）修改时的数据加载；2）提交的按钮禁用
 const formData = ref({
   id: undefined as number | undefined, // 订单编号
-  adjustPrice: 0, // 订单调价
-  payPrice: '', // 应付金额(总)
+  adjustPrice: 0, // 累计调价（元）
+  payPrice: '', // 当前应付金额(总)
+  originPayPrice: 0, // 未调价前的应付金额(元) = 当前应付 - 当前累计调价
   newPayPrice: '' // 调价后应付金额(总)
 })
 watch(
   () => formData.value.adjustPrice,
   (adjustPrice) => {
-    const numMatch = formData.value.payPrice.match(/\d+(\.\d+)?/)
-    if (numMatch) {
-      const payPriceNum = parseFloat(numMatch[0])
-      formData.value.newPayPrice = (payPriceNum + adjustPrice).toFixed(2) + '元'
-    }
+    formData.value.newPayPrice =
+      (formData.value.originPayPrice + (adjustPrice || 0)).toFixed(2) + '元'
   }
 )
 
@@ -53,8 +51,10 @@ const formRef = ref() // 表单 Ref
 const open = async (row: TradeOrderApi.OrderVO) => {
   resetForm()
   formData.value.id = row.id!
-  // 设置数据
-  formData.value.adjustPrice = Number(formatToFraction(row.adjustPrice!))
+  // 设置数据：adjustPrice 是**累计调价总额**，回填后再次提交表示「调整到这个总额」
+  const adjustPrice = Number(formatToFraction(row.adjustPrice || 0))
+  formData.value.originPayPrice = Number(formatToFraction(row.payPrice || 0)) - adjustPrice
+  formData.value.adjustPrice = adjustPrice
   formData.value.payPrice = floatToFixed2(row.payPrice!) + '元'
   formData.value.newPayPrice = formData.value.payPrice
   dialogVisible.value = true
@@ -67,7 +67,12 @@ const submitForm = async () => {
   // 提交请求
   formLoading.value = true
   try {
-    const { payPrice: _payPrice, newPayPrice: _newPayPrice, ...data } = cloneDeep(unref(formData))
+    const {
+      payPrice: _payPrice,
+      originPayPrice: _originPayPrice,
+      newPayPrice: _newPayPrice,
+      ...data
+    } = cloneDeep(unref(formData))
     data.adjustPrice = convertToInteger(data.adjustPrice)
     await TradeOrderApi.updateOrderPrice(data)
     message.success(t('common.updateSuccess'))
@@ -83,8 +88,9 @@ const submitForm = async () => {
 const resetForm = () => {
   formData.value = {
     id: undefined, // 订单编号
-    adjustPrice: 0, // 订单调价
-    payPrice: '', // 应付金额(总)
+    adjustPrice: 0, // 累计调价（元）
+    payPrice: '', // 当前应付金额(总)
+    originPayPrice: 0, // 未调价前的应付金额(元)
     newPayPrice: '' // 调价后应付金额(总)
   }
   formRef.value?.resetFields()

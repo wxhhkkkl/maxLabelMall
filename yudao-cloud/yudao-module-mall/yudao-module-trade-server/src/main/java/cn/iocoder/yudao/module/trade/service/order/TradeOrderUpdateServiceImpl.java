@@ -1018,23 +1018,26 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
         if (order.getPayStatus()) {
             throw exception(ORDER_UPDATE_PRICE_FAIL_PAID);
         }
-        // 1.2 校验调价金额是否变化
-        if (order.getAdjustPrice() > 0) {
-            throw exception(ORDER_UPDATE_PRICE_FAIL_ALREADY);
+        // 1.2 调价金额没有变化时，直接返回（避免重复提交、重复记日志）
+        //     ⚠️ reqVO.adjustPrice 是**累计调价总额**，不是本次增减额：
+        //     同一订单可以多次改价，后端按「新累计值 - 当前累计值」的差额更新。
+        if (ObjectUtil.equal(reqVO.getAdjustPrice(), order.getAdjustPrice())) {
+            return;
         }
-        // 1.3 支付价格不能为 0
-        int newPayPrice = order.getPayPrice() + reqVO.getAdjustPrice();
+        // 1.3 计算本次调价差额，并校验调整后的支付价格不能为 0
+        int adjustPrice = reqVO.getAdjustPrice() - order.getAdjustPrice();
+        int newPayPrice = order.getPayPrice() + adjustPrice;
         if (newPayPrice <= 0) {
             throw exception(ORDER_UPDATE_PRICE_FAIL_PRICE_ERROR);
         }
 
-        // 2. 更新订单
+        // 2. 更新订单（adjustPrice 存累计值，payPrice 按差额增减）
         tradeOrderMapper.updateById(new TradeOrderDO().setId(order.getId())
-                .setAdjustPrice(reqVO.getAdjustPrice() + order.getAdjustPrice()).setPayPrice(newPayPrice));
+                .setAdjustPrice(reqVO.getAdjustPrice()).setPayPrice(newPayPrice));
 
-        // 3. 更新 TradeOrderItem，需要做 adjustPrice 的分摊
+        // 3. 更新 TradeOrderItem，需要做 adjustPrice（本次差额）的分摊
         List<TradeOrderItemDO> orderOrderItems = tradeOrderItemMapper.selectListByOrderId(order.getId());
-        List<Integer> dividePrices = TradePriceCalculatorHelper.dividePrice2(orderOrderItems, reqVO.getAdjustPrice());
+        List<Integer> dividePrices = TradePriceCalculatorHelper.dividePrice2(orderOrderItems, adjustPrice);
         List<TradeOrderItemDO> updateItems = new ArrayList<>();
         for (int i = 0; i < orderOrderItems.size(); i++) {
             TradeOrderItemDO item = orderOrderItems.get(i);
@@ -1053,10 +1056,10 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
             payOrderApi.updatePayOrderPrice(order.getPayOrderId(), newPayPrice).checkError();
         }
 
-        // 5. 记录订单日志
+        // 5. 记录订单日志（调整价格记**本次差额**，便于逐次追溯）
         TradeOrderLogUtils.setOrderInfo(order.getId(), order.getStatus(), order.getStatus(),
                 MapUtil.<String, Object>builder().put("oldPayPrice", MoneyUtils.fenToYuanStr(order.getPayPrice()))
-                        .put("adjustPrice", MoneyUtils.fenToYuanStr(reqVO.getAdjustPrice()))
+                        .put("adjustPrice", MoneyUtils.fenToYuanStr(adjustPrice))
                         .put("newPayPrice", MoneyUtils.fenToYuanStr(newPayPrice)).build());
     }
 

@@ -13,7 +13,7 @@ public class TradeOrderUpdatePriceReqVO {
     @NotNull(message = "订单编号不能为空")
     private Long id;
 
-    @Schema(description = "订单调价，单位：分。正数，加价；负数，减价", requiredMode = Schema.RequiredMode.REQUIRED, example = "-100")
+    @Schema(description = "订单累计调价，单位：分。正数，加价；负数，减价；与当前累计值相同表示不调价", requiredMode = Schema.RequiredMode.REQUIRED, example = "-100")
     @NotNull(message = "订单调价价格不能为空")
     private Integer adjustPrice;
 

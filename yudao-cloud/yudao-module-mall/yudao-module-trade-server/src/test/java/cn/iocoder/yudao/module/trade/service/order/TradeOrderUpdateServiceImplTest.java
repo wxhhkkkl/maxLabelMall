@@ -70,6 +70,7 @@ import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServic
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
@@ -565,6 +566,66 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
             assertEquals(9L, order.getAgentUserId());
             assertEquals(TerminalEnum.ADMIN_AGENT.getTerminal(), order.getTerminal());
         }
+    }
+
+    /**
+     * 023：代客下单的发票走 createOrder0 既有的同一事务 —— 必须原样交给 invoiceService。
+     */
+    @Test
+    public void testCreateOrderByAdmin_passesInvoiceToSameTransaction() {
+        when(productSubscriptionPlanApi.getBySkuId(302L)).thenReturn(CommonResult.success(null));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-AGENT-INV");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockPersonalPrice();
+
+        AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
+        invoice.setType(1);
+        invoice.setTitleKind(1);
+        invoice.setTitleName("测试企业");
+        invoice.setTaxNo("91320104660690975E");
+        AppTradeOrderCreateReqVO reqVO = personalCreateReq();
+        reqVO.setInvoice(invoice);
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            orderService.createOrderByAdmin(9L, 88L, reqVO);
+        }
+
+        verify(tradeOrderInvoiceService).createInvoice(any(TradeOrderDO.class), eq(invoice));
+    }
+
+    /**
+     * 023 / SC-225：发票校验失败时订单必须一起回滚（同一事务）。
+     */
+    @Test
+    public void testCreateOrderByAdmin_invoiceFailure_rollsBackOrder() {
+        when(productSubscriptionPlanApi.getBySkuId(302L)).thenReturn(CommonResult.success(null));
+        when(tradeNoRedisDAO.generate(any())).thenReturn("NO-AGENT-INV-FAIL");
+        when(payOrderApi.createOrder(any())).thenReturn(CommonResult.success(1L));
+        mockPersonalPrice();
+        doThrow(new ServiceException(INVOICE_ORDER_AMOUNT_ZERO))
+                .when(tradeOrderInvoiceService).createInvoice(any(), any());
+
+        AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
+        invoice.setType(1);
+        invoice.setTitleKind(1);
+        invoice.setTitleName("测试企业");
+        invoice.setTaxNo("91320104660690975E");
+        AppTradeOrderCreateReqVO reqVO = personalCreateReq();
+        reqVO.setInvoice(invoice);
+
+        try (MockedStatic<ServletUtils> servletUtils = mockStatic(ServletUtils.class);
+             MockedStatic<WebFrameworkUtils> webFrameworkUtils = mockStatic(WebFrameworkUtils.class)) {
+            servletUtils.when(ServletUtils::getClientIP).thenReturn("127.0.0.1");
+            webFrameworkUtils.when(WebFrameworkUtils::getTerminal).thenReturn(0);
+
+            assertThrows(ServiceException.class, () -> orderService.createOrderByAdmin(9L, 88L, reqVO));
+        }
+
+        assertEquals(0L, tradeOrderMapper.selectCountByUserIdAndStatus(88L, null, null));
     }
 
     @Test
@@ -1089,6 +1150,56 @@ public class TradeOrderUpdateServiceImplTest extends BaseDbUnitTest {
         assertEquals(order.getPayPrice() - 1000,
                 tradeOrderMapper.selectById(order.getId()).getPayPrice());
         verify(payOrderApi).updatePayOrderPrice(7788L, order.getPayPrice() - 1000);
+    }
+
+    // ==================== 累计调价语义（2026-11-25）：未支付订单可多次改价 ====================
+
+    /**
+     * `reqVO.adjustPrice` 是**累计调价总额**，不是本次增减额：
+     * 第二次提交 -5 元表示「总调价 -5 元」，按差额 +5 元更新，不会重复扣款。
+     */
+    @Test
+    public void testUpdateOrderPrice_cumulative_adjustsByDifference() {
+        when(payOrderApi.updatePayOrderPrice(any(), any())).thenReturn(CommonResult.success(true));
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNPAID.getStatus(),
+                PayChannelEnum.WX_LITE.getCode(), 7788L, LocalDateTime.now());
+        int originPayPrice = order.getPayPrice();
+
+        // 第 1 次：累计调价 -10 元
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), -1000));
+        // 第 2 次：累计调价 -5 元 → 本次差额 +5 元（旧实现会再减 5 元）
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), -500));
+
+        TradeOrderDO updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals(-500, updated.getAdjustPrice());
+        assertEquals(originPayPrice - 500, updated.getPayPrice());
+        // 订单项同样按差额累计
+        TradeOrderItemDO orderItem = tradeOrderItemMapper.selectListByOrderId(order.getId()).get(0);
+        assertEquals(-500, orderItem.getAdjustPrice());
+        assertEquals(originPayPrice - 500, orderItem.getPayPrice());
+        // 支付单同步两次的新金额
+        verify(payOrderApi).updatePayOrderPrice(7788L, originPayPrice - 1000);
+        verify(payOrderApi).updatePayOrderPrice(7788L, originPayPrice - 500);
+
+        // 第 3 次：累计调回 0 元，应付金额回到原价
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), 0));
+        updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals(0, updated.getAdjustPrice());
+        assertEquals(originPayPrice, updated.getPayPrice());
+    }
+
+    /** 提交的累计调价与当前一致：不更新、不调支付单（避免重复提交产生重复扣款） */
+    @Test
+    public void testUpdateOrderPrice_sameCumulative_noop() {
+        TradeOrderDO order = createOrder(TradeOrderStatusEnum.UNPAID.getStatus(),
+                PayChannelEnum.WX_LITE.getCode(), 7788L, LocalDateTime.now());
+
+        orderService.updateOrderPrice(updatePriceReq(order.getId(), 0));
+
+        TradeOrderDO updated = tradeOrderMapper.selectById(order.getId());
+        assertEquals(0, updated.getAdjustPrice());
+        assertEquals(order.getPayPrice(), updated.getPayPrice());
+        verify(payOrderApi, never()).updatePayOrderPrice(any(), any());
     }
 
 }

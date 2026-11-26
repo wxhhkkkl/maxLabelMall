@@ -171,6 +171,9 @@ describe('SiteHeader —— 静态结构', () => {
     const w = await mountLoggedIn()
     const mLogin = w.find('.mobile-nav .m-login')
     expect(mLogin.attributes('href')).toBe('/account')
+    // 2026-11-25 所有者要求：手机上要**明确显示「个人中心」**——
+    // 只显示脱敏手机号时，用户看不出那是个人中心入口。
+    expect(mLogin.text()).toContain('个人中心')
     // 顶栏按**脱敏手机号**展示（所有者 2026-10-16 指定；脱敏是 FR-016 的 MUST）
     expect(mLogin.text()).toContain('138****8888')
   })
@@ -264,6 +267,8 @@ describe('SiteHeader —— 登录态（T072 追加；随 US2 交付）', () => 
     const w = mountHeader()
     await flushPromises()
     expect(w.get('.login').text().trim()).not.toBe('')
+    // 手机端同样要有明确的「个人中心」文字（不依赖手机号是否拉得到）
+    expect(w.get('.mobile-nav .m-login').text()).toContain('个人中心')
   })
 
   it('退出登录后立即恢复未登录态', async () => {

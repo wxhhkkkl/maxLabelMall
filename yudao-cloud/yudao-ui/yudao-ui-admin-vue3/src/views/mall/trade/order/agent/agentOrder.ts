@@ -1,3 +1,4 @@
+import type { InvoiceApplyFields } from '@/api/mall/trade/invoice'
 import type { AgentCreateReq, AgentOrderItem } from '@/api/mall/trade/order'
 
 /** 支付方式：两种真实扫码 + 对公转账 */
@@ -70,14 +71,22 @@ export function buildAgentCreateReq(params: {
   addressId?: number
   userRemark?: string
   paymentMode: AgentPaymentMode
+  /** 023：不传 = 不开票 */
+  invoice?: InvoiceApplyFields
 }): AgentCreateReq {
   return {
     userId: params.userId,
     items: params.items.map((item) => ({ skuId: item.skuId, count: item.count })),
     addressId: params.addressId,
     userRemark: params.userRemark || undefined,
-    payChannelCode: params.paymentMode === 'offline' ? 'offline' : undefined
+    payChannelCode: params.paymentMode === 'offline' ? 'offline' : undefined,
+    invoice: params.invoice
   }
+}
+
+/** 023：结算后实付 > 0 才允许开票（0 元订单的发票没有意义） */
+export function canUseInvoice(settlement?: { price?: { payPrice?: number } } | null): boolean {
+  return !!settlement && (settlement.price?.payPrice ?? 0) > 0
 }
 
 /** 代下单人展示：昵称优先；账号不存在时用编号兜底 */

@@ -43,6 +43,13 @@ vi.mock('@/api/mall/trade/order', () => ({
   pickUpOrder: vi.fn(),
   updateOrderErp: vi.fn()
 }))
+const createInvoiceByAdmin = vi.fn()
+vi.mock('@/api/mall/trade/invoice/index', () => ({
+  createInvoiceByAdmin: (...a: unknown[]) => createInvoiceByAdmin(...a),
+  getInvoicePage: vi.fn(),
+  issueInvoice: vi.fn(),
+  updateInvoice: vi.fn()
+}))
 const getSimpleDeliveryExpressList = vi.fn()
 vi.mock('@/api/mall/trade/delivery/express', () => ({
   getSimpleDeliveryExpressList: (...a: unknown[]) => getSimpleDeliveryExpressList(...a)
@@ -131,6 +138,8 @@ beforeEach(() => {
   getExpressMapUrl.mockResolvedValue('')
   updateOrderRemark.mockReset()
   updateOrderRemark.mockResolvedValue(true)
+  createInvoiceByAdmin.mockReset()
+  createInvoiceByAdmin.mockResolvedValue(88)
   checkPermi.mockReset()
   checkPermi.mockReturnValue(true)
 })
@@ -444,16 +453,16 @@ describe('后台订单详情 —— 发票详情', () => {
     expect(w.text()).not.toContain('修改发票信息')
   })
 
-  it('区块顺序：发票详情、商品详情紧跟在收货信息之后（2026-11-16 所有者要求）', async () => {
+  it('区块顺序：商品详情、发票详情紧跟在收货信息之后（2026-11-16 要求，2026-11-20 交换为商品在前）', async () => {
     const w = await mountDetail(order({ invoiceStatus: 0, invoice }))
 
     // 发票详情已从 el-descriptions 换成三列区块（2026-11-18），顺序断言要把它也算进来
     const sections = w.findAll('.el-descriptions, .invoice-block').map((section) => section.text())
     const indexOf = (title: string) => sections.findIndex((text) => text.includes(title))
     expect(indexOf('收货信息')).toBeGreaterThanOrEqual(0)
-    expect(indexOf('收货信息')).toBeLessThan(indexOf('发票详情'))
-    expect(indexOf('发票详情')).toBeLessThan(indexOf('商品详情'))
-    expect(indexOf('商品详情')).toBeLessThan(indexOf('订单状态'))
+    expect(indexOf('收货信息')).toBeLessThan(indexOf('商品详情'))
+    expect(indexOf('商品详情')).toBeLessThan(indexOf('发票详情'))
+    expect(indexOf('发票详情')).toBeLessThan(indexOf('订单状态'))
   })
 
   it('未申请开票：显示「未申请开票」，没有开票按钮', async () => {
@@ -463,6 +472,62 @@ describe('后台订单详情 —— 发票详情', () => {
     const invoiceSection = w.find('.invoice-block')
     expect(invoiceSection.exists()).toBe(true)
     expect(invoiceSection.findAll('button')).toHaveLength(0)
+  })
+
+  // ==================== 023 代申请发票 ====================
+
+  it('023：未申请且已支付的订单显示「代申请发票」，提交后刷新详情', async () => {
+    const w = await mountDetail(
+      order({ status: 10, payStatus: true, invoiceStatus: null, invoice: null })
+    )
+
+    const button = w.get('#applyInvoiceByAdmin')
+    expect(button.text()).toContain('代申请发票')
+
+    await button.trigger('click')
+    await flushPromises()
+    await w.get('input[placeholder="公司名或个人名"]').setValue('南京路桥机械有限公司')
+    await w.get('input[placeholder*="15 / 18"]').setValue('91320104660690975E')
+    const submit = w.findAll('button').find((b) => b.text() === '提交')
+    expect(submit, '找不到提交按钮').toBeTruthy()
+    await submit!.trigger('click')
+    await flushPromises()
+
+    expect(createInvoiceByAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 1,
+        titleName: '南京路桥机械有限公司',
+        taxNo: '91320104660690975E'
+      })
+    )
+    // 成功后重新拉详情（服务端为准）
+    expect(getOrder).toHaveBeenCalledTimes(2)
+  })
+
+  it('023：未支付 / 已取消 / 实付 0 / 已有发票 → 不显示代申请入口', async () => {
+    const cases = [
+      { status: 0, payStatus: false },
+      { status: 40, payStatus: true },
+      { status: 10, payStatus: true, payPrice: 0 },
+      { status: 10, payStatus: true, invoice: { ...invoice } }
+    ]
+    for (const over of cases) {
+      const w = await mountDetail(order({ invoiceStatus: null, invoice: null, ...over }))
+      expect(w.find('#applyInvoiceByAdmin').exists(), JSON.stringify(over)).toBe(false)
+    }
+  })
+
+  it('023：企业授权订单的代申请弹窗禁用「个人」抬头', async () => {
+    const w = await mountDetail(
+      order({ status: 10, payStatus: true, invoiceStatus: null, invoice: null, enterprise: true })
+    )
+
+    await w.get('#applyInvoiceByAdmin').trigger('click')
+    await flushPromises()
+
+    const personal = w.findAll('.el-radio').find((radio) => radio.text().includes('个人'))
+    expect(personal).toBeTruthy()
+    expect(personal!.classes()).toContain('is-disabled')
   })
 })
 

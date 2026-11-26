@@ -8,6 +8,8 @@
  * **筛选下拉的选项**与两个判定 —— 不在前端再维护一份"状态 → 文案"的映射。
  */
 
+import { TradeOrderStatusEnum } from './constants'
+
 export const INVOICE_STATUS = {
   WAITING: 0,
   ISSUED: 10,
@@ -70,6 +72,26 @@ export function orderInvoiceAction(status?: number | null): string | null {
     return '重新上传发票'
   }
   return null
+}
+
+/**
+ * 023：后台能否为这笔订单**代申请发票**（入口显示条件）
+ *
+ * 与后端 `createInvoiceByAdmin` 的校验一一对应：已支付 / 未取消 / 实付 > 0 / 尚无申请。
+ * 前端只用来"不给点了必被拒的按钮"，服务端仍是权威。
+ */
+export function canAdminApplyInvoice(order: {
+  invoice?: unknown | null
+  payStatus?: boolean
+  status?: number | null
+  payPrice?: number | null
+}): boolean {
+  return (
+    !order.invoice &&
+    order.payStatus === true &&
+    order.status !== TradeOrderStatusEnum.CANCELED.status &&
+    (order.payPrice ?? 0) > 0
+  )
 }
 
 /**

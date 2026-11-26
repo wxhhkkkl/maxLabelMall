@@ -38,6 +38,24 @@ export interface TradeOrderInvoiceVO {
   createTime?: Date // 申请时间
 }
 
+/**
+ * 开票申请字段（023）：与 C 端结算/补开、后端 `AppInvoiceApplyBaseVO` 同一套
+ *
+ * ⚠️ 必填矩阵由服务端 `InvoiceValidator` 裁决；前端校验只是提前提示。
+ */
+export interface InvoiceApplyFields {
+  type?: number // 1 普票 / 2 专票 / 3 收据
+  titleKind?: number // 1 企业 / 2 个人
+  titleName?: string
+  taxNo?: string
+  titleAddress?: string
+  titlePhone?: string
+  bankName?: string
+  bankAccount?: string
+  bankCode?: string
+  email?: string
+}
+
 /** 获得开票申请分页（待开票列表只含已支付订单的申请） */
 export const getInvoicePage = async (params: PageParam & { status?: number; orderNo?: string }) => {
   return await request.get<PageResult<TradeOrderInvoiceVO[]>>({ url: '/trade/order-invoice/page', params })
@@ -60,4 +78,14 @@ export const issueInvoice = async (id: number, fileUrl: string) => {
  */
 export const updateInvoice = async (data: TradeOrderInvoiceVO) => {
   return await request.put({ url: '/trade/order-invoice/update', data })
+}
+
+/**
+ * 后台代客户补申请发票（023）
+ *
+ * 适用于**所有订单**（不限于代客订单）；权限复用 `trade:order:update`。
+ * 服务端校验：已支付 / 实付 > 0 / 未取消 / 一单一条 / 抬头矩阵 / 企业单必须企业抬头。
+ */
+export const createInvoiceByAdmin = async (data: InvoiceApplyFields & { orderId: number }) => {
+  return await request.post<number>({ url: '/trade/order-invoice/create', data })
 }

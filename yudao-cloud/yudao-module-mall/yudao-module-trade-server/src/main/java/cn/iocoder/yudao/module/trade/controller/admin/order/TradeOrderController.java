@@ -316,6 +316,8 @@ public class TradeOrderController {
                 memberUserApi.getUser(order.getBrokerageUserId()).getCheckedData() : null;
         List<TradeOrderLogDO> orderLogs = tradeOrderLogService.getOrderLogListByOrderId(id);
         TradeOrderDetailRespVO respVO = TradeOrderConvert.INSTANCE.convert(order, orderItems, orderLogs, user, brokerageUser);
+        // 023：企业授权订单标记，后台代申请发票时前端据此禁用「个人」抬头
+        respVO.setEnterprise(order.getMaxlabelOrgId() != null);
         // 代下单人昵称（017）：账号不存在时为 null，前端显示 后台用户#{id}
         if (order.getAgentUserId() != null) {
             AdminUserRespDTO agentUser = adminUserApi.getUser(order.getAgentUserId()).getData();

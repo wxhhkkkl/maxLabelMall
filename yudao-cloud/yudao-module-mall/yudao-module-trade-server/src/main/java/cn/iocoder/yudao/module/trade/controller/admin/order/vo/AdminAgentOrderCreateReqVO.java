@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.trade.controller.admin.order.vo;
 
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -32,6 +33,16 @@ public class AdminAgentOrderCreateReqVO {
 
     @Schema(description = "支付渠道：仅支持传 offline（对公转账）；不传 = 在线支付", example = "offline")
     private String payChannelCode;
+
+    /**
+     * 开票申请（023）：不传 = 不开票；字段与 C 端结算页完全一致。
+     *
+     * ⚠️ 字段基类刻意与 C 端共用（`AppInvoiceApplyBaseVO`）—— 校验唯一来源是
+     *    `InvoiceValidator`，不要另建一份字段 VO。
+     */
+    @Schema(description = "开票申请；不传表示不开票")
+    @Valid
+    private AppInvoiceApplyBaseVO invoice;
 
     @Data
     @Schema(description = "商品项")

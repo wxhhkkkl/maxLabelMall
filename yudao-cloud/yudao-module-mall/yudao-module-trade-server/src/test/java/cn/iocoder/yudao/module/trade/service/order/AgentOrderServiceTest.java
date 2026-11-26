@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.trade.controller.admin.order.vo.AdminAgentOrderPa
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.AdminAgentOrderPayStatusRespVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.AdminAgentOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.order.vo.TradeOrderCreateRespVO;
+import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.order.vo.AppTradeOrderSettlementRespVO;
@@ -152,6 +153,52 @@ public class AgentOrderServiceTest extends BaseMockitoUnitTest {
         verify(tradeOrderUpdateService).createOrderByAdmin(eq(9L), eq(1L), captor.capture());
         assertEquals("offline", captor.getValue().getPayChannelCode());
         assertNull(resp.getPayOrderId());
+    }
+
+    @Test
+    void createPassesInvoiceToOrderCreation() {
+        // 023：代客下单的发票原样交给 createOrderByAdmin —— 由既有 createOrder0 与订单同一事务落库
+        when(memberUserApi.getUser(1L)).thenReturn(CommonResult.success(user(1L, CommonStatusEnum.ENABLE.getStatus())));
+        when(productSkuApi.getSkuMap(any())).thenReturn(Map.of(11L, sku(11L, 5L)));
+        when(productSpuApi.getSpuMap(any())).thenReturn(Map.of(5L, spu(5L, List.of(3))));
+        when(tradeOrderUpdateService.settlementOrder(anyLong(), any())).thenReturn(settlement(3, null));
+        TradeOrderDO order = TradeOrderDO.builder().id(123L).payPrice(2600).status(0).build();
+        when(tradeOrderUpdateService.createOrderByAdmin(anyLong(), anyLong(), any())).thenReturn(order);
+
+        AppInvoiceApplyBaseVO invoice = new AppInvoiceApplyBaseVO();
+        invoice.setType(1);
+        invoice.setTitleKind(1);
+        invoice.setTitleName("南京路桥机械有限公司");
+        invoice.setTaxNo("91320104660690975E");
+        AdminAgentOrderCreateReqVO reqVO = new AdminAgentOrderCreateReqVO();
+        reqVO.setUserId(1L);
+        reqVO.setItems(List.of(createItem(11L, 1)));
+        reqVO.setInvoice(invoice);
+
+        agentOrderService.create(9L, reqVO);
+
+        ArgumentCaptor<AppTradeOrderCreateReqVO> captor = ArgumentCaptor.forClass(AppTradeOrderCreateReqVO.class);
+        verify(tradeOrderUpdateService).createOrderByAdmin(eq(9L), eq(1L), captor.capture());
+        assertSame(invoice, captor.getValue().getInvoice());
+    }
+
+    @Test
+    void createWithoutInvoicePassesNull() {
+        when(memberUserApi.getUser(1L)).thenReturn(CommonResult.success(user(1L, CommonStatusEnum.ENABLE.getStatus())));
+        when(productSkuApi.getSkuMap(any())).thenReturn(Map.of(11L, sku(11L, 5L)));
+        when(productSpuApi.getSpuMap(any())).thenReturn(Map.of(5L, spu(5L, List.of(3))));
+        when(tradeOrderUpdateService.settlementOrder(anyLong(), any())).thenReturn(settlement(3, null));
+        TradeOrderDO order = TradeOrderDO.builder().id(123L).payPrice(2600).status(0).build();
+        when(tradeOrderUpdateService.createOrderByAdmin(anyLong(), anyLong(), any())).thenReturn(order);
+
+        AdminAgentOrderCreateReqVO reqVO = new AdminAgentOrderCreateReqVO();
+        reqVO.setUserId(1L);
+        reqVO.setItems(List.of(createItem(11L, 1)));
+        agentOrderService.create(9L, reqVO);
+
+        ArgumentCaptor<AppTradeOrderCreateReqVO> captor = ArgumentCaptor.forClass(AppTradeOrderCreateReqVO.class);
+        verify(tradeOrderUpdateService).createOrderByAdmin(eq(9L), eq(1L), captor.capture());
+        assertNull(captor.getValue().getInvoice());
     }
 
     @Test

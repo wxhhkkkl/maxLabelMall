@@ -102,6 +102,18 @@
         </el-form-item>
       </el-form>
 
+      <!-- 023：可选的发票（默认不开；实付 0 元时禁用） -->
+      <div class="mt-15px">
+        <el-checkbox v-model="invoiceEnabled" :disabled="!canInvoice">开具发票</el-checkbox>
+        <span v-if="!canInvoice" class="text-xs text-gray-500 ml-8px">实付 0 元，不能开票</span>
+      </div>
+      <InvoiceFieldsForm
+        v-if="invoiceEnabled"
+        ref="invoiceFieldsRef"
+        :form="invoiceForm"
+        :disable-personal="settlement?.enterprise"
+      />
+
       <div class="text-right">
         <el-button type="primary" :loading="submitting" @click="submit">创建订单</el-button>
       </div>
@@ -127,11 +139,15 @@
 <script lang="ts" setup>
 import { Qrcode } from '@/components/Qrcode'
 import * as TradeOrderApi from '@/api/mall/trade/order'
+import type { InvoiceApplyFields } from '@/api/mall/trade/invoice'
+import InvoiceFieldsForm from '@/views/mall/trade/invoice/InvoiceFieldsForm.vue'
+
 import AgentCustomerSelect from './AgentCustomerSelect.vue'
 import AgentProductSelect from './AgentProductSelect.vue'
 import AgentAddressSelect from './AgentAddressSelect.vue'
 import {
   buildAgentCreateReq,
+  canUseInvoice,
   DELIVERY_TYPE_EXPRESS,
   DELIVERY_TYPE_VIRTUAL,
   payPollingAction,
@@ -156,6 +172,28 @@ const userRemark = ref('')
 const settlement = ref<TradeOrderApi.AgentSettlementResp>()
 const loadingSettlement = ref(false)
 const submitting = ref(false)
+
+// 023：代客下单可直接带发票（默认不开）
+const invoiceEnabled = ref(false)
+const invoiceFieldsRef = ref<InstanceType<typeof InvoiceFieldsForm>>()
+const emptyInvoice = (): InvoiceApplyFields => ({
+  type: 1,
+  titleKind: 1,
+  titleName: '',
+  taxNo: '',
+  titleAddress: '',
+  titlePhone: '',
+  bankName: '',
+  bankAccount: '',
+  bankCode: '',
+  email: ''
+})
+const invoiceForm = ref<InvoiceApplyFields>(emptyInvoice())
+/** 实付为 0 的订单不能开票（服务端同样会忽略） */
+const canInvoice = computed(() => canUseInvoice(settlement.value))
+watch(canInvoice, (ok) => {
+  if (!ok) invoiceEnabled.value = false
+})
 
 const payDialogVisible = ref(false)
 const payTitle = ref('扫码支付')
@@ -186,6 +224,9 @@ const onCustomerSelected = (user: { id: number; nickname?: string; mobile?: stri
   paymentMode.value = undefined
   createdOrderId.value = undefined
   createdKey.value = ''
+  // 换客户：发票信息属于上一笔，清掉避免带错
+  invoiceEnabled.value = false
+  invoiceForm.value = emptyInvoice()
 }
 
 const addLine = (line: AgentOrderLine) => {
@@ -240,6 +281,15 @@ const submit = async () => {
     message.warning(error)
     return
   }
+  // 023：勾选开票时先校验字段；失败由表单红字提示，不发请求
+  if (invoiceEnabled.value) {
+    try {
+      await invoiceFieldsRef.value?.validate()
+    } catch {
+      message.warning('请完善发票信息')
+      return
+    }
+  }
   submitting.value = true
   try {
     // 已创建过且参数没变：页面内重试支付，绝不重复下单（Q130）
@@ -254,7 +304,8 @@ const submit = async () => {
         items: lines.value,
         addressId: addressId.value,
         userRemark: userRemark.value,
-        paymentMode: paymentMode.value!
+        paymentMode: paymentMode.value!,
+        invoice: invoiceEnabled.value ? { ...invoiceForm.value } : undefined
       })
     )
     // 对公转账：订单已是待收款，直接去详情

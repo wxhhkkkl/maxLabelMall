@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.trade.service.invoice;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
+import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.AdminTradeOrderInvoiceCreateReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoicePageReqVO;
 import cn.iocoder.yudao.module.trade.controller.admin.invoice.vo.TradeOrderInvoiceUpdateReqVO;
 import cn.iocoder.yudao.module.trade.controller.app.invoice.vo.AppInvoiceApplyBaseVO;
@@ -13,16 +14,23 @@ import cn.iocoder.yudao.module.trade.dal.mysql.order.TradeOrderMapper;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTitleKindEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.InvoiceTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.invoice.TradeOrderInvoiceStatusEnum;
+import cn.iocoder.yudao.module.trade.enums.order.TradeOrderOperateTypeEnum;
 import cn.iocoder.yudao.module.trade.enums.order.TradeOrderStatusEnum;
+import cn.iocoder.yudao.module.trade.service.order.TradeOrderLogService;
+import cn.iocoder.yudao.module.trade.service.order.bo.TradeOrderLogCreateReqBO;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 import java.util.Map;
 
 import static cn.iocoder.yudao.module.trade.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
 
 /**
  * {@link TradeOrderInvoiceService} 的单元测试 —— **下单时创建申请**（US19 / T379）。
@@ -34,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * ⚠️ 不传 `invoice`（不开票）时**不产生任何记录**（FR-159）—— 这是"默认行为与今天一致"的证据。
  */
-@Import(TradeOrderInvoiceServiceImpl.class)
+@Import({TradeOrderInvoiceServiceImpl.class})
 public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
 
     @Resource
@@ -43,6 +51,9 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
     private TradeOrderInvoiceMapper invoiceMapper;
     @Resource
     private TradeOrderMapper orderMapper;
+    /** 测试库没有 `trade_order_log` 表：审计用 mock 验证调用内容，不写库 */
+    @MockitoBean
+    private TradeOrderLogService tradeOrderLogService;
 
     /** 造一笔**已支付**的订单（`trade_order` 在 H2 里的 NOT NULL 列不少，漏一个就插不进去） */
     private TradeOrderDO createOrder(int payPrice) {
@@ -636,6 +647,104 @@ public class TradeOrderInvoiceServiceImplTest extends BaseDbUnitTest {
         assertEquals(2, invoiceService.getInvoiceListByOrderIds(
                 List.of(order1.getId(), order2.getId(), 9999L)).size());
         assertTrue(invoiceService.getInvoiceListByOrderIds(List.of()).isEmpty());
+    }
+
+    // ==================== 后台代申请（023 / US74） ====================
+
+    /** 企业授权订单：`maxlabel_org_id` 非空（代申请时据此强制企业抬头） */
+    private TradeOrderDO createEnterpriseOrder(int payPrice) {
+        TradeOrderDO order = createOrder(payPrice);
+        TradeOrderDO update = new TradeOrderDO();
+        update.setId(order.getId());
+        update.setMaxlabelOrgId(500L);
+        orderMapper.updateById(update);
+        order.setMaxlabelOrgId(500L);
+        return order;
+    }
+
+    private AdminTradeOrderInvoiceCreateReqVO adminInvoiceReq(Long orderId, AppInvoiceApplyBaseVO base) {
+        AdminTradeOrderInvoiceCreateReqVO reqVO = new AdminTradeOrderInvoiceCreateReqVO();
+        BeanUtils.copyProperties(base, reqVO);
+        reqVO.setOrderId(orderId);
+        return reqVO;
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_success_keepsOrderAndWritesLog() {
+        TradeOrderDO order = createOrder(7800);
+        Integer payPrice = order.getPayPrice();
+        Boolean payStatus = order.getPayStatus();
+        Integer status = order.getStatus();
+
+        Long id = invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice()));
+
+        // 发票记录：归属订单会员、金额取实付、待开票
+        TradeOrderInvoiceDO invoice = invoiceMapper.selectById(id);
+        assertNotNull(invoice);
+        assertEquals(order.getId(), invoice.getOrderId());
+        assertEquals(88L, invoice.getUserId());
+        assertEquals(7800, invoice.getAmount());
+        assertEquals(TradeOrderInvoiceStatusEnum.WAITING.getStatus(), invoice.getStatus());
+
+        // FR-609：订单金额 / 支付状态 / 订单状态都不变
+        TradeOrderDO updated = orderMapper.selectById(order.getId());
+        assertEquals(payPrice, updated.getPayPrice());
+        assertEquals(payStatus, updated.getPayStatus());
+        assertEquals(status, updated.getStatus());
+
+        // FR-607 / SC-229：写一条“后台代客户申请发票”日志，操作人是当前后台账号
+        ArgumentCaptor<TradeOrderLogCreateReqBO> logCaptor = ArgumentCaptor.forClass(TradeOrderLogCreateReqBO.class);
+        verify(tradeOrderLogService).createOrderLog(logCaptor.capture());
+        assertEquals(order.getId(), logCaptor.getValue().getOrderId());
+        assertEquals(9L, logCaptor.getValue().getUserId());
+        assertEquals(TradeOrderOperateTypeEnum.ADMIN_APPLY_INVOICE.getType(),
+                logCaptor.getValue().getOperateType());
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_unpaid_rejected() {
+        TradeOrderDO order = createOrder(7800, false, TradeOrderStatusEnum.UNPAID.getStatus(), 88L);
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice())));
+        assertEquals(INVOICE_ORDER_NOT_PAID.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_zeroAmount_rejected() {
+        TradeOrderDO order = createOrder(0);
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice())));
+        assertEquals(INVOICE_ORDER_AMOUNT_ZERO.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_canceled_rejected() {
+        TradeOrderDO order = createOrder(7800, true, TradeOrderStatusEnum.CANCELED.getStatus(), 88L);
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice())));
+        assertEquals(INVOICE_ORDER_CANCELED.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_duplicate_rejected() {
+        TradeOrderDO order = createOrder(7800);
+        invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice()));
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), normalInvoice())));
+        assertEquals(INVOICE_ORDER_EXISTS.getCode(), e.getCode());
+    }
+
+    @Test
+    public void testCreateInvoiceByAdmin_enterpriseWithPersonalTitle_rejected() {
+        TradeOrderDO order = createEnterpriseOrder(7800);
+
+        ServiceException e = assertThrows(ServiceException.class,
+                () -> invoiceService.createInvoiceByAdmin(9L, adminInvoiceReq(order.getId(), personalInvoice())));
+        assertEquals(ENTERPRISE_ORDER_INVOICE_TITLE_REQUIRED.getCode(), e.getCode());
     }
 
 }

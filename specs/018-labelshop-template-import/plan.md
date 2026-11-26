@@ -116,6 +116,7 @@ yudao-cloud/
 │       │   ├── LabelshopClient.java                    # 只读协议 + OSS 签名
 │       │   ├── LabelshopSourceEnumerator.java          # 12/13/1 枚举
 │       │   ├── LabelshopImportContentWriter.java       # 原样写入 + 明细
+│       │   ├── LabelshopImageImporter.java             # 外链图片下载 + 入库 + 内嵌（Q148~Q151）
 │       │   ├── LabelshopImportTaskStore.java           # 任务/心跳/恢复
 │       │   ├── LabelshopImportProperties.java
 │       │   ├── LabelshopImportExecutorConfig.java      # 专用线程池

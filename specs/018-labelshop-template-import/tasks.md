@@ -478,3 +478,16 @@ Task: "ipcContract.ts + 主进程 saveTextFile"
   `GET /member/share-content/member-folders`；`member-page` 支持 `folderId`
   （空=全部、0=根目录、>0=指定）；前端左右布局，点击文件夹切换筛选，保留「文件夹」列
   per FR-515 / SC-194
+
+## Phase 13: 模板外链图片导入（2026-11-26）
+
+- [x] T083 新增 `LabelshopImageImporter`：解析 `.lsdx` 的 `<picture>`，把
+  `labelshop:\codingv\<name>` 按文件名从图片 OSS 下载（基地址可配置），写入 016 图片内容
+  （`content_type=5`、`storage_type=2`，与模板同 scope / folder / category、归属 OWNER），
+  并改写为内嵌（`type=0` + 正文 base64）；原生 `img=` 转正文；失败 / 非图片 / 超限只记警告；
+  同任务内按「文件夹 + 文件名」缓存下载结果 per Q148~Q151 / FR-516~FR-520
+- [x] T084 接线 `LabelshopImportServiceImpl`：`.lsdx`（含个人云端转换结果）写入前调用图片改写，
+  图片警告并入任务 `errorMessage`；不改模板失败判定与容量闸门 per FR-518 / SC-196
+- [x] T085 补单测：`LabelshopImageImporterTest`（覆盖下载 / 内嵌、非 labelshop 跳过、
+  404 / 非图片、`img` 转正文、同图去重、缓存复用、超限回退、非法 XML、URL 转义、`pname` 缺省）；
+  `LabelshopImportRunTaskTest` 增加图片警告透传用例 per SC-195~SC-197

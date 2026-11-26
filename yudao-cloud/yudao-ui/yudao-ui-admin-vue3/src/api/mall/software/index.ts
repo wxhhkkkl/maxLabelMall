@@ -92,7 +92,8 @@ export interface SoftwareVersionVO {
   fileUrl: string
   objectKey: string
   releaseNotes?: string
-  releaseTime?: string
+  /** ⚠️ epoch 毫秒数（后端全局按时间戳序列化/反序列化 LocalDateTime），不是 "yyyy-MM-dd" 字符串 */
+  releaseTime?: number
   current: boolean
   status: number
   createTime?: string
@@ -126,7 +127,8 @@ export const registerSoftwareVersion = (data: {
   objectKey: string
   fileUrl: string
   releaseNotes?: string
-  releaseTime?: string
+  /** ⚠️ epoch 毫秒数（后端全局按时间戳序列化/反序列化 LocalDateTime），不是 "yyyy-MM-dd" 字符串 */
+  releaseTime?: number
 }) => request.post<number>({ url: '/software/version/register', data })
 
 export const publishSoftwareVersion = (id: number, current = false) =>

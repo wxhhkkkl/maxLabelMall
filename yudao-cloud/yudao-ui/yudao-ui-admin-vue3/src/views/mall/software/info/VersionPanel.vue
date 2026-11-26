@@ -151,7 +151,9 @@ const handleUpload = async () => {
       objectKey: presign.path,
       fileUrl: presign.url,
       releaseNotes: form.releaseNotes,
-      releaseTime: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      // 后端 LocalDateTime 走 TimestampLocalDateTimeDeserializer，只认 epoch 毫秒数；
+      // 发 "yyyy-MM-dd HH:mm:ss" 字符串会被解析成 0，发布日期一律变 1970-01-01
+      releaseTime: Date.now()
     })
     message.success('已登记为草稿，确认无误后请发布')
     form.version = ''

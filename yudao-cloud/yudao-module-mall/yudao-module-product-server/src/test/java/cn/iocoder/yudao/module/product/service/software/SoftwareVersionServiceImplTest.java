@@ -199,6 +199,49 @@ public class SoftwareVersionServiceImplTest extends BaseDbUnitTest {
         // 同上：逻辑删除后 selectById 过滤掉该行，文件与链接仍可用
     }
 
+    /**
+     * 删了再传同一个版本号（2026-11-26 线上 500 的回归用例）
+     *
+     * 唯一索引 uk_version 不含 deleted：软删除的墓碑行仍占着键位，而逻辑删除查询看不见它。
+     * 旧实现先查（看不到墓碑）再插入 → 撞唯一索引 → 全局异常处理返回 500「系统异常」。
+     * 期望：复活那条墓碑、覆盖成新文件，回到草稿，表里仍只有一行。
+     */
+    @Test
+    void reRegisterAfterDeleteRevivesTombstone() {
+        Long first = versionService.registerVersion(version("1.0.1", "windows", "x64"));
+        versionService.deleteVersion(first);
+
+        SoftwareVersionDO again = version("1.0.1", "windows", "x64");
+        again.setFileName("b.exe");
+        again.setObjectKey("software/windows-x64/1.0.1/b.exe");
+        Long revived = versionService.registerVersion(again);
+
+        assertEquals(first, revived);                 // 复用同一行，不再插一条
+        SoftwareVersionDO saved = versionService.getVersion(revived);
+        assertNotNull(saved);
+        assertEquals("b.exe", saved.getFileName());   // 文件信息被新上传覆盖
+        assertEquals(1, saved.getStatus());           // 回到草稿
+        assertNull(saved.getCurrentFlag());
+        assertEquals(1, versionMapper.selectListBySoftwareId(softwareId).size());
+    }
+
+    /**
+     * 删除「当前发布」不能挡住同组合的下一个当前发布
+     *
+     * 墓碑行如果留着 current_flag=1，而 uk_current 又不看 deleted，
+     * 之后任何一个版本设为当前发布都会撞唯一索引 → 误报「已有当前发布版本」。
+     */
+    @Test
+    void deleteCurrentDoesNotBlockNextCurrent() {
+        Long first = versionService.registerVersion(version("1.0.1", "windows", "x64"));
+        versionService.publishVersion(first, true);
+        versionService.deleteVersion(first);
+
+        Long second = versionService.registerVersion(version("1.0.2", "windows", "x64"));
+        assertDoesNotThrow(() -> versionService.publishVersion(second, true));
+        assertEquals(second, versionService.getCurrentVersion(softwareId, "windows", "x64").getId());
+    }
+
     @Test
     void registerForUnknownSoftwareRejected() {
         SoftwareVersionDO v = version("1.0.1", "windows", "x64");

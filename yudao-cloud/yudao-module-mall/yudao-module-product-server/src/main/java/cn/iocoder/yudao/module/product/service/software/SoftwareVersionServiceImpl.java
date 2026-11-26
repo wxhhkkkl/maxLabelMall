@@ -55,7 +55,27 @@ public class SoftwareVersionServiceImpl implements SoftwareVersionService {
         version.setId(null);
         version.setStatus(SoftwareVersionStatusEnum.DRAFT.getStatus());
         version.setCurrentFlag(null);
-        versionMapper.insert(version);
+
+        // uk_version 不含 deleted：软删除的墓碑仍占着键位，而逻辑删除查询看不到它。
+        // 「删了再传同一个版本号」要先把墓碑找出来 —— 还活着就是重复，已删除就复活它。
+        SoftwareVersionDO existing = versionMapper.selectBySkuKeyIncludingDeleted(
+                version.getSoftwareId(), version.getPlatform(), version.getArch(), version.getVersion());
+        if (existing != null) {
+            if (!Boolean.TRUE.equals(existing.getDeleted())) {
+                throw exception(SOFTWARE_VERSION_DUPLICATE);
+            }
+            // 复活墓碑并覆盖成新文件；旧文件仍在对象存储，已发出的旧链接照常可下载（FR-353）
+            version.setId(existing.getId());
+            versionMapper.reviveDeletedVersion(version);
+            return existing.getId();
+        }
+
+        try {
+            versionMapper.insert(version);
+        } catch (DuplicateKeyException e) {
+            // 并发登记同一版本：唯一索引兜底，转成可读的业务错误
+            throw exception(SOFTWARE_VERSION_DUPLICATE);
+        }
         return version.getId();
     }
 
@@ -98,8 +118,9 @@ public class SoftwareVersionServiceImpl implements SoftwareVersionService {
             bizNo = "{{#id}}", success = SOFTWARE_VERSION_DELETE_SUCCESS)
     public void deleteVersion(Long id) {
         validateVersionExists(id);
-        // 软删除：文件与已发出的链接仍然可用（Q87 / FR-353）
-        versionMapper.deleteById(id);
+        // 软删除：文件与已发出的链接仍然可用（Q87 / FR-353）；
+        // 顺手清掉 current_flag —— 墓碑留着 1 会占住 uk_current，挡住同组合的下一个当前发布
+        versionMapper.deleteByIdClearingCurrent(id);
     }
 
     @Override
@@ -158,11 +179,8 @@ public class SoftwareVersionServiceImpl implements SoftwareVersionService {
             log.warn("[registerVersion] 文件地址不在白名单: {}", version.getFileUrl());
             throw exception(SOFTWARE_FILE_INVALID);
         }
-        // 版本号唯一（FR-333）
-        if (versionMapper.selectBySkuKey(version.getSoftwareId(), version.getPlatform(),
-                version.getArch(), version.getVersion()) != null) {
-            throw exception(SOFTWARE_VERSION_DUPLICATE);
-        }
+        // 版本号唯一（FR-333）由 registerVersion 里「含墓碑」的查重负责 ——
+        // 这里不能查，逻辑删除会把墓碑过滤掉，反而放过后面撞索引的插入
         // 回源 HEAD：文件必须真实存在且大小一致（FR-337）
         long remoteSize;
         try {

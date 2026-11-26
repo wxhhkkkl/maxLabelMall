@@ -76,6 +76,33 @@ specs/019-product-browse-level/plan.md
   支付回调在 `/trade/order/update-paid` 按前缀分流（回滚须前后端同时回滚）
   📌 客户**先支付（或 0 元/对公确认）再寄件**；回收地址由后台维护；客户侧不提供自助退款
 
+当前特性（022 对公转账单导出 PDF：门面站仅前端）：
+- specs/022-offline-pay-pdf/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/022-offline-pay-pdf/contracts/pdf-content.md
+  ⚠️ **上线顺序**：无 SQL、无后端改动，只发**门面站**；`storefront` 新增运行时依赖
+  `jspdf` + `html2canvas`（点击导出时才动态加载，首屏体积不变）
+  📌 口径：**所有未取消的对公转账订单**（`offlinePay` 非空且状态不是「已取消」）显示
+  「导出对公转账单」；待收款时用于打款，确认收款后用于留档（Q165~Q168）
+  📌 PDF 内容：收款账户（户名/账号/开户行 + 提示语）、商品清单（名称/规格/单价/数量/小计）、
+  订单号/下单时间/**订单状态**/实付金额、金额明细（商品小计/促销优惠/运费/券/积分/会员优惠/应付）、
+  收货信息、开票信息（已申请且未作废）、买家留言；A4 自动分页，长清单不截断
+  📌 中文以画布图片渲染（文字不可复制），**商品图片不入 PDF**（跨域画布污染）；
+  用户可控文本一律 HTML 转义（商品名/留言/抬头）
+  📌 已取消订单不显示入口：后端 `waiting` 只看「是否确认收款/是否已付」，取消后仍可能为 true
+  📌 回滚：回退门面站本次改动并重新发布；无数据库/后端回滚项
+
+当前特性（023 代客开票：管理端代客户申请发票）：
+- specs/023-agent-invoice/{spec,plan,research,data-model,tasks,quickstart}.md
+- specs/023-agent-invoice/contracts/admin-api.md
+  ⚠️ **上线顺序**：先发**后端**，再发**管理端**；**无 SQL、无新表/列、无新权限点**
+  （接口与按钮复用 `trade:order:update`）
+  📌 口径：代客下单表单可勾选「开具发票」（完整 006 字段，与订单同一事务落库）；
+  后台订单详情可对**所有**已支付、未取消、实付 > 0、尚无发票的订单代客户补申请（Q170~Q172）
+  📌 一单一条；企业授权订单必须企业抬头（订单快照 `maxlabel_org_id`）；0 元订单不能开票；
+  后台代申请写订单日志「后台代客户申请发票」（`ADMIN_APPLY_INVOICE`）
+  📌 修订 017 FR-465「不代客申请发票」；客户仍可在 C 端支付后自助补开
+  📌 回滚：回退后端 + 管理端本次改动；已创建的发票申请属 006 既有数据，不需要清理
+
 📌 **2026-11-18 订单中心一级目录 + 订单列表拆两菜单**（无新表、无加列）：
 - 上线顺序：先执行 `sql/mysql/046-order-center-top-level.sql`（「订单中心」从 MALL 下移到根，
   path 改 `/trade`），再执行 `sql/mysql/047-order-list-split.sql`（订单列表改名「商品订单」+
@@ -123,6 +150,13 @@ specs/019-product-browse-level/plan.md
   `/member/share-content/member-overview|member-page|member-get`，权限 `member:user:query`）
   📌 **2026-11-13 所有者取消强制 HTTPS**（原 FR-507 / Q137）：导入接口 HTTP 与 HTTPS 均可用，
   前端不再按协议禁用；nginx 无需为本功能额外配置 `X-Forwarded-Proto`
+  📌 **2026-11-26 模板外链图片随模板导入（Q148~Q151）**：
+  `<picture type="1" file="labelshop:\\codingv\...">` 按文件名从
+  `https://cvsimg.oss-cn-beijing.aliyuncs.com/li/<name>` 下载（`yudao.maxlabel.labelshop.image-base-url` 可配），
+  写入模板所在文件夹的 016 图片内容（`content_type=5`，宽高取 `srcwidth`/`srcheight` ÷ 100 的 mm）
+  并内嵌为 `type=0` 正文 base64；
+  原生 `img=` 内嵌图也转成正文（桌面端只读正文）。图片失败 / 非图片 / 超限只记警告、不阻断模板；
+  同任务同文件夹同图只下载一次。**无 SQL、无新权限点**；OSS 上目前是缩略图（约 100dpi）
   📌 回滚：把按钮权限 `member:org:labelshop-import` 置为停用/删除即关闭入口（接口变 403）；
   已导入内容保留在 016 空间，2 张导入表保留供审计，不自动删除
 

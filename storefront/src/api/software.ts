@@ -28,7 +28,8 @@ export interface SoftwareVersion {
   arch: string
   fileName: string
   fileSize: number
-  releaseTime?: string
+  /** ⚠️ epoch 毫秒数（后端全局按时间戳序列化 LocalDateTime）。渲染 MUST 过 `utils/time.ts` 的 formatDate */
+  releaseTime?: number
   /** 对象存储的公开永久直链 */
   downloadUrl: string
 }

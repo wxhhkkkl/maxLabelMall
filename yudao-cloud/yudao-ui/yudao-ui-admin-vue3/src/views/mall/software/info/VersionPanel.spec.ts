@@ -85,7 +85,8 @@ describe('版本面板 · 上传时序', () => {
       objectKey: 'software/windows-x64/1.0.23/MaxLabel-Setup-1.0.23.exe',
       fileUrl: 'https://img.yuwangchenfa.com/software/windows-x64/1.0.23/MaxLabel-Setup-1.0.23.exe',
       releaseNotes: '',
-      releaseTime: expect.any(String)
+      // 必须是 epoch 毫秒数：字符串会被后端反序列化成 0 → 1970-01-01
+      releaseTime: expect.any(Number)
     })
   })
 

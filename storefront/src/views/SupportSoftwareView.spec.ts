@@ -62,6 +62,52 @@ describe('服务支持 · 软件与驱动（013 / US49）', () => {
     expect(wrapper.text()).toContain('138.0 MB')
   })
 
+  /**
+   * 发布日期（2026-11-26）
+   *
+   * 后端给的是 **epoch 毫秒数**（`TimestampLocalDateTimeSerializer`），不是字符串。
+   * 旧实现按字符串 `slice(0, 10)`，数字上直接抛 TypeError；而 1970 的历史数据存的是 0，
+   * 恰好被 `v-if` 当成假值吞掉，才没炸出来。所以：数字要格式化，0 不渲染。
+   */
+  it('发布日期按 epoch 毫秒渲染，为 0 时不显示', async () => {
+    listAll.mockResolvedValue([
+      {
+        id: 1,
+        categoryId: 1,
+        title: 'MaxLabel',
+        introduction: '',
+        type: 1,
+        versions: [
+          {
+            version: '1.2.9',
+            platform: 'windows',
+            arch: 'x64',
+            fileName: 'a.exe',
+            fileSize: 1,
+            releaseTime: new Date(2026, 10, 26, 13, 29, 31).getTime(),
+            downloadUrl: 'https://img.yuwangchenfa.com/software/a.exe'
+          },
+          {
+            version: '1.2.9',
+            platform: 'windows',
+            arch: 'x86',
+            fileName: 'b.exe',
+            fileSize: 1,
+            releaseTime: 0,
+            downloadUrl: 'https://img.yuwangchenfa.com/software/b.exe'
+          }
+        ]
+      }
+    ])
+    const wrapper = mount(SupportSoftwareView)
+    await flushPromises()
+
+    const details = wrapper.findAll('.driver-version-detail')
+    expect(details).toHaveLength(2)
+    expect(details[0]!.text()).toContain('2026-11-26')
+    expect(details[1]!.text()).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+  })
+
   it('没有可下载项时给出空态', async () => {
     listAll.mockResolvedValue([])
     const wrapper = mount(SupportSoftwareView)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { listAllSoftware, type SoftwareDetail } from '@/api/software'
+import { formatDate } from '@/utils/time'
 
 const items = ref<SoftwareDetail[]>([])
 const loading = ref(true)
@@ -50,7 +51,7 @@ onMounted(load)
                 <div v-if="item.versions?.length" class="driver-versions">
                   <div v-for="(version, index) in item.versions" :key="version.platform + version.arch + version.version + index" class="driver-version">
                     <div class="driver-version-system"><b>{{ platformLabel(version.platform) }}</b><span>{{ version.arch }}</span></div>
-                    <div class="driver-version-detail"><span>版本 {{ version.version }}</span><span>{{ formatSize(version.fileSize) }}</span><span v-if="version.releaseTime">{{ version.releaseTime.slice(0, 10) }}</span></div>
+                    <div class="driver-version-detail"><span>版本 {{ version.version }}</span><span>{{ formatSize(version.fileSize) }}</span><span v-if="version.releaseTime">{{ formatDate(version.releaseTime) }}</span></div>
                     <a :href="version.downloadUrl" rel="noopener noreferrer" target="_blank" class="download" :aria-label="`下载 ${item.title} ${version.platform} ${version.arch} ${version.version}`">下载 <span aria-hidden="true">↓</span></a>
                   </div>
                 </div><p v-else class="driver-no-version">暂无可用版本</p>

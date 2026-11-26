@@ -7,6 +7,7 @@ import { isNumber } from '@/utils/is'
 import { ElMessage } from 'element-plus'
 import { useLocaleStore } from '@/store/modules/locale'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
+import { pickImageFiles } from './pickImageFiles'
 import merge from 'lodash-es/merge'
 
 defineOptions({ name: 'Editor' })
@@ -46,6 +47,25 @@ const emit = defineEmits(['change', 'update:modelValue'])
 // 使用项目的上传方法，实现逐个文件上传
 const { httpRequest: imageHttpRequest } = useUpload(`${props.directory}-image`)
 const { httpRequest: videoHttpRequest } = useUpload(`${props.directory}-video`)
+
+/** 上传单张图片并插入正文（工具栏上传与自定义「选择文件」共用） */
+const uploadImageFile = async (file: File, insertFn: InsertFnType) => {
+  try {
+    const res = await imageHttpRequest({
+      file: file as any,
+      onProgress: () => {},
+      onSuccess: () => {},
+      onError: () => {}
+    } as any)
+    // 兼容前端直连上传和后端上传两种模式的返回格式
+    const url = (res as any).data?.data || (res as any).data
+    // 第三个参数是 href：传空，详情图就是普通图片，不包一层指向自身的链接
+    insertFn(url, 'image', '')
+  } catch (error: any) {
+    ElMessage.error(error.msg || '图片上传失败')
+    console.error('Upload error:', error)
+  }
+}
 
 // 编辑器实例，必须用 shallowRef
 const editorRef = shallowRef<IDomEditor>()
@@ -135,21 +155,21 @@ const editorConfig = computed((): IEditorConfig => {
           allowedFileTypes: ['image/*'],
 
           // 使用 customUpload 实现逐个文件上传，复用项目的 httpRequest
-          async customUpload(file: File, insertFn: InsertFnType) {
-            try {
-              const res = await imageHttpRequest({
-                file: file as any,
-                onProgress: () => {},
-                onSuccess: () => {},
-                onError: () => {}
-              } as any)
-              // 兼容前端直连上传和后端上传两种模式的返回格式
-              const url = (res as any).data?.data || (res as any).data
-              insertFn(url, 'image', url)
-            } catch (error: any) {
-              ElMessage.error(error.msg || '图片上传失败')
-              console.error('Upload error:', error)
-            }
+          customUpload(file: File, insertFn: InsertFnType) {
+            return uploadImageFile(file, insertFn)
+          },
+          // 自己接管「选择文件」：wangEditor 自带方案是「先 click 再绑 change」，
+          // Edge 下点击会同步阻塞到对话框关闭，选中事件在监听器绑上之前就丢了。
+          customBrowseAndUpload(insertFn: InsertFnType) {
+            pickImageFiles(async (files) => {
+              if (files.length === 0) {
+                ElMessage.error('浏览器没有读取到选中的图片，请重试或换用 Chrome')
+                return
+              }
+              for (const file of files) {
+                await uploadImageFile(file, insertFn)
+              }
+            })
           }
         },
         ['uploadVideo']: {
